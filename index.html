@@ -52,7 +52,7 @@ body {
   margin: 0; background: var(--bg); color: var(--text);
   font: 17px/1.6 var(--font); letter-spacing: -0.011em;
   -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
-  overflow-x: hidden;
+  overflow-x: clip;   /* trims the tilted stripe and photo glow; "hidden" would turn body into a scroll box and stop the menu from sticking */
   transition: background-color .6s, color .6s;
 }
 h1, h2, h3 { font-family: var(--font); font-weight: 700; line-height: 1.05; letter-spacing: -0.03em; margin: 0; text-wrap: balance; }
@@ -147,16 +147,14 @@ section { padding: 120px 0 20px; }
 .chip[aria-pressed="true"] { background: var(--paper); color: var(--text); box-shadow: 0 1px 3px rgba(16,12,40,.12), 0 4px 12px -6px rgba(16,12,40,.2); }
 html[data-theme="night"] .chip[aria-pressed="true"] { background: rgba(255,255,255,.14); box-shadow: none; }
 
-/* ───── Projects (bento grid: a card widens when a row would otherwise have a gap) ───── */
+/* ───── Projects ───── */
 .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
 .card { position: relative; background: var(--paper); border: 1px solid var(--hair); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; cursor: pointer; text-align: left; padding: 0; font: inherit; color: inherit; display: flex; flex-direction: column; transition: transform .5s var(--ease), box-shadow .5s var(--ease), border-color .5s, background .6s; }
 .card:hover { transform: translateY(-6px); box-shadow: var(--shadow-lift); }
 html[data-theme="night"] .card:hover { box-shadow: var(--shadow-lift), 0 18px 60px -22px var(--c); border-color: color-mix(in srgb, var(--c) 40%, transparent); }
 .reveal.in .card { animation: rise .7s var(--ease) backwards; animation-delay: calc(var(--i, 0) * 70ms); }
 .card.hide { display: none; }
-.card.wide { grid-column: span 2; }
 .thumb { aspect-ratio: 16/10; position: relative; overflow: hidden; background: var(--c); }
-.card.wide .thumb { aspect-ratio: 33/10; }
 .thumb canvas { width: 100%; height: 100%; display: block; }
 .tag, .play-badge { position: absolute; top: 14px; border-radius: 999px; padding: 4px 11px; font-size: .74rem; font-weight: 600; letter-spacing: 0; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
 .tag { left: 14px; background: rgba(255,255,255,.8); color: #1D1D1F; }
@@ -206,18 +204,38 @@ html[data-theme="night"] .note .mini-hl { background: linear-gradient(transparen
 .sticky { border: 1px solid color-mix(in srgb, var(--c) 32%, transparent); border-radius: 999px; padding: 9px 16px; font-weight: 500; font-size: .95rem; background: color-mix(in srgb, var(--c) 13%, var(--paper)); color: var(--text); user-select: none; transition: transform .35s var(--spring), background .3s, box-shadow .3s; }
 .sticky:hover { transform: translateY(-3px) scale(1.04); background: color-mix(in srgb, var(--c) 24%, var(--paper)); box-shadow: 0 10px 24px -12px var(--c); }
 
-/* Mineral shelf */
+/* Mineral shelf: Apple-style product tiles. Each specimen floats in its own soft rounded tile with a faint wash of its
+   colour at the bottom; hovering lifts it and sets off sparkles in its colour. Sizes use cqw (percent of the grid's width). */
 .shelf { background: var(--paper); border: 1px solid var(--hair); border-radius: var(--radius); box-shadow: var(--shadow); padding: 26px; transition: background .6s; }
 .shelf h3 { font-size: 1.25rem; font-weight: 650; letter-spacing: -0.02em; margin-bottom: 4px; }
-.shelf p { margin: 0 0 16px; color: var(--muted); font-size: .92rem; }
-.gems { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.gem { position: relative; aspect-ratio: 1; padding: 0; border: 0; border-radius: 16px; overflow: hidden; background: #F4EFE6; cursor: zoom-in; transition: transform .45s var(--spring), box-shadow .3s; }
-.gem:hover, .gem:focus-visible { transform: translateY(-3px) scale(1.04); z-index: 1; box-shadow: 0 14px 30px -14px rgba(16,12,40,.5); }
-html[data-theme="night"] .gem:hover { box-shadow: 0 0 30px -4px var(--gc); }
-.gem img { width: 100%; height: 100%; object-fit: cover; transition: transform .6s var(--ease); }
-.gem:hover img { transform: scale(1.14); }
-.gem .gname { position: absolute; left: 6px; right: 6px; bottom: 6px; background: rgba(16,14,30,.76); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); color: #fff; font-size: .68rem; font-weight: 600; line-height: 1.25; padding: 4px 8px; border-radius: 999px; text-align: center; transform: translateY(160%); transition: transform .3s var(--spring); pointer-events: none; }
-.gem:hover .gname, .gem:focus-visible .gname { transform: none; }
+.shelf > p:not(.placard) { margin: 0 0 16px; color: var(--muted); font-size: .92rem; }
+.gallery { container-type: inline-size; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.gem { position: relative; aspect-ratio: 1 / 1.08; padding: 0; border: 0; border-radius: 18px; cursor: zoom-in; display: flex; align-items: center; justify-content: center; background: var(--fill); -webkit-tap-highlight-color: transparent; }
+.gem:focus-visible { outline-offset: 2px; }
+/* the stone's colour only washes in on hover */
+.gem::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity .4s var(--ease);
+  background: radial-gradient(80% 60% at 50% 100%, color-mix(in srgb, var(--gc) 26%, transparent), transparent 75%); }
+.gem:hover::before, .gem:focus-visible::before { opacity: 1; }
+.gem img { position: relative; z-index: 1; width: auto; height: auto; max-width: 21cqw; max-height: 20cqw; object-fit: contain; transform-origin: 50% 100%; filter: drop-shadow(0 4px 6px rgba(16,12,40,.16)); animation: float 5s ease-in-out infinite; animation-delay: var(--d); transition: transform .55s var(--spring); }
+html[data-theme="night"] .gem img { filter: drop-shadow(0 6px 8px rgba(0,0,0,.45)); }
+.gem:hover img, .gem:focus-visible img { transform: translateY(-6px) rotate(-4deg) scale(1.06); }
+.gem .no { position: absolute; top: 8%; left: 9%; font-size: max(2.3cqw, 8px); font-weight: 600; letter-spacing: .12em; color: var(--muted); opacity: .75; }
+.spark { position: absolute; font-style: normal; font-size: 15px; line-height: 1; color: var(--gc); text-shadow: 0 0 8px var(--gc); opacity: 0; pointer-events: none; }
+.spark:nth-of-type(1) { top: 22%; left: 18%; }
+.spark:nth-of-type(2) { top: 36%; right: 14%; font-size: 10px; }
+.spark:nth-of-type(3) { top: 14%; right: 30%; font-size: 8px; }
+.gem:hover .spark, .gem:focus-visible .spark { animation: twinkle 1.4s ease-in-out infinite; }
+.gem:hover .spark:nth-of-type(2), .gem:focus-visible .spark:nth-of-type(2) { animation-delay: .45s; }
+.gem:hover .spark:nth-of-type(3), .gem:focus-visible .spark:nth-of-type(3) { animation-delay: .9s; }
+.placard { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: start; margin: 14px 2px 0; min-height: 2.9em; font-size: .88rem; line-height: 1.45; color: var(--muted); }
+.placard b { font-size: .7rem; font-weight: 600; letter-spacing: .12em; color: var(--accent); padding-top: .2em; }
+.placard strong { color: var(--text); font-weight: 600; }
+.origin { font-style: normal; white-space: nowrap; font-size: .75rem; font-weight: 600; color: var(--text); background: var(--fill); border-radius: 999px; padding: 2px 10px; }
+.origin:empty { display: none; }
+@media (max-width: 500px) {
+  .placard { grid-template-columns: auto 1fr; }
+  .placard .origin { grid-column: 2; justify-self: start; }
+}
 
 /* Specimen viewer */
 #specimen { width: min(560px, 100% - 32px); }
@@ -226,6 +244,7 @@ html[data-theme="night"] .gem:hover { box-shadow: 0 0 30px -4px var(--gc); }
 .spec-body { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 22px 20px; }
 .spec-body h3 { font-size: 1.35rem; font-weight: 650; }
 .spec-body p { margin: 2px 0 0; color: var(--muted); }
+.spec-body .origin:not(:empty) { display: inline-block; margin-bottom: 6px; }
 .spec-nav { display: flex; gap: 8px; flex: none; }
 .spec-nav button { width: 40px; height: 40px; border-radius: 50%; border: 0; background: var(--fill); color: var(--text); font: 600 1rem var(--font); cursor: pointer; transition: background .2s; }
 .spec-nav button:hover { background: color-mix(in srgb, var(--text) 14%, transparent); }
@@ -235,6 +254,9 @@ html[data-theme="night"] .gem:hover { box-shadow: 0 0 30px -4px var(--gc); }
 .polaroid:hover { transform: translateY(-4px); box-shadow: var(--shadow-lift); }
 .polaroid img { border-radius: 18px; width: 100%; height: auto; object-fit: cover; }
 .polaroid figcaption { font-size: .9rem; font-weight: 500; color: var(--muted); text-align: center; padding-top: 12px; }
+.light-paint { position: relative; aspect-ratio: 16 / 10; border-radius: 18px; overflow: hidden; cursor: crosshair; }
+.light-paint img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; border-radius: 0; }
+.light-paint canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 html[data-theme="night"] .polaroid.lit { box-shadow: 0 0 70px -12px rgba(185,140,255,.55), var(--shadow); }
 
 /* ───── Coffee ───── */
@@ -303,6 +325,9 @@ dialog[open] { animation: pop .5s var(--ease); }
 @keyframes wave { 0%, 60%, 100% { transform: rotate(0); } 10%, 30% { transform: rotate(16deg); } 20%, 40% { transform: rotate(-8deg); } }
 @keyframes halo { to { transform: rotate(28deg) scale(1.1); } }
 @keyframes drift { to { transform: translate(18%, 14%) scale(1.15); } }
+@keyframes float { 50% { translate: 0 -5px; } }
+@keyframes twinkle { 0%, 100% { opacity: 0; transform: scale(.3) rotate(0); } 50% { opacity: 1; transform: scale(1) rotate(90deg); } }
+@keyframes led-flow { to { background-position: -200% 0; } }
 @keyframes live { from { box-shadow: 0 0 0 0 rgba(255,77,141,.7); } to { box-shadow: 0 0 0 9px rgba(255,77,141,0); } }
 /* Quick stuttering power-on, then a restless low-level flicker with the odd deeper dropout */
 @keyframes led-power {
@@ -424,17 +449,20 @@ dialog[open] { animation: pop .5s var(--ease); }
   <div class="about">
     <div class="about-main">
       <div class="note">
-        <p><strong>I like signals other people throw away.</strong> By day I wrangle manufacturing data, train cost-prediction models and teach wearables to understand movement. The common thread: taking something noisy and real — factory floors, bank accounts, ankle sensors, the air in my room — and making it <span class="mini-hl">make sense</span>.</p>
+        <p><strong>I like signals other people throw away.</strong> By day I wrangle manufacturing data, train cost-prediction models and teach wearables to understand movement. The common thread: taking something noisy and real [factory floors, bank accounts, ankle sensors, the air in my room] and making it <span class="mini-hl">make sense</span>.</p>
         <p>Away from the keyboard I'm usually exploring: hiking somewhere green, hunting down <span class="mini-hl">light installations</span> after dark, or adding one more specimen to a slowly growing mineral collection. I just like building stuff — software, circuits, furniture, whatever's in reach.</p>
         <div class="stats">
           <div class="stat" style="--c: var(--pink)"><b data-count="7">0</b><span>projects shipped</span></div>
-          <div class="stat" style="--c: var(--mint)"><b data-count="14">0</b><span>sensors wired up</span></div>
+          <div class="stat" style="--c: var(--mint)"><b data-count="2152">0</b><span>km walked this year</span></div>
           <div class="stat" style="--c: var(--sky)"><b data-count="too many">0</b><span>specimens collected</span></div>
         </div>
       </div>
-        <figure class="polaroid lit" style="--pr: 2.5deg">
-        <img src="assets/light-installation.jpg" alt="A forest path at night under arches of colourful festival lights, trees glowing purple" loading="lazy" width="900" height="798">
-        <figcaption>✨   try the 💡 up top for night lights</figcaption>
+        <figure class="polaroid lit">
+        <div class="light-paint">
+          <img src="assets/light-installation.jpg" alt="A forest path at night under arches of colourful festival lights, trees glowing purple" loading="lazy" width="900" height="798">
+          <canvas id="trail" aria-hidden="true"></canvas>
+        </div>
+        <figcaption>✨ wave over the photo for fairy dust, or try the 💡 up top for night lights</figcaption>
         </figure>
     </div>
     <div class="about-side">
@@ -442,7 +470,8 @@ dialog[open] { animation: pop .5s var(--ease); }
       <div class="shelf">
         <h3>The mineral shelf 🔎</h3>
         <p>A few favourites from my own collection. Click for a closer inspection.</p>
-        <div class="gems" id="gems"></div>
+        <div class="gallery" id="gems"></div>
+        <p class="placard" id="placard" aria-live="polite"></p>
       </div>
     </div>
   </div>
@@ -471,8 +500,7 @@ dialog[open] { animation: pop .5s var(--ease); }
   <div class="big-card">
     <h2>Let's make something!</h2>
     <p>Got an idea, a dataset that misbehaves, or a weird project that needs a co-conspirator? My inbox is open.</p>
-    <button class="btn" id="hi" data-email="oleksandr.maksimov.v@gmail.com">Copy my email ✨</button>
-    <!--<span class="email" id="email-text">oleksandr.maksimov.v@gmail.com</span> -->
+    <button class="btn" id="hi" data-email="omk@gmail.com">Copy my email ✨</button>
     <div class="socials">
       <a href="https://github.com/AlexCuber" rel="noopener">GitHub</a>
       <a href="https://www.linkedin.com/in/oleksandr-maksimov-v" rel="noopener">LinkedIn</a>
@@ -521,6 +549,7 @@ dialog[open] { animation: pop .5s var(--ease); }
   <div class="spec-img"><img id="spec-img" alt=""></div>
   <div class="spec-body">
     <div>
+      <em class="origin" id="spec-origin"></em>
       <h3 id="spec-name"></h3>
       <p id="spec-note"></p>
     </div>
@@ -577,18 +606,12 @@ function applyTheme(mode, announce) {
   root.dataset.theme = mode;
   lamp.title = mode === "night" ? "Back to daylight" : "Lights on";
   lamp.setAttribute("aria-label", lamp.title);
-  try { localStorage.setItem("theme", mode); } catch {}
   swapPhotos(mode === "night");
   if (announce) say(mode === "night" ? "Lights on ✨ welcome to the night walk" : "Back to daylight ☀️");
 }
-let stored = null;
-try { stored = localStorage.getItem("theme"); } catch {}
-applyTheme(stored || (matchMedia("(prefers-color-scheme: dark)").matches ? "night" : "day"), false);
-lamp.addEventListener("click", e => {
-  applyTheme(root.dataset.theme === "night" ? "day" : "night", true);
-  const r = lamp.getBoundingClientRect();
-  burst(r.left + r.width / 2, r.top + r.height / 2, 36);
-});
+/* Every visit starts in daylight; the lights are something visitors switch on themselves */
+applyTheme("day", false);
+lamp.addEventListener("click", () => applyTheme(root.dataset.theme === "night" ? "day" : "night", true));
 
 /* Marquee */
 const words = ["PySpark", "XGBoost", "Signal processing", "ESP32", "Databricks", "Feature engineering", "SQL", "Time series", "ML"];
@@ -659,22 +682,6 @@ projects.forEach((p, i) => {
   painters.push({ cv: b.querySelector("canvas"), p });
 });
 
-/* Bento layout: if the last row would have gaps, widen one card in each of the bottom rows (alternating sides) so every row is full */
-function layoutGrid() {
-  [...grid.children].forEach(c => c.classList.remove("wide"));
-  const cards = [...grid.children].filter(c => !c.classList.contains("hide"));
-  const cols = getComputedStyle(grid).gridTemplateColumns.split(" ").length;
-  const n = cards.length, extra = (cols - n % cols) % cols, rows = (n + extra) / cols;
-  if (cols < 2 || n < 2 || !extra || extra > rows) return;
-  for (let r = 0, i = 0; r < rows; r++) {
-    const k = r - (rows - extra), size = k >= 0 ? cols - 1 : cols;
-    if (k >= 0) cards[i + (k % 2 ? size - 1 : 0)].classList.add("wide");
-    i += size;
-  }
-}
-layoutGrid();
-addEventListener("resize", () => requestAnimationFrame(layoutGrid));
-
 /* Stipple points for the plotter thumbnail: dense in a disc and a ring, ordered into one route */
 const PLOT = (() => {
   let seed = 7;
@@ -708,7 +715,7 @@ function draw(cv, p, t) {
   const sheen = x.createLinearGradient(0, 0, w * .4, h);
   sheen.addColorStop(0, "rgba(255,255,255,.22)"); sheen.addColorStop(1, "rgba(27,19,64,.08)");
   x.fillStyle = sheen; x.fillRect(0, 0, w, h);
-  /* compact scenes stay centred instead of stretching across wide cards */
+  /* compact scenes stay centred instead of stretching across wide frames (the project window is 16:7) */
   if (["rank", "air", "invaders"].includes(p.art) && w > h * 2) { x.translate((w - h * 1.9) / 2, 0); w = h * 1.9; }
   x.lineWidth = LW; x.strokeStyle = INK; x.lineJoin = "round"; x.lineCap = "round";
   const pal = COLORS.filter(c => c !== p.c);
@@ -859,7 +866,6 @@ document.querySelectorAll(".chip").forEach(c => c.addEventListener("click", () =
   document.querySelectorAll(".chip").forEach(o => o.setAttribute("aria-pressed", o === c));
   const f = c.dataset.filter;
   grid.querySelectorAll(".card").forEach(card => card.classList.toggle("hide", f !== "all" && !card.dataset.cats.split(" ").includes(f)));
-  layoutGrid();
 }));
 
 /* Modal */
@@ -938,7 +944,7 @@ arcade.addEventListener("close", () => {
 });
 
 /* Interest stickers */
-const interests = ["🥾 Trail days", "✨ Light festivals", "💎 Mineral hunting", "🔨 Building stuff", "🗺️ Exploring", "🌿 Forest air", "☕ Coffee experiments", "🔌 Home tinkering"];
+const interests = ["🥾 Trail days", "✨ Light festivals", "💎 Mineral hunting", "🔨 Building stuff", "🗺️ Exploring", "🌿 Forest air", "🧩 Board games & puzzles", "🔌 Home tinkering"];
 const cloud = document.getElementById("cloud");
 interests.forEach((txt, i) => {
   const s = document.createElement("span");
@@ -949,14 +955,14 @@ interests.forEach((txt, i) => {
 });
 
 /* The mineral shelf */
-/* Names are best guesses from the photos — correct them to match your labels */
+/* n = what it is, from = where it was found (shown as its own pill on the label and in the viewer; leave "" if unknown) */
 const minerals = [
-  { img: "crystal1", n: "white calcite MALLORCA", note: "white calcite growing on a rusty, iron-stained rock.", c: "#FFD23F" },
-  { img: "crystal2", n: "pink calcite MOROCCO", note: "A chunky salmon-pink specimen with white veins.", c: "#FF5DA2" },
-  { img: "crystal3", n: "smoky quartz", note: "Translucent and smoky, with glassy faces that catch the light.", c: "#B98CFF" },
-  { img: "crystal4", n: "milky quartz NORWAY", note: "Frosty white quartz with a dark band along one side.", c: "#5B7CFF" },
-  { img: "crystal5", n: "quartz + malachite FAROE ISL.", note: "Glittering crystal clusters splashed with copper green.", c: "#2EC4B6" },
-  { img: "crystal6", n: "druzy quartz MOROCCO", note: "Two pieces carpeted in tiny sparkling crystals.", c: "#FF8A3D" }
+  { img: "crystal1", n: "White calcite", from: "Mallorca", note: "White calcite growing on a rusty, iron-stained rock.", c: "#FFD23F" },
+  { img: "crystal2", n: "Pink calcite", from: "Morocco", note: "A chunky salmon-pink specimen with white veins.", c: "#FF5DA2" },
+  { img: "crystal3", n: "Smoky quartz", from: "", note: "Translucent and smoky, with glassy faces that catch the light.", c: "#B98CFF" },
+  { img: "crystal4", n: "Milky quartz", from: "Norway", note: "Frosty white quartz with a dark band along one side.", c: "#5B7CFF" },
+  { img: "crystal5", n: "Quartz + malachite", from: "Faroe Islands", note: "Glittering crystal clusters splashed with copper green.", c: "#2EC4B6" },
+  { img: "crystal6", n: "Druzy quartz", from: "Morocco", note: "Two pieces carpeted in tiny sparkling crystals.", c: "#FF8A3D" }
 ];
 const gemsEl = document.getElementById("gems");
 const specimen = document.getElementById("specimen");
@@ -968,17 +974,27 @@ function showSpecimen(i) {
   img.src = `assets/minerals/${m.img}.jpg`;
   img.alt = `${m.n}, a mineral specimen from Oleksandr's collection`;
   document.getElementById("spec-name").textContent = m.n;
+  document.getElementById("spec-origin").textContent = m.from ? `📍 ${m.from}` : "";
   document.getElementById("spec-note").textContent = m.note;
 }
+/* Shelf pieces are cut-outs (assets/minerals/<img>-cut.webp, made with tools/cutout.swift); the viewer shows the full photo */
+const placard = document.getElementById("placard");
+const canHover = matchMedia("(hover: hover)").matches;
+const idleLabel = () => { placard.innerHTML = canHover ? "Hover over a specimen to read its label." : "Tap a specimen to take a closer look."; };
+idleLabel();
 minerals.forEach((m, i) => {
+  const no = String(i + 1).padStart(2, "0");
   const g = document.createElement("button");
   g.className = "gem";
-  g.style.setProperty("--gc", m.c);
-  g.style.setProperty("--r", ((i * 37) % 7 - 3) + "deg");
-  g.innerHTML = `<img src="assets/minerals/${m.img}.jpg" alt="${m.n}" loading="lazy" width="300" height="300"><span class="gname" aria-hidden="true">${m.n}</span>`;
+  g.style.cssText = `--gc:${m.c}; --d:${-i * 1.7}s`;
+  g.setAttribute("aria-label", `${m.n}: open a closer look`);
+  g.innerHTML = `<img src="assets/minerals/${m.img}-cut.webp" alt="" loading="lazy"><i class="spark" aria-hidden="true">✦</i><i class="spark" aria-hidden="true">✦</i><i class="spark" aria-hidden="true">✦</i><span class="no" aria-hidden="true">${no}</span>`;
+  const label = () => { placard.innerHTML = `<b>NO.${no}</b><span><strong>${m.n}</strong> · ${m.note}</span><em class="origin">${m.from ? `📍 ${m.from}` : ""}</em>`; };
+  g.addEventListener("pointerenter", label);
+  g.addEventListener("focus", label);
+  g.addEventListener("pointerleave", idleLabel);
+  g.addEventListener("blur", idleLabel);
   g.addEventListener("click", () => {
-    const r = g.getBoundingClientRect();
-    burst(r.left + r.width / 2, r.top, 24);
     showSpecimen(i);
     specimen.showModal();
   });
@@ -995,14 +1011,21 @@ specimen.addEventListener("keydown", e => {
 
 /* Count-up stats */
 const stats = document.querySelectorAll("[data-count]");
-stats.forEach(s => s.textContent = s.dataset.count);
+const fmt = v => Number.isNaN(+v) ? v : (+v).toLocaleString("en");
+stats.forEach(s => s.textContent = fmt(s.dataset.count));
 if (!reduce && "IntersectionObserver" in window) {
+  /* counts up over the same ~1.4 s whether the number is 7 or 2,152, easing out at the end */
   const io = new IntersectionObserver(es => es.forEach(e => {
     if (!e.isIntersecting) return; io.unobserve(e.target);
-    const end = +e.target.dataset.count; let n = 0;
+    const end = +e.target.dataset.count;
     if (Number.isNaN(end)) return;
-    const step = () => { n++; e.target.textContent = Math.min(n, end); if (n < end) setTimeout(step, 60); };
-    e.target.textContent = 0; step();
+    const t0 = performance.now();
+    const step = now => {
+      const k = Math.min((now - t0) / 1400, 1);
+      e.target.textContent = fmt(Math.round(end * (1 - (1 - k) ** 3)));
+      if (k < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
   }), { threshold: .6 });
   stats.forEach(s => io.observe(s));
 }
@@ -1080,6 +1103,75 @@ if (!reduce) {
   addEventListener("pointermove", e => { mouse.x = e.clientX; mouse.y = e.clientY; });
 }
 
+/* Fairy dust: moving the mouse (or a finger) over the festival photo sheds glittering specks that drift, twinkle and slowly fall */
+const paint = document.querySelector(".light-paint"), tc = document.getElementById("trail"), tctx = tc.getContext("2d");
+/* the dust colour travels round the colour wheel as the trail gets longer: one soft glow sprite per 15° of hue,
+   drawn once, so hundreds of specks stay cheap */
+const DUST = Array.from({ length: 24 }, (_, i) => `hsl(${i * 15} 100% 72%)`);
+const dustSprites = DUST.map(c => {
+  const cv = document.createElement("canvas"); cv.width = cv.height = 32;
+  const g = cv.getContext("2d"), r = g.createRadialGradient(16, 16, 0, 16, 16, 16);
+  r.addColorStop(0, "#FFFFFF"); r.addColorStop(.3, c); r.addColorStop(1, "rgba(0,0,0,0)");
+  g.fillStyle = r; g.fillRect(0, 0, 32, 32);
+  return cv;
+});
+let dust = [], dusting = false, last = null, travelled = 0;
+const HUE_PX = 9;   /* pixels of movement per 15° step of colour: about one full rainbow every 200px */
+function sprinkle(cx, cy) {
+  const r = paint.getBoundingClientRect(), x = cx - r.left, y = cy - r.top;
+  if (x < 0 || y < 0 || x > r.width || y > r.height) { last = null; return; }
+  /* spread specks evenly along the path so fast and slow movements leave the same gentle trail */
+  const from = last || { x, y }, dist = Math.hypot(x - from.x, y - from.y);
+  const n = Math.min(14, 1 + Math.floor(dist / 5));
+  const startTravel = travelled;
+  travelled += dist;
+  for (let i = 0; i < n && dust.length < 700; i++) {
+    const k = n === 1 ? 1 : i / (n - 1);
+    dust.push({
+      x: from.x + (x - from.x) * k + (Math.random() - .5) * 8,
+      y: from.y + (y - from.y) * k + (Math.random() - .5) * 8,
+      vx: (Math.random() - .5) * .35, vy: (Math.random() - .5) * .3 - .05,
+      life: 1, fade: .0045 + Math.random() * .006,
+      size: 3 + Math.random() * 5, c: Math.floor((startTravel + dist * k) / HUE_PX) % DUST.length,
+      tw: Math.random() * 7, star: Math.random() < .2
+    });
+  }
+  /* a soft glowing haze drifts behind the sparkles */
+  if (dust.length < 700) dust.push({ x, y, vx: (Math.random() - .5) * .2, vy: .05, life: 1, fade: .012, size: 16 + Math.random() * 12, c: Math.floor(travelled / HUE_PX) % DUST.length, tw: 0, haze: true });
+  last = { x, y };
+  if (!dusting) { dusting = true; requestAnimationFrame(drawDust); }
+}
+function drawDust() {
+  const r = paint.getBoundingClientRect(), dpr = Math.min(devicePixelRatio || 1, 2);
+  if (tc.width !== Math.round(r.width * dpr) || tc.height !== Math.round(r.height * dpr)) { tc.width = Math.round(r.width * dpr); tc.height = Math.round(r.height * dpr); }
+  tctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  tctx.clearRect(0, 0, r.width, r.height);
+  tctx.globalCompositeOperation = "lighter";
+  dust = dust.filter(d => (d.life -= d.fade) > 0);
+  dust.forEach(d => {
+    d.vy += .004; d.vx *= .99; d.x += d.vx; d.y += d.vy; d.tw += .25;
+    const a = d.haze ? d.life * .3 : d.life * (.55 + .45 * Math.sin(d.tw)), sz = d.size * (.6 + .4 * d.life);
+    tctx.globalAlpha = a;
+    tctx.drawImage(dustSprites[d.c], d.x - sz, d.y - sz, sz * 2, sz * 2);
+    if (d.star) {
+      const len = Math.min(sz * 1.1, 5);
+      tctx.strokeStyle = "#FFFFFF"; tctx.lineWidth = .6;
+      tctx.beginPath(); tctx.moveTo(d.x - len, d.y); tctx.lineTo(d.x + len, d.y); tctx.moveTo(d.x, d.y - len); tctx.lineTo(d.x, d.y + len); tctx.stroke();
+    }
+  });
+  tctx.globalAlpha = 1; tctx.globalCompositeOperation = "source-over";
+  if (dust.length) requestAnimationFrame(drawDust);
+  else { dusting = false; tctx.clearRect(0, 0, r.width, r.height); }
+}
+if (!reduce) {
+  paint.addEventListener("pointermove", e => { if (e.pointerType !== "touch") sprinkle(e.clientX, e.clientY); });
+  paint.addEventListener("pointerleave", () => { last = null; });
+  /* touch events keep arriving while the page scrolls under the finger, so a swipe leaves dust too */
+  paint.addEventListener("touchstart", e => { last = null; sprinkle(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
+  paint.addEventListener("touchmove", e => sprinkle(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
+  paint.addEventListener("touchend", () => { last = null; }, { passive: true });
+}
+
 /* Confetti */
 const cc = document.getElementById("confetti"), cx2 = cc.getContext("2d");
 let bits = [];
@@ -1111,7 +1203,6 @@ document.getElementById("bmc").addEventListener("click", e => {
   const r = e.currentTarget.getBoundingClientRect();
   burst(r.left + r.width / 2, r.top, 50);
 });
-document.querySelector(".logo").addEventListener("click", e => burst(e.clientX, e.clientY));
 </script>
 </body>
 </html>
