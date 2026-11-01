@@ -1,0 +1,17 @@
+# macOS folder metadata
+.DS_Store
+
+# Original phone videos: large and they carry the GPS location. Publish the converted .mp4 only.
+*.mov
+*.MOV
+
+# Local backups and drafts
+index copy.html
+photobkp/
+professional2.png
+Oleksandr's Playground.*
+project portfolio Oleksandr5.html
+
+# Python caches from the game source
+__pycache__/
+games/src/cucumber_invasion/build/
