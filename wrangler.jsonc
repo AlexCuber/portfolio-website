@@ -11,9 +11,9 @@
   },
   // secrets and text variables you set in the dashboard survive deploys
   "keep_vars": true,
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
 
   // Optional rate limit (3 messages per visitor per hour). Create a KV namespace in the dashboard
   // (Storage & Databases -> KV -> Create), paste its ID below, remove the two // and add a comma after the } above.
-  // "kv_namespaces": [{ "binding": "RATE_LIMIT", "id": "PASTE-YOUR-KV-NAMESPACE-ID-HERE" }]
+  "kv_namespaces": [{ "binding": "RATE_LIMIT", "id": "0cd04d03c1a043a28a131159c33435f6" }]
 }
