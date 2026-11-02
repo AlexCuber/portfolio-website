@@ -1,0 +1,9 @@
+# Copy this file to .dev.vars for local testing with:  npx wrangler dev   (then open http://localhost:8787)
+# These are Cloudflare's official Turnstile TEST keys: the widget always passes. Never use them on the live site.
+TURNSTILE_SITE_KEY=1x00000000000000000000AA
+TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
+# Dry run prints the email in the terminal instead of sending it. Remove it (and add the three below) to send for real.
+CONTACT_DRY_RUN=1
+# RESEND_API_KEY=re_...
+# CONTACT_TO=you@example.com
+# CONTACT_FROM=Website <contact@yourdomain.com>

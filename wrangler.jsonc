@@ -1,0 +1,19 @@
+// Cloudflare Worker for the website: serves every file in this folder as static assets, and runs src/worker.js
+// for /api/contact (the contact form). Cloudflare's Git build runs `npx wrangler deploy`, which reads this file.
+{
+  // must match your Worker's name in the Cloudflare dashboard (Workers & Pages)
+  "name": "portfolio-website",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": ".",
+    "binding": "ASSETS"
+  },
+  // secrets and text variables you set in the dashboard survive deploys
+  "keep_vars": true,
+  "observability": { "enabled": true }
+
+  // Optional rate limit (3 messages per visitor per hour). Create a KV namespace in the dashboard
+  // (Storage & Databases -> KV -> Create), paste its ID below, remove the two // and add a comma after the } above.
+  // "kv_namespaces": [{ "binding": "RATE_LIMIT", "id": "PASTE-YOUR-KV-NAMESPACE-ID-HERE" }]
+}

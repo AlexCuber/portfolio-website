@@ -335,6 +335,19 @@ html[data-theme="night"] .big-card { box-shadow: 0 0 0 1px var(--hair), var(--sh
 .big-card p { font-size: 1.15rem; color: rgba(255,255,255,.72); max-width: 46ch; margin: 18px auto 32px; }
 .big-card .btn { background: #fff; color: #0B0A16; }
 .big-card .btn:hover { box-shadow: 0 0 34px rgba(255,255,255,.3); }
+.contact-form { display: grid; gap: 12px; max-width: 580px; margin: 0 auto; text-align: left; }
+.cf-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.contact-form label { display: grid; gap: 6px; font-size: .78rem; font-weight: 600; color: rgba(255,255,255,.7); }
+.contact-form input, .contact-form textarea { width: 100%; font: 500 .98rem var(--font); color: #fff; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.16); border-radius: 14px; padding: 12px 14px; resize: vertical; transition: border-color .2s, background .2s; }
+.contact-form input:focus, .contact-form textarea:focus { outline: none; border-color: rgba(255,255,255,.55); background: rgba(255,255,255,.12); }
+.cf-hp { position: absolute !important; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+.cf-bottom { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.cf-turnstile { min-height: 65px; flex: 1 1 260px; max-width: 320px; }
+.contact-form .btn[disabled] { opacity: .6; cursor: progress; transform: none; }
+.cf-status { min-height: 1.4em; margin: 0 !important; font-size: .92rem !important; color: rgba(255,255,255,.75); text-align: center; max-width: none !important; }
+.cf-status.ok { color: #9CF0C8; }
+.cf-status.err { color: #FFB4C8; }
+@media (max-width: 560px) { .cf-row { grid-template-columns: 1fr; } .cf-bottom { justify-content: center; } }
 .socials { display: flex; justify-content: center; gap: 10px; margin-top: 30px; flex-wrap: wrap; }
 .socials a { color: rgba(255,255,255,.86); background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14); border-radius: 999px; padding: 7px 16px; font-weight: 500; font-size: .92rem; text-decoration: none; transition: background .2s, transform .25s var(--ease); }
 .socials a:hover { background: rgba(255,255,255,.16); transform: translateY(-2px); }
@@ -546,13 +559,25 @@ dialog[open] { animation: pop .5s var(--ease); }
 
 <section class="wrap contact reveal" id="contact">
   <div class="big-card">
-    <h2>Let's make something!</h2>
-    <p>Got an idea, a dataset that misbehaves, or a weird project that needs a co-conspirator? My inbox is open.</p>
-    <button class="btn" id="hi" data-email="omk@gmail.com">Copy my email ✨</button>
+    <h2>Let's talk!</h2>
+    <p>Got an idea, a dataset that misbehaves, or an exciting project?</p>
+    <form class="contact-form" id="contact-form" novalidate>
+      <div class="cf-row">
+        <label>Your name<input name="name" type="text" maxlength="80" autocomplete="name" required></label>
+        <label>Your email<input name="email" type="email" maxlength="254" autocomplete="email" required></label>
+      </div>
+      <label>Message<textarea name="message" rows="5" minlength="10" maxlength="5000" required></textarea></label>
+      <!-- honeypot: hidden from people, irresistible to bots -->
+      <label class="cf-hp" aria-hidden="true">Website<input name="website" type="text" tabindex="-1" autocomplete="off"></label>
+      <div class="cf-bottom">
+        <div class="cf-turnstile" id="cf-turnstile"></div>
+        <button class="btn" type="submit" id="cf-send">Send message ✨</button>
+      </div>
+      <p class="cf-status" id="cf-status" role="status"></p>
+    </form>
     <div class="socials">
       <a href="https://github.com/AlexCuber" rel="noopener">GitHub</a>
       <a href="https://www.linkedin.com/in/oleksandr-maksimov-v" rel="noopener">LinkedIn</a>
-      <a href="https://www.instagram.com/alex.cuber?exln=MWo5cHp0ZGNtZ2w4&utm_source=qr" rel="noopener">Instagram</a>
     </div>
   </div>
 </section>
@@ -1723,14 +1748,55 @@ function confetti() {
   if (bits.length) requestAnimationFrame(confetti); else cx2.clearRect(0, 0, cc.width, cc.height);
 }
 
-/* Email copy + coffee cheer */
-document.getElementById("hi").addEventListener("click", async e => {
-  const r = e.currentTarget.getBoundingClientRect();
-  burst(r.left + r.width / 2, r.top);
-  const email = e.currentTarget.dataset.email;
-  try { await navigator.clipboard.writeText(email); say("Email copied!"); }
-  catch { say(`Copy didn't work, write to ${email}`); }
+/* Contact form: sends to /api/contact (src/worker.js, the site's Cloudflare Worker), which emails the message to me.
+   The Turnstile anti-bot widget loads only once the form is near the screen. */
+const cform = document.getElementById("contact-form"), cstatus = document.getElementById("cf-status"), csend = document.getElementById("cf-send");
+let formStarted = Date.now(), turnstileId = null;
+const formSay = (msg, kind = "") => { cstatus.textContent = msg; cstatus.className = `cf-status ${kind}`; };
+function setupTurnstile() {
+  fetch("/api/contact").then(r => r.ok ? r.json() : null).catch(() => null).then(cfg => {
+    if (!cfg || !cfg.siteKey) { formSay("The message form isn't available right now. LinkedIn works too!", "err"); csend.disabled = true; return; }
+    window.onTurnstileReady = () => {
+      turnstileId = turnstile.render("#cf-turnstile", { sitekey: cfg.siteKey, theme: "dark", size: "flexible", action: "contact" });
+    };
+    const sc = document.createElement("script");
+    sc.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=onTurnstileReady";
+    sc.async = true;
+    document.head.appendChild(sc);
+  });
+}
+if ("IntersectionObserver" in window) {
+  const near = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) { near.disconnect(); setupTurnstile(); } }, { rootMargin: "600px" });
+  near.observe(cform);
+} else setupTurnstile();
+cform.addEventListener("input", () => { if (cstatus.classList.contains("err")) formSay(""); });
+cform.addEventListener("submit", async e => {
+  e.preventDefault();
+  const f = Object.fromEntries(new FormData(cform));
+  if (!f.name.trim()) return formSay("Please add your name.", "err");
+  if (!cform.email.checkValidity() || !f.email.includes(".")) return formSay("Please enter a valid email address, so I can reply.", "err");
+  if (f.message.trim().length < 10) return formSay("Your message is a little short. Tell me a bit more?", "err");
+  const token = turnstileId !== null && window.turnstile ? turnstile.getResponse(turnstileId) : "";
+  if (!token) return formSay("Just a second: the anti-spam check is still running.", "err");
+  csend.disabled = true; formSay("Sending…");
+  try {
+    const res = await fetch("/api/contact", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...f, token, started: formStarted }) });
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok || !out.ok) throw new Error(out.error || "The message couldn't be sent. Please try again.");
+    formSay(`Thank you! Your message is on its way, and I'll reply to ${f.email}.`, "ok");
+    cform.reset();
+    formStarted = Date.now();
+    const r = csend.getBoundingClientRect();
+    burst(r.left + r.width / 2, r.top);
+  } catch (err) {
+    formSay(err.message, "err");
+  } finally {
+    csend.disabled = false;
+    if (turnstileId !== null) turnstile.reset(turnstileId);
+  }
 });
+
+/* Coffee cheer */
 document.getElementById("bmc").addEventListener("click", e => {
   const r = e.currentTarget.getBoundingClientRect();
   burst(r.left + r.width / 2, r.top, 50);

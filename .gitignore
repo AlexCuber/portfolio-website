@@ -15,3 +15,8 @@ project portfolio Oleksandr5.html
 # Python caches from the game source
 __pycache__/
 games/src/cucumber_invasion/build/
+
+# Local secrets for `npx wrangler dev` (copy .dev.vars.example to .dev.vars)
+.dev.vars
+.wrangler/
+node_modules/

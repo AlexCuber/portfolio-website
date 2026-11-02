@@ -1,0 +1,23 @@
+# Files that stay in the repo but are not published on the website
+.git
+.gitignore
+.assetsignore
+.dev.vars
+.dev.vars.example
+.wrangler
+node_modules
+wrangler.jsonc
+src
+tools
+games/src
+games/README.md
+
+# Local-only files (also kept out of git): never publish them, even from a local deploy
+*.mov
+*.MOV
+.DS_Store
+index copy.html
+photobkp
+professional2.png
+Oleksandr's Playground.*
+project portfolio Oleksandr5.html
