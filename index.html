@@ -341,13 +341,14 @@ html[data-theme="night"] .big-card { box-shadow: 0 0 0 1px var(--hair), var(--sh
 .contact-form input, .contact-form textarea { width: 100%; font: 500 .98rem var(--font); color: #fff; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.16); border-radius: 14px; padding: 12px 14px; resize: vertical; transition: border-color .2s, background .2s; }
 .contact-form input:focus, .contact-form textarea:focus { outline: none; border-color: rgba(255,255,255,.55); background: rgba(255,255,255,.12); }
 .cf-hp { position: absolute !important; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
-.cf-bottom { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.cf-turnstile { min-height: 65px; flex: 1 1 260px; max-width: 320px; }
+.cf-bottom { display: flex; justify-content: center; }
+.cf-turnstile { display: flex; justify-content: center; max-height: 0; overflow: hidden; opacity: 0; transition: max-height .4s var(--ease), opacity .4s; }
+.cf-turnstile.show { max-height: 90px; opacity: 1; }
 .contact-form .btn[disabled] { opacity: .6; cursor: progress; transform: none; }
 .cf-status { min-height: 1.4em; margin: 0 !important; font-size: .92rem !important; color: rgba(255,255,255,.75); text-align: center; max-width: none !important; }
 .cf-status.ok { color: #9CF0C8; }
 .cf-status.err { color: #FFB4C8; }
-@media (max-width: 560px) { .cf-row { grid-template-columns: 1fr; } .cf-bottom { justify-content: center; } }
+@media (max-width: 560px) { .cf-row { grid-template-columns: 1fr; } }
 .socials { display: flex; justify-content: center; gap: 10px; margin-top: 30px; flex-wrap: wrap; }
 .socials a { color: rgba(255,255,255,.86); background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14); border-radius: 999px; padding: 7px 16px; font-weight: 500; font-size: .92rem; text-decoration: none; transition: background .2s, transform .25s var(--ease); }
 .socials a:hover { background: rgba(255,255,255,.16); transform: translateY(-2px); }
@@ -569,8 +570,9 @@ dialog[open] { animation: pop .5s var(--ease); }
       <label>Message<textarea name="message" rows="5" minlength="10" maxlength="5000" required></textarea></label>
       <!-- honeypot: hidden from people, irresistible to bots -->
       <label class="cf-hp" aria-hidden="true">Website<input name="website" type="text" tabindex="-1" autocomplete="off"></label>
+      <!-- the anti-bot check: invisible, and only takes up space if Cloudflare asks for a click -->
+      <div class="cf-turnstile" id="cf-turnstile"></div>
       <div class="cf-bottom">
-        <div class="cf-turnstile" id="cf-turnstile"></div>
         <button class="btn" type="submit" id="cf-send">Send message ✨</button>
       </div>
       <p class="cf-status" id="cf-status" role="status"></p>
@@ -1749,15 +1751,27 @@ function confetti() {
 }
 
 /* Contact form: sends to /api/contact (src/worker.js, the site's Cloudflare Worker), which emails the message to me.
-   The Turnstile anti-bot widget loads only once the form is near the screen. */
+   The Turnstile anti-bot check is invisible: it runs quietly once all three fields are filled in (or when Send is
+   pressed), and its box only appears in the rare case Cloudflare wants a click from that visitor. */
 const cform = document.getElementById("contact-form"), cstatus = document.getElementById("cf-status"), csend = document.getElementById("cf-send");
-let formStarted = Date.now(), turnstileId = null;
+const tsBox = document.getElementById("cf-turnstile");
+let formStarted = Date.now(), turnstileId = null, tsToken = "", tsRunning = false, tsWaiting = [];
 const formSay = (msg, kind = "") => { cstatus.textContent = msg; cstatus.className = `cf-status ${kind}`; };
+const tsDone = token => { tsToken = token; tsRunning = false; tsWaiting.splice(0).forEach(resolve => resolve(token)); };
 function setupTurnstile() {
   fetch("/api/contact").then(r => r.ok ? r.json() : null).catch(() => null).then(cfg => {
     if (!cfg || !cfg.siteKey) { formSay("The message form isn't available right now. LinkedIn works too!", "err"); csend.disabled = true; return; }
     window.onTurnstileReady = () => {
-      turnstileId = turnstile.render("#cf-turnstile", { sitekey: cfg.siteKey, theme: "dark", size: "flexible", action: "contact" });
+      turnstileId = turnstile.render(tsBox, {
+        sitekey: cfg.siteKey, theme: "dark", size: "flexible", action: "contact",
+        appearance: "interaction-only", execution: "execute",
+        callback: tsDone,
+        "error-callback": () => { tsDone(""); tsBox.classList.remove("show"); },
+        "expired-callback": () => { tsToken = ""; },
+        "before-interactive-callback": () => { tsBox.classList.add("show"); formSay("Cloudflare would like a quick check: just tick the box above."); },
+        "after-interactive-callback": () => { tsBox.classList.remove("show"); if (cstatus.textContent.startsWith("Cloudflare")) formSay(csend.disabled ? "Sending…" : ""); }
+      });
+      if (formReady()) getToken();
     };
     const sc = document.createElement("script");
     sc.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=onTurnstileReady";
@@ -1765,20 +1779,35 @@ function setupTurnstile() {
     document.head.appendChild(sc);
   });
 }
+/* resolves with a token (or "" if the check failed), starting the check if it isn't running yet */
+function getToken() {
+  if (tsToken) return Promise.resolve(tsToken);
+  if (turnstileId === null || !window.turnstile) return Promise.resolve("");
+  return new Promise(resolve => {
+    tsWaiting.push(resolve);
+    if (!tsRunning) { tsRunning = true; turnstile.execute(turnstileId); }
+  });
+}
+const formReady = () => cform.name.value.trim() && cform.email.checkValidity() && cform.email.value.includes(".") && cform.message.value.trim().length >= 10;
 if ("IntersectionObserver" in window) {
   const near = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) { near.disconnect(); setupTurnstile(); } }, { rootMargin: "600px" });
   near.observe(cform);
 } else setupTurnstile();
-cform.addEventListener("input", () => { if (cstatus.classList.contains("err")) formSay(""); });
+cform.addEventListener("input", () => {
+  if (cstatus.classList.contains("err")) formSay("");
+  if (formReady()) getToken();   /* all three fields filled in: get the check out of the way before Send */
+});
 cform.addEventListener("submit", async e => {
   e.preventDefault();
   const f = Object.fromEntries(new FormData(cform));
   if (!f.name.trim()) return formSay("Please add your name.", "err");
   if (!cform.email.checkValidity() || !f.email.includes(".")) return formSay("Please enter a valid email address, so I can reply.", "err");
   if (f.message.trim().length < 10) return formSay("Your message is a little short. Tell me a bit more?", "err");
-  const token = turnstileId !== null && window.turnstile ? turnstile.getResponse(turnstileId) : "";
-  if (!token) return formSay("Just a second: the anti-spam check is still running.", "err");
-  csend.disabled = true; formSay("Sending…");
+  csend.disabled = true;
+  if (!tsToken && !tsBox.classList.contains("show")) formSay("One moment…");
+  const token = await getToken();
+  if (!token) { csend.disabled = false; return formSay("The anti-spam check couldn't finish. Please try sending again.", "err"); }
+  formSay("Sending…");
   try {
     const res = await fetch("/api/contact", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...f, token, started: formStarted }) });
     const out = await res.json().catch(() => ({}));
@@ -1791,7 +1820,10 @@ cform.addEventListener("submit", async e => {
   } catch (err) {
     formSay(err.message, "err");
   } finally {
+    /* a token works once: clear it and hide the widget again, ready for a next message */
     csend.disabled = false;
+    tsToken = ""; tsRunning = false;
+    tsBox.classList.remove("show");
     if (turnstileId !== null) turnstile.reset(turnstileId);
   }
 });
