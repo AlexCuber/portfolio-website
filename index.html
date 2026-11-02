@@ -187,6 +187,54 @@ dialog.arcade { width: min(1040px, 100% - 24px); max-height: calc(100dvh - 24px)
 dialog.arcade .m-close { top: 11px; right: 12px; background: rgba(255,255,255,.12); color: #fff; box-shadow: none; }
 dialog.arcade .m-close:hover { background: rgba(255,255,255,.22); }
 
+/* ───── Star maps: live sky in the project window + the map maker ───── */
+.sky-label { display: none; }
+.m-thumb.sky { aspect-ratio: 16 / 10; max-height: 56vh; width: 100%; background: #0B0D26; }
+.m-thumb.sky canvas { position: absolute; inset: 0; width: 100%; height: 100%; }   /* absolute: the canvas's own pixel size never stretches the window */
+.m-thumb.sky .sky-label { display: grid; gap: 2px; justify-items: start; position: absolute; left: 14px; top: 14px; max-width: min(310px, calc(50% - 40px)); padding: 8px 13px; border-radius: 14px; background: rgba(8,9,28,.5); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); color: #fff; font-size: .78rem; line-height: 1.35; pointer-events: none; }
+.sky-label span { color: rgba(255,255,255,.7); }
+@media (max-width: 760px) { .sky-label .long { display: none; } }
+.sky-tip { position: absolute; z-index: 2; translate: -50% -100%; padding: 3px 9px; border-radius: 999px; background: rgba(255,255,255,.92); color: #14122A; font-size: .75rem; font-weight: 600; white-space: nowrap; pointer-events: none; }
+.sky-tip[hidden] { display: none; }
+.sky-label b { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; }
+.sky-label b::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #FF4D8D; animation: live 1.8s ease-out infinite; }
+dialog.maker { width: min(1040px, 100% - 24px); max-height: calc(100dvh - 24px); overflow: auto; }
+.maker-grid { display: grid; grid-template-columns: 1fr 340px; min-height: 100%; }
+.maker-stage { display: grid; place-items: center; padding: 28px; background: radial-gradient(80% 60% at 50% 40%, #171A40, #06071A); }
+.maker-stage canvas { width: min(100%, 560px, calc((100dvh - 110px) * .819)); aspect-ratio: 2400 / 2930; }   /* drawn without a background: the panel's night sky shows through */
+.maker-form { padding: 30px 26px 24px; display: flex; flex-direction: column; gap: 14px; }
+.maker-form h3 { font-size: 1.5rem; letter-spacing: -0.03em; padding-right: 40px; }
+.maker-form p { margin: 6px 0 0; color: var(--muted); font-size: .92rem; line-height: 1.5; }
+.maker-form label, .mk-field { display: grid; gap: 6px; font-size: .78rem; font-weight: 600; color: var(--muted); }
+.maker-form input:not([type="checkbox"]):not([type="range"]), .maker-form select { width: 100%; font: 500 .95rem var(--font); color: var(--text); background: var(--fill); border: 1px solid transparent; border-radius: 12px; padding: 10px 12px; transition: border-color .2s; }
+.maker-form input:focus, .maker-form select:focus { outline: none; border-color: var(--accent); }
+.maker-form input[type="range"] { width: 100%; accent-color: var(--accent); }
+.maker-form output { font-weight: 500; color: var(--text); margin-left: 4px; }
+.mk-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.mk-row[hidden] { display: none; }
+.mk-field .chips { width: fit-content; }
+.mk-link { justify-self: start; width: fit-content; margin-top: -6px; padding: 0; border: 0; background: none; color: var(--accent); font: 600 .85rem var(--font); cursor: pointer; }
+.mk-link:hover { text-decoration: underline; }
+.mk-check { display: flex !important; align-items: center; gap: 8px; font-size: .9rem !important; font-weight: 500 !important; color: var(--text) !important; cursor: pointer; }
+.mk-check input { width: 18px; height: 18px; accent-color: var(--accent); }
+.mk-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
+.mk-actions small, .mk-credit { color: var(--muted); font-size: .78rem; }
+.mk-steps { display: flex; justify-content: space-between; font-size: .72rem; font-weight: 500; }
+.mk-steps i { font-style: normal; }
+.maker-form .mk-note { margin: -2px 0 0; padding: 12px 14px; border-radius: 14px; background: var(--fill); font-size: .85rem; line-height: 1.5; }
+.mk-note a { color: var(--accent); font-weight: 600; text-decoration: none; }
+.mk-note a:hover { text-decoration: underline; }
+@media (max-width: 760px) {
+  /* on phones the caption becomes a strip above the sky, so it doesn't cover the N */
+  .m-thumb.sky { aspect-ratio: 1 / 1.12; max-height: 68vh; }
+  .m-thumb.sky canvas { top: 52px; height: calc(100% - 52px); }
+  .m-thumb.sky .sky-label { left: 0; top: 0; max-width: none; height: 52px; align-content: center; padding: 0 64px 0 16px; border-radius: 0; background: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .maker-grid { grid-template-columns: 1fr; }
+  .maker-stage { padding: 20px; }
+  .maker-stage canvas { max-width: 300px; }
+  .maker-form { padding: 22px 20px; }
+}
+
 /* ───── About ───── */
 .about { display: grid; grid-template-columns: 1.15fr .85fr; gap: 28px; align-items: start; }
 .about-main, .about-side { display: grid; gap: 28px; }
@@ -452,7 +500,7 @@ dialog[open] { animation: pop .5s var(--ease); }
         <p><strong>I like signals other people throw away.</strong> By day I wrangle manufacturing data, train cost-prediction models and teach wearables to understand movement. The common thread: taking something noisy and real [factory floors, bank accounts, ankle sensors, the air in my room] and making it <span class="mini-hl">make sense</span>.</p>
         <p>Away from the keyboard I'm usually exploring: hiking somewhere green, hunting down <span class="mini-hl">light installations</span> after dark, or adding one more specimen to a slowly growing mineral collection. I just like building stuff — software, circuits, furniture, whatever's in reach.</p>
         <div class="stats">
-          <div class="stat" style="--c: var(--pink)"><b data-count="7">0</b><span>projects shipped</span></div>
+          <div class="stat" style="--c: var(--pink)"><b data-count="8">0</b><span>projects shipped</span></div>
           <div class="stat" style="--c: var(--mint)"><b data-count="2152">0</b><span>km walked this year</span></div>
           <div class="stat" style="--c: var(--sky)"><b data-count="too many">0</b><span>specimens collected</span></div>
         </div>
@@ -518,12 +566,14 @@ dialog[open] { animation: pop .5s var(--ease); }
     <canvas id="m-canvas"></canvas>
     <video id="m-video" muted loop playsinline preload="none" aria-label="The machine in action"></video>
     <button class="m-sound" id="m-sound">🔊 Watch with sound</button>
+    <div class="sky-label" id="sky-label" aria-live="off"></div>
+    <div class="sky-tip" id="sky-tip" hidden></div>
   </div>
   <div class="m-body">
     <h3 id="m-title"></h3>
     <div class="m-actions" id="m-actions" hidden>
-      <button class="btn play" id="m-play">▶ Play it right here</button>
-      <small>Real Python, running in your browser. First load takes a few seconds.</small>
+      <button class="btn play" id="m-play"></button>
+      <small id="m-note"></small>
     </div>
     <div class="m-label">The problem</div>
     <p id="m-context"></p>
@@ -543,6 +593,41 @@ dialog[open] { animation: pop .5s var(--ease); }
     <a id="arcade-full" href="#" target="_blank" rel="noopener">Open full screen ↗</a>
   </div>
   <div class="screen"><iframe id="arcade-frame" title="Playable game" allow="autoplay; fullscreen"></iframe></div>
+</dialog>
+<dialog id="maker" class="maker" aria-labelledby="maker-title">
+  <button class="m-close" id="maker-close" aria-label="Close">✕</button>
+  <div class="maker-grid">
+    <div class="maker-stage"><canvas id="maker-canvas" role="img" aria-label="Your star map preview"></canvas></div>
+    <form class="maker-form" id="maker-form" onsubmit="return false">
+      <div>
+        <h3 id="maker-title">Make your own star map</h3>
+        <p>The real sky above any place, at any moment: a birthday, a first date, the night you moved city.</p>
+      </div>
+      <label>Place
+        <select id="mk-place"></select>
+      </label>
+      <div class="mk-row" id="mk-custom" hidden>
+        <label>Latitude <input id="mk-lat" type="number" step="0.0001" min="-90" max="90" inputmode="decimal"></label>
+        <label>Longitude <input id="mk-lon" type="number" step="0.0001" min="-180" max="180" inputmode="decimal"></label>
+      </div>
+      <button type="button" class="mk-link" id="mk-here">📍 Use my location</button>
+      <div class="mk-row">
+        <label>Date <input id="mk-date" type="date"></label>
+        <label>Local time <input id="mk-time" type="time"></label>
+      </div>
+      <label><span>Stars <output id="mk-mag-out"></output></span>
+        <input id="mk-mag" type="range" min="4.5" max="6.5" step="1" value="5.5">
+        <span class="mk-steps" aria-hidden="true"><i>City</i><i>Countryside</i><i>Dark sky</i></span>
+      </label>
+      <div class="mk-field"><span>Shape</span><div class="chips" id="mk-shape"><button type="button" class="chip" aria-pressed="true" data-v="circle">Round</button><button type="button" class="chip" aria-pressed="false" data-v="square">Square</button></div></div>
+      <label class="mk-check"><input type="checkbox" id="mk-lines" checked> Constellation lines</label>
+      <div class="mk-actions">
+        <button type="button" class="btn play" id="mk-download">Download sample</button>
+      </div>
+      <p class="mk-note">This is a small taste of the tool. If there's a night you'd love to have as a print-quality map, feel free to <a href="#contact" id="mk-hi">say hi</a>.</p>
+      <small class="mk-credit">Stars: HYG database (CC BY-SA). Constellation figures: Stellarium.</small>
+    </form>
+  </div>
 </dialog>
 <dialog id="specimen" aria-labelledby="spec-name">
   <button class="m-close" id="spec-close" aria-label="Close">✕</button>
@@ -651,6 +736,13 @@ const projects = [
     role: "Built the whole thing: ESP32 sensor acquisition with an on-device display, Wi-Fi logging to a local MySQL database, rolling time-series features feeding an XGBoost model that forecasts minutes until the CO₂ threshold. A smart-lamp alert that changes color depending on the air quality metrics over the home network.",
     pipeline: ["Sensors", "ESP32", "MySQL", "XGBoost forecast", "Lamp alert"],
     tech: ["ESP32", "MySQL", "Sensor integration", "IoT", "XGBoost", "Time-series features"] },
+  { title: "Star maps from a moment in time", cats: "data", tag: "Data viz · Astronomy", c: "#2B2D72", art: "stars",
+    sky: true,
+    desc: "The night sky exactly as it looked from any place at any moment, drawn from a real star catalogue and turned into a print-ready poster. Make your own right here.",
+    context: "People remember where they were on a big night, but not what was above them. I wanted to recreate the real sky over a meaningful place and moment (a birthday, an anniversary, a first night in a new city) and turn it into something you can print and hang on a wall.",
+    role: "Started with a Mollweide projection of ten well-known constellations, then rebuilt it as an observer's view. The Python script loads the HYG catalogue (about 120,000 stars) and the 88 constellation figures from Stellarium, converts every star from celestial coordinates (RA/Dec) to the altitude and azimuth seen from a given latitude, longitude and local time with astropy, finds the time zone with timezonefinder, keeps only what is above the horizon, and draws it on a polar projection with the zenith in the centre. Star size and glow scale with brightness, and the map is exported as a 300 dpi transparent PNG, round or square. For this site I ported the maths to JavaScript, so the map above is the live sky over Copenhagen and you can make your own.",
+    pipeline: ["HYG catalogue", "Constellation figures", "RA/Dec → Alt/Az", "Above the horizon", "Polar projection", "Glow by magnitude", "300 dpi print"],
+    tech: ["Python", "astropy", "pandas", "matplotlib", "NumPy", "timezonefinder", "JavaScript canvas"] },
   { title: "CNC pen plotter", cats: "hardware", tag: "Hardware · Generative art", c: "#7FD8F0", art: "plotter",
     video: "assets/plotter.mp4",
     desc: "A home-built pen plotter that turns photos and algorithms into line drowings with Gcode. Uses algorithms such as Voronoi stippling, and Traveling salesman for continuous path creation.",
@@ -675,8 +767,8 @@ projects.forEach((p, i) => {
   b.dataset.cats = p.cats;
   b.style.setProperty("--c", p.c);
   b.style.setProperty("--i", i);
-  b.innerHTML = `<div class="thumb"><canvas></canvas><span class="tag">${p.tag}</span>${p.play ? `<span class="play-badge">Playable</span>` : p.video ? `<span class="play-badge">Video</span>` : ""}</div>
-    <div class="card-body"><h3>${p.title}</h3><p>${p.desc}</p><div class="meta">${p.tech.slice(0, 3).map(t => `<span>${t}</span>`).join("")}</div><span class="more-hint">${p.play ? "Open it &amp; press play" : p.video ? "Open it &amp; watch it draw" : "Open the full story"} <i>→</i></span></div>`;
+  b.innerHTML = `<div class="thumb"><canvas></canvas><span class="tag">${p.tag}</span>${p.play ? `<span class="play-badge">Playable</span>` : p.sky ? `<span class="play-badge">Live sky</span>` : p.video ? `<span class="play-badge">Video</span>` : ""}</div>
+    <div class="card-body"><h3>${p.title}</h3><p>${p.desc}</p><div class="meta">${p.tech.slice(0, 3).map(t => `<span>${t}</span>`).join("")}</div><span class="more-hint">${p.play ? "Open it &amp; press play" : p.sky ? "Open it &amp; make your own map" : p.video ? "Open it &amp; watch it draw" : "Open the full story"} <i>→</i></span></div>`;
   b.addEventListener("click", () => openModal(p));
   grid.appendChild(b);
   painters.push({ cv: b.querySelector("canvas"), p });
@@ -700,6 +792,19 @@ const PLOT = (() => {
     route.push(pts.splice(best, 1)[0]);
   }
   return route;
+})();
+
+/* Thumbnail sky for the star-map card: [RA hours, Dec degrees] of the bright stars around the north celestial pole */
+const FIGURES = [
+  [[11.06, 61.75], [11.03, 56.38], [11.90, 53.69], [12.26, 57.03], [11.06, 61.75]],            /* the Plough's bowl */
+  [[12.26, 57.03], [12.90, 55.96], [13.40, 54.93], [13.79, 49.31]],                            /* ...and its handle */
+  [[0.15, 59.15], [0.68, 56.54], [0.95, 60.72], [1.43, 60.24], [1.91, 63.67]],                  /* Cassiopeia */
+  [[2.53, 89.26], [17.54, 86.59], [16.77, 82.04], [15.73, 77.79], [14.85, 74.16], [15.35, 71.83], [16.29, 75.76], [15.73, 77.79]] /* Little Dipper */
+];
+const STARFIELD = (() => {
+  let seed = 11;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  return Array.from({ length: 90 }, () => [rnd() * 24, 25 + rnd() * 65, .3 + rnd() * .7]);
 })();
 
 /* Animated canvas thumbnails — one tiny scene per project */
@@ -823,6 +928,30 @@ function draw(cv, p, t) {
     shape(() => x.roundRect(tx - 4, py - 22, 8, ph + 44, 4), "#fff");
     shape(() => x.roundRect(tx - 9, ty - 9, 18, 18, 4), "#FFD23F");
     x.beginPath(); x.arc(tx, ty, 3, 0, 7); x.fillStyle = "#FF5DA2"; x.fill();
+  } else if (p.art === "stars") {
+    /* real stars around the celestial pole turn like a time-lapse: the Plough, Cassiopeia and the Little Dipper circle Polaris */
+    const px = w * .5, py = h * .4, sc = Math.min(w, h * 1.6) * .0062;
+    const rot = (reduce ? 40 : t * 9) * Math.PI / 180;
+    /* facing north, the hour angle grows towards the left, so the sky turns counter-clockwise around Polaris */
+    const at = ([ra, dec]) => { const r = (90 - dec) * sc, ha = rot - ra * 15 * Math.PI / 180; return [px - r * Math.sin(ha), py - r * Math.cos(ha)]; };
+    STARFIELD.forEach(([ra, dec, b], i) => {
+      const [sx, sy] = at([ra, dec]);
+      x.globalAlpha = b * (.55 + .45 * Math.sin(t * 2 + i));
+      x.fillStyle = "#fff"; x.beginPath(); x.arc(sx, sy, .6 + b, 0, 7); x.fill();
+    });
+    x.globalAlpha = 1;
+    x.strokeStyle = "rgba(255,255,255,.75)"; x.lineWidth = 1.3;
+    FIGURES.forEach(fig => { x.beginPath(); fig.forEach((st, k) => k ? x.lineTo(...at(st)) : x.moveTo(...at(st))); x.stroke(); });
+    FIGURES.flat().forEach(st => {
+      const [sx, sy] = at(st);
+      x.fillStyle = "rgba(255,255,255,.25)"; x.beginPath(); x.arc(sx, sy, 4.5, 0, 7); x.fill();
+      x.fillStyle = "#fff"; x.beginPath(); x.arc(sx, sy, 1.9, 0, 7); x.fill();
+    });
+    /* rolling hills in front, so the sky sits above a horizon */
+    x.strokeStyle = INK; x.lineWidth = LW;
+    x.beginPath(); x.moveTo(0, h);
+    for (let xx = 0; xx <= w; xx += 6) x.lineTo(xx, h * .86 - Math.sin(xx / w * 5 + .8) * h * .05 - Math.sin(xx / w * 13) * h * .015);
+    x.lineTo(w, h); x.closePath(); x.fillStyle = "#14123A"; x.fill(); x.stroke();
   } else if (p.art === "invaders") {
     /* the cucumber fleet marches side to side while the cat fires back */
     const march = reduce ? 0 : Math.sin(t * 1.3) * w * .07;
@@ -862,8 +991,9 @@ requestAnimationFrame(loop);
 addEventListener("resize", () => { if (reduce) requestAnimationFrame(loop); });
 
 /* Filter */
-document.querySelectorAll(".chip").forEach(c => c.addEventListener("click", () => {
-  document.querySelectorAll(".chip").forEach(o => o.setAttribute("aria-pressed", o === c));
+const filterChips = document.querySelectorAll("#projects .chip");
+filterChips.forEach(c => c.addEventListener("click", () => {
+  filterChips.forEach(o => o.setAttribute("aria-pressed", o === c));
   const f = c.dataset.filter;
   grid.querySelectorAll(".card").forEach(card => card.classList.toggle("hide", f !== "all" && !card.dataset.cats.split(" ").includes(f)));
 }));
@@ -877,16 +1007,24 @@ function openModal(p) {
   document.getElementById("m-pipeline").innerHTML = p.pipeline.map(s => `<span>${s}</span>`).join("<i>→</i>");
   document.getElementById("m-meta").innerHTML = p.tech.map(t => `<span>${t}</span>`).join("");
   document.getElementById("m-thumb").style.setProperty("--c", p.c);
-  mPainter = { cv: document.getElementById("m-canvas"), p };
+  mPainter = p.sky ? null : { cv: document.getElementById("m-canvas"), p };
   setVideo(p.video);
-  document.getElementById("m-actions").hidden = !p.play;
-  document.getElementById("m-play").onclick = () => openArcade(p);
+  const action = p.play ? { label: "▶ Play it right here", note: "Real Python, running in your browser. First load takes a few seconds.", run: () => openArcade(p) }
+    : p.sky ? { label: "✨ Make your own star map", note: "A small sample of the tool: any place, any moment.", run: openMaker }
+    : null;
+  document.getElementById("m-actions").hidden = !action;
+  if (action) {
+    document.getElementById("m-play").textContent = action.label;
+    document.getElementById("m-note").textContent = action.note;
+    document.getElementById("m-play").onclick = action.run;
+  }
   modal.showModal();
+  setLiveSky(!!p.sky);
   if (reduce) requestAnimationFrame(loop);
 }
 document.getElementById("m-close").addEventListener("click", () => modal.close());
 modal.addEventListener("click", e => { if (e.target === modal) modal.close(); });
-modal.addEventListener("close", () => setVideo(null));
+modal.addEventListener("close", () => { setVideo(null); setLiveSky(false); });
 
 /* Project videos play silently on a loop as soon as the card opens; the button restarts them with sound */
 const mThumb = document.getElementById("m-thumb");
@@ -1102,6 +1240,400 @@ if (!reduce) {
   addEventListener("resize", sizeFlies);
   addEventListener("pointermove", e => { mouse.x = e.clientX; mouse.y = e.clientY; });
 }
+
+/* ───── Star maps: the star-map project's maths, ported to the browser ─────
+   Stars come from assets/stars.json (built from the HYG catalogue by tools/build_stars.py). Each star's J2000 position is
+   precessed to the date, turned into altitude/azimuth for the observer, and drawn on a polar projection: zenith in the
+   centre, horizon at the edge, north up and east on the left, as when you lie on your back and look up. */
+const D2R = Math.PI / 180;
+let starData = null, starLoad = null, lineStars = null;
+function loadStars() {
+  return starLoad ||= fetch("assets/stars.json")
+    .then(r => { if (!r.ok) throw new Error("stars " + r.status); return r.json(); })
+    .then(d => { starData = d; lineStars = new Set(d.lines.flat()); return d; })
+    .catch(e => { starLoad = null; throw e; });
+}
+const siderealDeg = jd => { const T = (jd - 2451545) / 36525; return 280.46061837 + 360.98564736629 * (jd - 2451545) + .000387933 * T * T; };
+/* An observer at a place and moment: converts sky coordinates to [altitude, azimuth] in radians.
+   j2000() takes catalogue (J2000) positions and precesses them to the date first (IAU 1976, as astropy does);
+   ofDate() takes positions that are already for the date (Sun, Moon). */
+function observer(ms, lat, lon) {
+  const jd = ms / 86400000 + 2440587.5, T = (jd - 2451545) / 36525, sec = D2R / 3600;
+  const zeta = (2306.2181 * T + .30188 * T * T + .017998 * T ** 3) * sec;
+  const z = (2306.2181 * T + 1.09468 * T * T + .018203 * T ** 3) * sec;
+  const th = (2004.3109 * T - .42665 * T * T - .041833 * T ** 3) * sec, ct = Math.cos(th), st = Math.sin(th);
+  const lst = (siderealDeg(jd) + lon) * D2R, sinLat = Math.sin(lat * D2R), cosLat = Math.cos(lat * D2R);
+  const ofDate = (ra, dec) => {
+    const ha = lst - ra, cd = Math.cos(dec), sd = Math.sin(dec), ch = Math.cos(ha);
+    return [Math.asin(sd * sinLat + cd * cosLat * ch), Math.atan2(-Math.sin(ha) * cd, cosLat * sd - sinLat * cd * ch)];
+  };
+  const j2000 = (ra, dec) => {
+    const a = ra + zeta, cd = Math.cos(dec), sd = Math.sin(dec);
+    return ofDate(Math.atan2(cd * Math.sin(a), ct * cd * Math.cos(a) - st * sd) + z, Math.asin(st * cd * Math.cos(a) + ct * sd));
+  };
+  return { jd, j2000, ofDate };
+}
+/* altitude and azimuth (radians) of every catalogue star, as [alt0, az0, alt1, az1, ...] */
+function skyPositions(obs) {
+  const out = new Float32Array(starData.stars.length * 2);
+  starData.stars.forEach(([ra, dec], i) => {
+    const [alt, az] = obs.j2000(ra * D2R, dec * D2R);
+    out[i * 2] = alt; out[i * 2 + 1] = az;
+  });
+  return out;
+}
+/* Sun and Moon, low precision (Sun ~0.01°, Moon ~0.3°), as ecliptic longitude/latitude of date */
+function sunMoon(jd) {
+  const n = jd - 2451545, eps = (23.439 - 4e-7 * n) * D2R;
+  const g = (357.528 + .9856003 * n) * D2R;
+  const sunLon = (280.460 + .9856474 * n + 1.915 * Math.sin(g) + .02 * Math.sin(2 * g)) * D2R;
+  const L = 218.316 + 13.176396 * n, M = (134.963 + 13.064993 * n) * D2R, F = (93.272 + 13.22935 * n) * D2R, D = (297.85 + 12.190749 * n) * D2R;
+  const moonLon = (L + 6.289 * Math.sin(M) + 1.274 * Math.sin(2 * D - M) + .658 * Math.sin(2 * D) + .214 * Math.sin(2 * M) - .186 * Math.sin(g) - .114 * Math.sin(2 * F)) * D2R;
+  const moonLat = (5.128 * Math.sin(F) + .28 * Math.sin(M + F) + .278 * Math.sin(M - F) + .173 * Math.sin(2 * D - F)) * D2R;
+  const toEq = (lam, bet) => [Math.atan2(Math.sin(lam) * Math.cos(eps) - Math.tan(bet) * Math.sin(eps), Math.cos(lam)), Math.asin(Math.sin(bet) * Math.cos(eps) + Math.cos(bet) * Math.sin(eps) * Math.sin(lam))];
+  return { sun: toEq(sunLon, 0), moon: toEq(moonLon, moonLat), elongation: Math.acos(Math.cos(moonLat) * Math.cos(moonLon - sunLon)) };
+}
+function sunAltitude(ms, lat, lon) {
+  const obs = observer(ms, lat, lon);
+  return obs.ofDate(...sunMoon(obs.jd).sun)[0] / D2R;
+}
+/* Naked-eye planets from JPL's approximate Keplerian elements (Standish, valid 1800-2050):
+   a, e, I, L, long. of perihelion, long. of node, each with its change per century */
+const PLANETS = {
+  Mercury: [[.38709927, .20563593, 7.00497902, 252.2503235, 77.45779628, 48.33076593], [3.7e-7, 1.906e-5, -.00594749, 149472.67411175, .16047689, -.12534081], "#D9D2C5", 2.4],
+  Venus: [[.72333566, .00677672, 3.39467605, 181.9790995, 131.60246718, 76.67984255], [3.9e-6, -4.107e-5, -7.889e-4, 58517.81538729, .00268329, -.27769418], "#FFF3CF", 4],
+  Earth: [[1.00000261, .01671123, -1.531e-5, 100.46457166, 102.93768193, 0], [5.62e-6, -4.392e-5, -.01294668, 35999.37244981, .32327364, 0]],
+  Mars: [[1.52371034, .0933941, 1.84969142, -4.55343205, -23.94362959, 49.55953891], [1.847e-5, 7.882e-5, -.00813131, 19140.30268499, .44441088, -.29257343], "#FF8F66", 3],
+  Jupiter: [[5.202887, .04838624, 1.30439695, 34.39644051, 14.72847983, 100.47390909], [-1.1607e-4, -1.3253e-4, -.00183714, 3034.74612775, .21252668, .20469106], "#F4DDB3", 3.6],
+  Saturn: [[9.53667594, .05386179, 2.48599187, 49.95424423, 92.59887831, 113.66242448], [-.0012506, -5.0991e-4, .00193609, 1222.49362201, -.41897216, -.28867794], "#EAD7A1", 3.2]
+};
+function heliocentric([el, rate], T) {
+  const [a, e, I, L, wp, node] = el.map((v, i) => v + rate[i] * T);
+  const M = ((L - wp) % 360) * D2R, w = (wp - node) * D2R, O = node * D2R, inc = I * D2R;
+  let E = M + e * Math.sin(M);
+  for (let k = 0; k < 6; k++) E -= (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
+  const xp = a * (Math.cos(E) - e), yp = a * Math.sqrt(1 - e * e) * Math.sin(E);
+  const cw = Math.cos(w), sw = Math.sin(w), cO = Math.cos(O), sO = Math.sin(O), ci = Math.cos(inc), si = Math.sin(inc);
+  return [(cw * cO - sw * sO * ci) * xp + (-sw * cO - cw * sO * ci) * yp, (cw * sO + sw * cO * ci) * xp + (-sw * sO + cw * cO * ci) * yp, sw * si * xp + cw * si * yp];
+}
+/* everything in the solar system worth drawing, with altitude/azimuth for this observer */
+function solarSystem(obs) {
+  const T = (obs.jd - 2451545) / 36525, eps = 23.43928 * D2R, earth = heliocentric(PLANETS.Earth, T);
+  const bodies = Object.entries(PLANETS).filter(([n]) => n !== "Earth").map(([name, p]) => {
+    const h = heliocentric(p, T), x = h[0] - earth[0], y = h[1] - earth[1], z = h[2] - earth[2];
+    const ye = y * Math.cos(eps) - z * Math.sin(eps), ze = y * Math.sin(eps) + z * Math.cos(eps);
+    const [alt, az] = obs.j2000(Math.atan2(ye, x), Math.atan2(ze, Math.hypot(x, ye)));
+    return { name, alt, az, color: p[2], size: p[3] };
+  });
+  const sm = sunMoon(obs.jd);
+  const [salt, saz] = obs.ofDate(...sm.sun), [malt, maz] = obs.ofDate(...sm.moon);
+  bodies.push({ name: "Sun", alt: salt, az: saz, sun: true });
+  /* the Moon is close enough that parallax lowers it by up to 1° */
+  bodies.push({ name: "Moon", alt: malt - .95 * D2R * Math.cos(malt), az: maz, moon: true, phase: Math.PI - sm.elongation });
+  return bodies;
+}
+const starGlow = (() => {
+  const c = document.createElement("canvas"); c.width = c.height = 64;
+  const g = c.getContext("2d"), r = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  r.addColorStop(0, "rgba(255,255,255,.5)"); r.addColorStop(.35, "rgba(255,255,255,.14)"); r.addColorStop(1, "rgba(255,255,255,0)");
+  g.fillStyle = r; g.fillRect(0, 0, 64, 64);
+  return c;
+})();
+const mix = (c1, c2, t) => { const h = c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16)); const p = h(c1), q = h(c2); return `rgb(${p.map((v, i) => Math.round(v + (q[i] - v) * t)).join(",")})`; };
+/* Squares the circle: maps a point of the unit disc to the square [-1, 1]² (elliptical grid mapping, Fong 2015),
+   so the whole sky can fill a rectangle with the horizon running along all four edges */
+function discToSquare(u, v) {
+  const s2 = 2 * Math.SQRT2, a = 2 + u * u - v * v, b = 2 - u * u + v * v, q = x => Math.sqrt(Math.max(0, x));
+  return [.5 * q(a + s2 * u) - .5 * q(a - s2 * u), .5 * q(b + s2 * v) - .5 * q(b - s2 * v)];
+}
+/* o: { lat, lon, ms, mag, lines, lineAlpha, shape: "circle" | "square" | "sky", bg, compass, planets, caption }
+   "circle" and "square" are the print layouts. "sky" fills the whole canvas with the whole sky: overhead in the middle,
+   the horizon along the edges, north at the top and east on the left (as when you lie on your back and look up).
+   Returns the Sun, Moon and planets that were drawn, with their canvas positions. */
+function drawStarMap(ctx, W, H, o) {
+  ctx.clearRect(0, 0, W, H);
+  const sky = o.shape === "sky", square = o.shape === "square";
+  const box = o.caption ? W * .84 : Math.min(W, H) * .88;
+  const cx = W / 2, cy = o.caption ? W * .08 + box / 2 : H / 2;
+  const R = sky ? 1 : (square ? box / .7657 : box) / 2;   /* the square print is the middle 76.6% of the round one (crop_square.py) */
+  const obs = observer(o.ms, o.lat, o.lon), pos = skyPositions(obs);
+  const project = (alt, az) => {
+    const r = (1 - alt / (Math.PI / 2)) * R, u = -r * Math.sin(az), v = -r * Math.cos(az);
+    if (!sky) return [cx + u, cy + v];
+    const [x, y] = discToSquare(u, v);
+    return [cx + x * W / 2, cy + y * H / 2];
+  };
+  const xy = i => project(pos[i * 2], pos[i * 2 + 1]);
+  const bodies = o.planets ? solarSystem(obs) : [], sun = bodies.find(b => b.sun);
+  /* how much daylight: 0 at night (Sun 8° below the horizon or lower), 1 once it's 6° up */
+  const day = sun ? Math.min(1, Math.max(0, (sun.alt / D2R + 8) / 14)) : 0;
+  if (o.bg) { ctx.fillStyle = "#0B0D26"; ctx.fillRect(0, 0, W, H); }
+  ctx.save();
+  ctx.beginPath();
+  if (sky) ctx.rect(0, 0, W, H); else if (square) ctx.rect(cx - box / 2, cy - box / 2, box, box); else ctx.arc(cx, cy, R, 0, Math.PI * 2);
+  if (o.bg) {
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, sky ? Math.hypot(W, H) / 2 : R);
+    g.addColorStop(0, sky ? mix("#121538", "#2456B0", day) : "#171B47");
+    g.addColorStop(1, sky ? mix("#0B0D26", "#8DB8EA", day) : "#0B0D26");
+    ctx.fillStyle = g; ctx.fill();
+    if (sky && sun && sun.alt > -12 * D2R) {
+      /* warm glow where the Sun is, strongest around sunrise and sunset */
+      const [gx, gy] = project(Math.max(sun.alt, 0), sun.az), warm = Math.max(.25, 1 - Math.abs(sun.alt / D2R) / 12), gr = Math.min(W, H) * .6;
+      const glow = ctx.createRadialGradient(gx, gy, 0, gx, gy, gr);
+      glow.addColorStop(0, `rgba(255,190,120,${.5 * warm})`); glow.addColorStop(1, "rgba(255,170,110,0)");
+      ctx.fillStyle = glow; ctx.fill();
+    }
+  }
+  ctx.clip();
+  const pt = (sky ? Math.min(W, H) : R * 2) / 1260;   /* production_round.py draws on a ~1260 pt wide figure: 1 pt there = pt pixels here */
+  ctx.globalAlpha = 1 - day * .65;   /* daylight washes the stars out */
+  if (o.lines) {
+    ctx.strokeStyle = `rgba(222,226,240,${o.lineAlpha ?? .6})`; ctx.lineWidth = Math.max(.6, .7 * pt);
+    ctx.beginPath();
+    starData.lines.forEach(([a, b]) => {
+      if (pos[a * 2] < 0 || pos[b * 2] < 0) return;
+      ctx.moveTo(...xy(a)); ctx.lineTo(...xy(b));
+    });
+    ctx.stroke();
+  }
+  ctx.fillStyle = "#fff";
+  starData.stars.forEach(([, , mag], i) => {
+    if (pos[i * 2] < 0) return;
+    const fig = o.lines && lineStars.has(i);
+    if (!fig && mag > o.mag) return;
+    /* same sizing as the Python version: marker area grows with brightness, constellation stars a bit larger, plus a glow */
+    const area = (fig ? 35 : 20) * Math.max(.12, 5.01 - mag) / 5;
+    const [sx, sy] = xy(i);
+    if (area > 1) { const gr = Math.sqrt(area + Math.ceil(area * 1.2) * 10) / 2 * pt; ctx.drawImage(starGlow, sx - gr, sy - gr, gr * 2, gr * 2); }
+    ctx.beginPath(); ctx.arc(sx, sy, Math.max(Math.sqrt(area) / 2 * pt, (sky ? Math.min(W, H) / 2 : R) * .0016), 0, Math.PI * 2); ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+  const drawn = [], u = Math.min(W, H) / 300;
+  bodies.forEach(b => {
+    if (b.alt < 0) return;
+    const [bx, by] = project(b.alt, b.az);
+    let r;
+    if (b.sun) {
+      r = 7 * u;
+      const g = ctx.createRadialGradient(bx, by, 0, bx, by, 30 * u);
+      g.addColorStop(0, "rgba(255,240,190,1)"); g.addColorStop(.25, "rgba(255,220,140,.5)"); g.addColorStop(1, "rgba(255,210,120,0)");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(bx, by, 30 * u, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#FFF8E4"; ctx.beginPath(); ctx.arc(bx, by, r, 0, Math.PI * 2); ctx.fill();
+    } else if (b.moon) {
+      /* lit side faces the Sun; the terminator is an ellipse whose width follows the phase */
+      r = 6.5 * u;
+      const [sx, sy] = project(Math.max(sun.alt, 0), sun.az), cosI = Math.cos(b.phase);
+      ctx.save(); ctx.translate(bx, by); ctx.rotate(Math.atan2(sy - by, sx - bx));
+      ctx.fillStyle = "rgba(255,255,255,.16)"; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowColor = "rgba(255,255,255,.6)"; ctx.shadowBlur = 10 * u;
+      ctx.fillStyle = "#F4F1E6"; ctx.beginPath();
+      ctx.arc(0, 0, r, -Math.PI / 2, Math.PI / 2);
+      ctx.ellipse(0, 0, Math.abs(cosI) * r, r, 0, Math.PI / 2, -Math.PI / 2, cosI < 0);
+      ctx.fill(); ctx.restore();
+    } else {
+      r = b.size * u * .55;
+      ctx.save(); ctx.shadowColor = b.color; ctx.shadowBlur = 8 * u;
+      ctx.fillStyle = b.color; ctx.beginPath(); ctx.arc(bx, by, r, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    }
+    drawn.push({ name: b.name, x: bx, y: by, r });
+  });
+  ctx.restore();
+  if (o.compass) {
+    const fs = Math.max(10, Math.min(W, H) * .032), inset = fs * 1.1;
+    ctx.fillStyle = `rgba(255,255,255,${.6 + day * .2})`; ctx.font = `600 ${fs}px Inter, system-ui, sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    if (sky) {
+      ctx.save(); ctx.shadowColor = "rgba(6,10,40,.45)"; ctx.shadowBlur = fs * .5;
+      [["N", cx, inset], ["S", cx, H - inset], ["E", inset, cy], ["W", W - inset, cy]].forEach(([l, lx, ly]) => ctx.fillText(l, lx, ly));
+      ctx.restore();
+    } else {
+      ctx.strokeStyle = "rgba(255,255,255,.16)"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
+      [["N", 0, -1], ["E", -1, 0], ["S", 0, 1], ["W", 1, 0]].forEach(([l, dx, dy]) => ctx.fillText(l, cx + dx * (R + fs), cy + dy * (R + fs)));
+    }
+  }
+  if (o.caption) {
+    const [title, sub] = o.caption, ty = W * .08 + box + W * .1;
+    ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    if (title) { ctx.fillStyle = "#F4F2FF"; ctx.font = `600 ${W * .05}px Inter, system-ui, sans-serif`; ctx.fillText(title, cx, ty); }
+    ctx.fillStyle = "rgba(244,242,255,.72)"; ctx.font = `500 ${W * .019}px Inter, system-ui, sans-serif`;
+    if ("letterSpacing" in ctx) ctx.letterSpacing = `${W * .004}px`;
+    ctx.fillText(sub.toUpperCase(), cx, title ? ty + W * .055 : ty - W * .02);
+    if ("letterSpacing" in ctx) ctx.letterSpacing = "0px";
+  }
+  return drawn;
+}
+
+/* The project window shows the whole live sky over Copenhagen, redrawn every 30 seconds. The Sun, Moon and planets
+   carry no labels: hovering (or tapping) one shows its name. */
+const COPENHAGEN = { lat: 55.6761, lon: 12.5683, tz: "Europe/Copenhagen" };
+const skyLabel = document.getElementById("sky-label"), skyTip = document.getElementById("sky-tip"), mCanvas = document.getElementById("m-canvas");
+let skyTimer = null, skyBodies = [];
+function renderLiveSky() {
+  if (!starData || !mThumb.classList.contains("sky")) return;
+  /* offsetWidth is the layout size: unlike getBoundingClientRect it ignores the window's opening (scale) animation,
+     so the drawing and the hover positions always line up */
+  const w = mCanvas.offsetWidth, h = mCanvas.offsetHeight, dpr = Math.min(devicePixelRatio || 1, 2);
+  if (!w) return;
+  mCanvas.width = Math.round(w * dpr); mCanvas.height = Math.round(h * dpr);
+  const now = Date.now();
+  skyBodies = drawStarMap(mCanvas.getContext("2d"), mCanvas.width, mCanvas.height, { ...COPENHAGEN, ms: now, mag: 5.5, lines: true, lineAlpha: .28, shape: "sky", bg: true, compass: true, planets: true })
+    .map(b => ({ ...b, x: b.x / dpr, y: b.y / dpr, r: b.r / dpr }));
+  const time = new Intl.DateTimeFormat("en-GB", { timeZone: COPENHAGEN.tz, hour: "2-digit", minute: "2-digit" }).format(now);
+  skyLabel.innerHTML = `<b>Live · the sky over Copenhagen, ${time}</b><span><span class="long">Overhead in the middle, the horizon at the edges. </span>${skyBodies.length ? `${canHover ? "Hover" : "Tap"} the Sun, Moon and planets.` : ""}</span>`;
+}
+function skyTipAt(e) {
+  /* pointer position in the canvas's own (unscaled) pixels, then the nearest body within reach */
+  const c = mCanvas.getBoundingClientRect(), k = mCanvas.offsetWidth / c.width;
+  const x = (e.clientX - c.left) * k, y = (e.clientY - c.top) * k;
+  let hit = null, best = Infinity;
+  skyBodies.forEach(b => { const d = Math.hypot(b.x - x, b.y - y); if (d < Math.max(16, b.r + 8) && d < best) { hit = b; best = d; } });
+  skyTip.hidden = !hit;
+  if (hit) { skyTip.textContent = hit.name; skyTip.style.left = `${mCanvas.offsetLeft + hit.x}px`; skyTip.style.top = `${mCanvas.offsetTop + hit.y - hit.r - 8}px`; }
+}
+mThumb.addEventListener("pointermove", e => { if (mThumb.classList.contains("sky")) skyTipAt(e); });
+mThumb.addEventListener("pointerdown", e => { if (mThumb.classList.contains("sky")) skyTipAt(e); });
+mThumb.addEventListener("pointerleave", () => { skyTip.hidden = true; });
+function setLiveSky(on) {
+  mThumb.classList.toggle("sky", on);
+  skyTip.hidden = true;
+  clearInterval(skyTimer);
+  if (!on) return;
+  skyLabel.innerHTML = "<b>Finding the stars…</b>";
+  mCanvas.getContext("2d").clearRect(0, 0, mCanvas.width, mCanvas.height);
+  loadStars().then(() => { renderLiveSky(); skyTimer = setInterval(renderLiveSky, 30000); })
+    .catch(() => { skyLabel.innerHTML = "<b>The live sky couldn't load right now</b>"; });
+}
+
+/* The map maker: any place, any local date and time */
+const maker = document.getElementById("maker"), mkCanvas = document.getElementById("maker-canvas");
+const $ = id => document.getElementById(id);
+const CITIES = [
+  ["Aarhus", 56.1629, 10.2039, "Europe/Copenhagen"], ["Amsterdam", 52.3676, 4.9041, "Europe/Amsterdam"], ["Barcelona", 41.3874, 2.1686, "Europe/Madrid"],
+  ["Berlin", 52.52, 13.405, "Europe/Berlin"], ["Buenos Aires", -34.6037, -58.3816, "America/Argentina/Buenos_Aires"], ["Cape Town", -33.9249, 18.4241, "Africa/Johannesburg"],
+  ["Copenhagen", 55.6761, 12.5683, "Europe/Copenhagen"], ["Dubai", 25.2048, 55.2708, "Asia/Dubai"], ["Kyiv", 50.4501, 30.5234, "Europe/Kiev"],
+  ["Lisbon", 38.7223, -9.1393, "Europe/Lisbon"], ["London", 51.5072, -0.1276, "Europe/London"], ["Los Angeles", 34.0522, -118.2437, "America/Los_Angeles"],
+  ["Madrid", 40.4168, -3.7038, "Europe/Madrid"], ["Marrakesh", 31.6295, -7.9811, "Africa/Casablanca"], ["Mexico City", 19.4326, -99.1332, "America/Mexico_City"],
+  ["New York", 40.7128, -74.006, "America/New_York"], ["Oslo", 59.9139, 10.7522, "Europe/Oslo"], ["Palma de Mallorca", 39.5696, 2.6502, "Europe/Madrid"],
+  ["Paris", 48.8566, 2.3522, "Europe/Paris"], ["Prague", 50.0755, 14.4378, "Europe/Prague"], ["Reykjavík", 64.1466, -21.9426, "Atlantic/Reykjavik"],
+  ["Rio de Janeiro", -22.9068, -43.1729, "America/Sao_Paulo"], ["Rome", 41.9028, 12.4964, "Europe/Rome"], ["Singapore", 1.3521, 103.8198, "Asia/Singapore"],
+  ["Stockholm", 59.3293, 18.0686, "Europe/Stockholm"], ["Sydney", -33.8688, 151.2093, "Australia/Sydney"], ["Tokyo", 35.6762, 139.6503, "Asia/Tokyo"],
+  ["Tórshavn", 62.0079, -6.7909, "Atlantic/Faroe"], ["Vienna", 48.2082, 16.3738, "Europe/Vienna"], ["Warsaw", 52.2297, 21.0122, "Europe/Warsaw"]
+];
+const STAR_LEVELS = { 4.5: "as seen from a city", 5.5: "as seen from the countryside", 6.5: "a perfectly dark sky" };
+let place = null, here = null;
+/* tz is an IANA zone name, or a fixed UTC offset in hours for typed-in coordinates */
+function tzOffsetMs(tz, ms) {
+  if (typeof tz === "number") return tz * 3600000;
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: tz, hourCycle: "h23", year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "numeric", second: "numeric" })
+    .formatToParts(new Date(ms)).map(x => [x.type, +x.value]));
+  return Date.UTC(p.year, p.month - 1, p.day, p.hour % 24, p.minute, p.second) - Math.floor(ms / 1000) * 1000;
+}
+function localToUTC(date, time, tz) {
+  const [y, mo, d] = date.split("-").map(Number), [h, mi] = (time || "00:00").split(":").map(Number);
+  const wall = Date.UTC(y, mo - 1, d, h, mi);
+  return wall - tzOffsetMs(tz, wall - tzOffsetMs(tz, wall));
+}
+function wallClock(tz, ms) {
+  const d = new Date(ms + tzOffsetMs(tz, ms)), pad = n => String(n).padStart(2, "0");
+  return { date: `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`, time: `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}` };
+}
+const pressed = id => $(id).querySelector('[aria-pressed="true"]').dataset.v;
+const coords = (lat, lon) => `${Math.abs(lat).toFixed(2)}°${lat >= 0 ? "N" : "S"} ${Math.abs(lon).toFixed(2)}°${lon >= 0 ? "E" : "W"}`;
+function makerOptions() {
+  const date = $("mk-date").value, time = $("mk-time").value || "00:00";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !place || !Number.isFinite(place.lat) || !Number.isFinite(place.lon)) return null;
+  const [y, mo, d] = date.split("-").map(Number);
+  const longDate = new Date(Date.UTC(y, mo - 1, d)).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+  return {
+    lat: place.lat, lon: place.lon, ms: localToUTC(date, time, place.tz), mag: +$("mk-mag").value, lines: $("mk-lines").checked,
+    shape: pressed("mk-shape"), bg: true,
+    caption: ["", [place.name, coords(place.lat, place.lon), longDate, time].filter(Boolean).join("  ·  ")],
+    file: `star-map-${(place.name || "my-sky").toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, "-")}-${date}.jpg`
+  };
+}
+let makerQueued = false;
+function renderMaker() {
+  $("mk-mag-out").textContent = `· ${STAR_LEVELS[$("mk-mag").value] || ""}`;
+  if (makerQueued) return;
+  makerQueued = true;
+  requestAnimationFrame(() => {
+    makerQueued = false;
+    const o = makerOptions();
+    if (!starData || !o || !maker.open) return;
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    mkCanvas.width = Math.round(mkCanvas.offsetWidth * dpr); mkCanvas.height = Math.round(mkCanvas.offsetWidth * dpr * 2930 / 2400);
+    drawStarMap(mkCanvas.getContext("2d"), mkCanvas.width, mkCanvas.height, { ...o, bg: false });
+  });
+}
+function usePlace(v) {
+  $("mk-custom").hidden = v !== "custom";
+  if (v === "here" && here) place = here;
+  else if (v === "custom") {
+    const lat = place ? place.lat : COPENHAGEN.lat, lon = place ? place.lon : COPENHAGEN.lon;
+    $("mk-lat").value = lat.toFixed(4); $("mk-lon").value = lon.toFixed(4);
+    place = { name: "", lat, lon, tz: Math.round(lon / 15) };   /* typed coordinates use local solar time */
+  } else { const c = CITIES[+v]; place = { name: c[0], lat: c[1], lon: c[2], tz: c[3] }; }
+  renderMaker();
+}
+$("mk-place").innerHTML = CITIES.map((c, i) => `<option value="${i}">${c[0]}</option>`).join("") + `<option value="custom">Custom coordinates…</option>`;
+$("mk-place").addEventListener("change", e => usePlace(e.target.value));
+["mk-lat", "mk-lon"].forEach(id => $(id).addEventListener("input", () => {
+  const lat = Math.max(-90, Math.min(90, +$("mk-lat").value)), lon = Math.max(-180, Math.min(180, +$("mk-lon").value));
+  place = { name: "", lat, lon, tz: Math.round(lon / 15) };
+  renderMaker();
+}));
+["mk-date", "mk-time", "mk-mag", "mk-lines"].forEach(id => $(id).addEventListener("input", renderMaker));
+["mk-shape"].forEach(id => $(id).addEventListener("click", e => {
+  const b = e.target.closest(".chip");
+  if (!b) return;
+  $(id).querySelectorAll(".chip").forEach(c => c.setAttribute("aria-pressed", c === b));
+  renderMaker();
+}));
+$("mk-here").addEventListener("click", () => {
+  if (!navigator.geolocation) { say("Your browser can't share a location"); return; }
+  $("mk-here").textContent = "📍 Finding you…";
+  navigator.geolocation.getCurrentPosition(pos => {
+    here = { name: "", lat: pos.coords.latitude, lon: pos.coords.longitude, tz: Intl.DateTimeFormat().resolvedOptions().timeZone };
+    if (!$("mk-place").querySelector('[value="here"]')) $("mk-place").insertAdjacentHTML("afterbegin", `<option value="here">My location</option>`);
+    $("mk-place").value = "here";
+    $("mk-here").textContent = "📍 Use my location";
+    usePlace("here");
+  }, () => { $("mk-here").textContent = "📍 Use my location"; say("Couldn't get your location"); }, { timeout: 10000 });
+});
+$("mk-download").addEventListener("click", () => {
+  const o = makerOptions();
+  if (!o || !starData) return;
+  /* the website hands out a light sample: a 900 px JPG */
+  const c = document.createElement("canvas");
+  c.width = 900; c.height = 1099;
+  drawStarMap(c.getContext("2d"), c.width, c.height, o);
+  c.toBlob(blob => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = o.file;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    say("Your sample star map is downloading ✨");
+  }, "image/jpeg", .75);
+});
+$("mk-hi").addEventListener("click", e => {
+  e.preventDefault();
+  maker.close();
+  document.getElementById("contact").scrollIntoView({ behavior: reduce ? "auto" : "smooth" });
+});
+function openMaker() {
+  modal.close();
+  if (!place) {
+    $("mk-place").value = String(CITIES.findIndex(c => c[0] === "Copenhagen"));
+    usePlace($("mk-place").value);
+    const now = wallClock(place.tz, Date.now());
+    $("mk-date").value = now.date; $("mk-time").value = now.time;
+  }
+  maker.showModal();
+  Promise.all([loadStars(), document.fonts.load("600 40px Inter").catch(() => {})]).then(renderMaker).catch(() => say("The star catalogue couldn't load right now"));
+}
+$("maker-close").addEventListener("click", () => maker.close());
+maker.addEventListener("click", e => { if (e.target === maker) maker.close(); });
+addEventListener("resize", () => { if (maker.open) renderMaker(); if (modal.open) renderLiveSky(); });
 
 /* Fairy dust: moving the mouse (or a finger) over the festival photo sheds glittering specks that drift, twinkle and slowly fall */
 const paint = document.querySelector(".light-paint"), tc = document.getElementById("trail"), tctx = tc.getContext("2d");
