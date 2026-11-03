@@ -45,6 +45,7 @@ class CucumberInvasion:
         self.stats = GameStats(self)
         self.sb = Scoreboard(self)
         self.paused_until = 0
+        self.pointer_down = False   # mouse button / finger currently pressed on the game
 
         self.play_button = Button(self, "Play")
 
@@ -74,14 +75,22 @@ class CucumberInvasion:
                 self._check_keyup_events(event)
 
             elif event.type == pygame.MOUSEBUTTONDOWN:
+                self.pointer_down = True
                 if self.stats.game_active:
                     self.cat.target_x = event.pos[0]
                     self._fire_bullet()
                 else:
                     self._check_play_button(event.pos)
 
+            elif event.type == pygame.MOUSEBUTTONUP:
+                self.pointer_down = False
+
             elif event.type == pygame.MOUSEMOTION:
-                if self.stats.game_active and event.buttons[0]:
+                # Dragging steers the cat, but only between our own press and release (in Safari the
+                # reported button state can stay "pressed", so plain mouse moves would steer the cat),
+                # and never while an arrow key is held: the keyboard always wins.
+                keys_held = self.cat.moving_left or self.cat.moving_right
+                if self.stats.game_active and self.pointer_down and event.buttons[0] and not keys_held:
                     self.cat.target_x = event.pos[0]
 
     def _check_play_button(self, mouse_pos):

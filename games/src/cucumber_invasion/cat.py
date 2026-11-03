@@ -22,15 +22,18 @@ class Cat:
 
     def update(self, dt=1.0):
         speed = self.settings.cat_speed * dt
-        if self.target_x is not None:
+        # arrow keys win over a tapped / clicked target
+        if self.moving_right or self.moving_left:
+            self.target_x = None
+            if self.moving_right:
+                self.x += speed
+            if self.moving_left:
+                self.x -= speed
+        elif self.target_x is not None:
             dx = self.target_x - (self.x + self.rect.width / 2)
             self.x += max(-speed, min(speed, dx))
             if abs(dx) <= speed:
                 self.target_x = None
-        elif self.moving_right:
-            self.x += speed
-        elif self.moving_left:
-            self.x -= speed
         self.x = max(0.0, min(self.x, float(self.screen_rect.right - self.rect.width)))
         self.rect.x = self.x
 
