@@ -465,7 +465,7 @@ dialog[open] { animation: pop .5s var(--ease); }
   <div class="hero-copy">
     <span class="hello"><span class="wave" aria-hidden="true">👋</span> Hello there, I'm</span>
     <h1><span class="wiggle" data-text="Oleksandr"></span></h1>
-    <h2><span class="led on" id="led-work" style="--led: var(--led-blue)">Models</span> by day. <span class="led" id="led-coffee" style="--led: var(--led-pink)">Contraptions</span> by night</h2>
+    <h2><span class="led on" id="led-work" style="--led: var(--led-blue)">Models</span> by day. <span class="led" id="led-night" style="--led: var(--led-pink)">Side quests</span> by night</h2>
     <p class="lede">Data Scientist turning messy real-world data into decisions people trust; and spare weekends into things that glow, beep, and occasionally work.</p>
     <div class="btns">
       <a class="btn" href="#projects">See my projects <span class="arr" aria-hidden="true">→</span></a>
@@ -473,15 +473,16 @@ dialog[open] { animation: pop .5s var(--ease); }
     </div>
   </div>
   <div class="stage">
-    <span class="flip-hint" id="flip-hint">Tap for coffee ☕</span>
-    <button class="flip" id="flip" aria-label="Flip photo between work mode and coffee mode">
+    <span class="flip-hint" id="flip-hint">Tap for night mode 🌙</span>
+    <button class="flip" id="flip" aria-label="Switch between day and night mode">
       <span class="side front">
-        <img src="assets/oleksandr-pro.jpg" data-dark alt="Oleksandr, portrait in a dark red blazer" width="880" height="1100">
-        <span class="caption">Work mode</span>
+        <img src="assets/oleksandr-pro.jpg" alt="Oleksandr, portrait in a dark red blazer" width="880" height="1100">
+        <span class="caption">Day mode</span>
       </span>
       <span class="side back">
-        <img src="assets/oleksandr-coffee.jpg" data-dark alt="Oleksandr drinking coffee from a yellow Lego-head mug" loading="lazy" width="1000" height="1000">
-        <span class="caption">Coffee mode</span>
+        <!-- night portrait: two candidates, oleksandr-pro-dark.jpg and oleksandr-pro-dark2.jpg -->
+        <img src="assets/oleksandr-pro-dark.jpg" alt="Oleksandr, portrait in a dark red blazer against a dark background" width="880" height="1100">
+        <span class="caption">Night mode</span>
       </span>
     </button>
   </div>
@@ -561,7 +562,7 @@ dialog[open] { animation: pop .5s var(--ease); }
 <section class="wrap contact reveal" id="contact">
   <div class="big-card">
     <h2>Let's talk!</h2>
-    <p>Got an idea, a dataset that misbehaves, or an exciting project?</p>
+    <p>Got an idea, a mischievous dataset, or an exciting project?</p>
     <form class="contact-form" id="contact-form" novalidate>
       <div class="cf-row">
         <label>Your name<input name="name" type="text" maxlength="80" autocomplete="name" required></label>
@@ -714,11 +715,12 @@ function swapPhotos(dark) {
     next.src = want;
   });
 }
-function applyTheme(mode, announce) {
+function applyTheme(mode, announce, turnCard) {
   root.dataset.theme = mode;
   lamp.title = mode === "night" ? "Back to daylight" : "Lights on";
   lamp.setAttribute("aria-label", lamp.title);
   swapPhotos(mode === "night");
+  setCard(mode === "night", turnCard);
   if (announce) say(mode === "night" ? "Lights on ✨ welcome to the night walk" : "Back to daylight ☀️");
 }
 /* Every visit starts in daylight; the lights are something visitors switch on themselves */
@@ -801,24 +803,41 @@ projects.forEach((p, i) => {
   painters.push({ cv: b.querySelector("canvas"), p });
 });
 
-/* Stipple points for the plotter thumbnail: dense in a disc and a ring, ordered into one route */
+/* The plotter thumbnail draws an owl on a branch. Its big eyes are already on the paper; the pen draws the rest as
+   strokes (body and ear tufts in one line, brow, beak, wings, chest feathers, talons, branch, twig and leaf), lifting
+   between them like the real servo pen lift. Coordinates are fractions of the paper, curves are sampled quadratic Béziers. */
 const PLOT = (() => {
-  let seed = 7;
-  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  const pts = [];
-  while (pts.length < 150) {
-    const u = rnd(), v = rnd(), d = Math.hypot(u - .5, v - .5);
-    const dark = d < .16 || Math.abs(d - .34) < .045;
-    if (rnd() < (dark ? .95 : .015)) pts.push([u, v]);
-  }
-  const route = [pts.shift()];
-  while (pts.length) {
-    const [lu, lv] = route[route.length - 1];
-    let best = 0;
-    pts.forEach(([u, v], i) => { if (Math.hypot(u - lu, v - lv) < Math.hypot(pts[best][0] - lu, pts[best][1] - lv)) best = i; });
-    route.push(pts.splice(best, 1)[0]);
-  }
-  return route;
+  const curve = (p0, c, p1, n = 10) => Array.from({ length: n }, (_, i) => {
+    const k = (i + 1) / n, m = 1 - k;
+    return [m * m * p0[0] + 2 * m * k * c[0] + k * k * p1[0], m * m * p0[1] + 2 * m * k * c[1] + k * k * p1[1]];
+  });
+  const body = [[.36, .84],
+    ...curve([.36, .84], [.22, .62], [.3, .3]),          /* left side */
+    [.29, .1], [.41, .21],                               /* left ear tuft */
+    ...curve([.41, .21], [.5, .17], [.59, .21]),         /* top of the head */
+    [.71, .1], [.7, .3],                                 /* right ear tuft */
+    ...curve([.7, .3], [.78, .62], [.64, .84]),          /* right side */
+    ...curve([.64, .84], [.5, .93], [.36, .84])];        /* belly, back to the start */
+  const brow = [[.32, .23], ...curve([.32, .23], [.4, .17], [.5, .3], 8), ...curve([.5, .3], [.6, .17], [.68, .23], 8)];
+  const beak = [[.47, .45], [.5, .54], [.53, .45], [.47, .45]];
+  const wingL = [[.33, .5], ...curve([.33, .5], [.25, .7], [.4, .8])], wingR = [[.67, .5], ...curve([.67, .5], [.75, .7], [.6, .8])];
+  const chest = [[[.43, .62], [.45, .65], [.47, .62]], [[.53, .62], [.55, .65], [.57, .62]], [[.46, .7], [.48, .73], [.5, .7], [.52, .73], [.54, .7]]];
+  const talons = [.42, .45, .55, .58].map(u => [[u, .85], [u - .005, .9]]);
+  const branch = [[.08, .9], ...curve([.08, .9], [.5, .87], [.94, .89], 12)], twig = [[.78, .885], [.84, .82]];
+  /* an almond-shaped leaf at the end of the twig, then its midrib */
+  const leaf = [[.84, .82], ...curve([.84, .82], [.99, .8], [.97, .62], 10), ...curve([.97, .62], [.82, .65], [.84, .82], 10)];
+  const vein = [[.84, .82], ...curve([.84, .82], [.9, .74], [.95, .66], 6)];
+  const strokes = [body, brow, beak, wingL, wingR, ...chest, ...talons, branch, twig, leaf, vein];
+  /* one timeline: drawing moves, plus pen-up moves between strokes (travel counts as time too, at a faster pace) */
+  const steps = [];
+  let total = 0, at = strokes[0][0];
+  const step = (p, q, draw) => { const len = Math.hypot(q[0] - p[0], q[1] - p[1]) * (draw ? 1 : .5); steps.push({ p, q, draw, start: total, len }); total += len; };
+  strokes.forEach(st => {
+    if (at !== st[0]) step(at, st[0], false);
+    for (let i = 1; i < st.length; i++) step(st[i - 1], st[i], true);
+    at = st[st.length - 1];
+  });
+  return { steps, total };
 })();
 
 /* Thumbnail sky for the star-map card: [RA hours, Dec degrees] of the bright stars around the north celestial pole */
@@ -937,24 +956,39 @@ function draw(cv, p, t) {
     x.fillStyle = lc; x.fillRect(w * .82, h * .81 - lvl * h * .64, w * .08, lvl * h * .66); x.restore();
     x.font = `800 ${Math.round(h * .09)}px system-ui`; x.fillStyle = INK; x.textAlign = "left"; x.fillText("CO₂", w * .8, h * .93);
   } else if (p.art === "plotter") {
-    /* the pen joins a stippled drawing into one continuous line, gantry following along */
+    /* the pen draws an owl around eyes that are already on the paper, lifting between strokes; the gantry follows */
     const ph = h * .72, pw = Math.min(w * .6, ph * 1.15), px = (w - pw) / 2, py = h * .14;
     const at = ([u, v]) => [px + u * pw, py + v * ph];
     shape(() => x.roundRect(px - 8, py - 8, pw + 16, ph + 16, 6), "#fff");
-    const n = PLOT.length - 1;
-    const k = reduce ? n : Math.min((t % 11) / 9, 1) * n;
-    x.fillStyle = "rgba(27,19,64,.55)";
-    PLOT.forEach(q => { const [a, b] = at(q); x.beginPath(); x.arc(a, b, 1.8, 0, 7); x.fill(); });
-    const i0 = Math.floor(k), f = k - i0;
-    const [ax, ay] = at(PLOT[i0]), [bx, by] = at(PLOT[Math.min(i0 + 1, n)]);
-    const tx = ax + (bx - ax) * f, ty = ay + (by - ay) * f;
-    x.beginPath(); x.moveTo(...at(PLOT[0]));
-    for (let i = 1; i <= i0; i++) x.lineTo(...at(PLOT[i]));
-    x.lineTo(tx, ty); x.lineWidth = 1.6; x.stroke(); x.lineWidth = LW;
+    /* the eyes: big rings with dark pupils and a glint */
+    [.39, .61].forEach(u => {
+      const [ex, ey] = at([u, .36]), r = ph * .1;
+      x.beginPath(); x.arc(ex, ey, r, 0, 7); x.lineWidth = 1.6; x.stroke();
+      x.beginPath(); x.arc(ex, ey, r * .5, 0, 7); x.fillStyle = INK; x.fill();
+      x.beginPath(); x.arc(ex + r * .18, ey - r * .18, r * .14, 0, 7); x.fillStyle = "#fff"; x.fill();
+    });
+    const cycle = t % 11, k = reduce ? PLOT.total : Math.min(cycle / 9, 1) * PLOT.total;
+    let tx, ty, penDown = false;
+    x.beginPath();
+    for (const s of PLOT.steps) {
+      if (s.start >= k) break;
+      const f = Math.min(1, (k - s.start) / s.len);
+      const [ax, ay] = at(s.p), [bx, by] = at(s.q);
+      tx = ax + (bx - ax) * f; ty = ay + (by - ay) * f; penDown = s.draw;
+      if (s.draw) { x.moveTo(ax, ay); x.lineTo(tx, ty); }
+    }
+    if (tx === undefined) [tx, ty] = at(PLOT.steps[0].p);
+    /* job done: the carriage glides back home to the corner, revealing the finished drawing */
+    if (reduce || cycle > 9) {
+      const f = reduce ? 1 : Math.min(1, (cycle - 9) / 1.2), e = f * f * (3 - 2 * f), [hx, hy] = at([0, 0]);
+      tx += (hx - tx) * e; ty += (hy - ty) * e; penDown = false;
+    }
+    x.lineWidth = 1.6; x.stroke(); x.lineWidth = LW;
     x.beginPath(); x.moveTo(w * .1, py - 16); x.lineTo(w * .9, py - 16); x.moveTo(w * .1, py + ph + 16); x.lineTo(w * .9, py + ph + 16); x.stroke();
     shape(() => x.roundRect(tx - 4, py - 22, 8, ph + 44, 4), "#fff");
     shape(() => x.roundRect(tx - 9, ty - 9, 18, 18, 4), "#FFD23F");
-    x.beginPath(); x.arc(tx, ty, 3, 0, 7); x.fillStyle = "#FF5DA2"; x.fill();
+    /* pink pen tip only while the pen is down on the paper */
+    if (penDown && k < PLOT.total) { x.beginPath(); x.arc(tx, ty, 3, 0, 7); x.fillStyle = "#FF5DA2"; x.fill(); }
   } else if (p.art === "stars") {
     /* real stars around the celestial pole turn like a time-lapse: the Plough, Cassiopeia and the Little Dipper circle Polaris */
     const px = w * .5, py = h * .4, sc = Math.min(w, h * 1.6) * .0062;
@@ -987,7 +1021,10 @@ function draw(cv, p, t) {
       const cx = w * (.2 + k * .12) + march, cy = h * (.24 + r * .25) + Math.sin(t * 4 + k + r) * 2;
       x.save(); x.translate(cx, cy); x.rotate(.18);
       shape(() => x.roundRect(-cw / 2, -ch / 2, cw, ch, cw / 2), "#7BC043");
-      x.fillStyle = "#fff"; x.beginPath(); x.arc(-cw * .18, -ch * .14, cw * .16, 0, 7); x.arc(cw * .2, -ch * .14, cw * .16, 0, 7); x.fill();
+      /* glowing red eyes, pulsing slightly out of step from cucumber to cucumber */
+      x.shadowColor = "#FF1E3C"; x.shadowBlur = cw * (.6 + .35 * Math.sin(t * 5 + k * 1.7 + r));
+      x.fillStyle = "#FF3B55"; x.beginPath(); x.arc(-cw * .18, -ch * .14, cw * .16, 0, 7); x.arc(cw * .2, -ch * .14, cw * .16, 0, 7); x.fill();
+      x.shadowBlur = 0; x.fillStyle = "#FFD0D6"; x.beginPath(); x.arc(-cw * .2, -ch * .16, cw * .05, 0, 7); x.arc(cw * .18, -ch * .16, cw * .05, 0, 7); x.fill();
       x.restore();
     }
     const catAt = s => w * .5 + (reduce ? 0 : Math.sin(s * .8) * w * .3);
@@ -1205,28 +1242,31 @@ if (!reduce && "IntersectionObserver" in window) {
   document.querySelectorAll(".reveal").forEach(el => el.classList.add("in"));
 }
 
-/* Photo card: flip + 3D tilt */
+/* Photo card: the daylight portrait changes to the night one when the lights go on (and the LED headline
+   switches from "Models" to "Side quests"). Tapping the card switches the lights too, turning it over. Plus a gentle 3D tilt. */
+function setCard(night, turn) {
+  const card = document.getElementById("flip");
+  /* tapping the card turns it over; the light bulb just swaps the photo, with no flip */
+  card.style.transition = turn ? "transform .7s cubic-bezier(.4,1.4,.4,1)" : "none";
+  card.style.transform = `rotateY(${night ? 180 : 0}deg)`;
+  document.getElementById("flip-hint").textContent = night ? "Tap for daylight ☀️" : "Tap for night mode 🌙";
+  document.getElementById("led-work").classList.toggle("on", !night);
+  document.getElementById("led-night").classList.toggle("on", night);
+}
 const flip = document.getElementById("flip");
 const stageEl = document.querySelector(".stage");
-let flipped = false;
-flip.addEventListener("click", () => {
-  flipped = !flipped;
-  flip.style.transition = "transform .7s cubic-bezier(.4,1.4,.4,1)";
-  flip.style.transform = `rotateY(${flipped ? 180 : 0}deg)`;
-  document.getElementById("flip-hint").textContent = flipped ? "Back to work 👔" : "Tap for coffee ☕";
-  document.getElementById("led-work").classList.toggle("on", !flipped);
-  document.getElementById("led-coffee").classList.toggle("on", flipped);
-});
+const flipped = () => root.dataset.theme === "night";
+flip.addEventListener("click", () => applyTheme(flipped() ? "day" : "night", true, true));
 if (!reduce) {
   stageEl.addEventListener("pointermove", e => {
     const r = stageEl.getBoundingClientRect();
     const px = (e.clientX - r.left) / r.width - .5, py = (e.clientY - r.top) / r.height - .5;
     flip.style.transition = "transform .18s ease-out";
-    flip.style.transform = `rotateX(${(-py * 7).toFixed(2)}deg) rotateY(${(px * 7 + (flipped ? 180 : 0)).toFixed(2)}deg)`;
+    flip.style.transform = `rotateX(${(-py * 7).toFixed(2)}deg) rotateY(${(px * 7 + (flipped() ? 180 : 0)).toFixed(2)}deg)`;
   });
   stageEl.addEventListener("pointerleave", () => {
     flip.style.transition = "transform .5s cubic-bezier(.4,1.4,.4,1)";
-    flip.style.transform = `rotateY(${flipped ? 180 : 0}deg)`;
+    flip.style.transform = `rotateY(${flipped() ? 180 : 0}deg)`;
   });
 }
 

@@ -21,3 +21,8 @@ photobkp
 professional2.png
 Oleksandr's Playground.*
 project portfolio Oleksandr5.html
+
+# Not used on the page: the dark coffee photo, the full-size photo originals (the page uses the .jpg copies) and photo backups
+assets/oleksandr-coffee-dark.jpg
+assets/*.png
+assets/*bkp.jpg
