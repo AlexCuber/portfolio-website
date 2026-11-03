@@ -5,7 +5,11 @@
 # to the tapped spot and fires). It also adds a scoreboard: points per cucumber,
 # a level counter that goes up (and speeds the game up) every time a fleet is
 # cleared, spare lives, and a high score that is remembered in the browser.
+# P (or the on-screen pause button) pauses the game, and it pauses itself when the
+# game window loses focus. When a game starts and ends it tells the website, which
+# runs the all-time leaderboard (see _notify_site).
 import asyncio
+import json
 import sys
 import pygame
 
@@ -45,7 +49,10 @@ class CucumberInvasion:
         self.stats = GameStats(self)
         self.sb = Scoreboard(self)
         self.paused_until = 0
+        self.paused = False
         self.pointer_down = False   # mouse button / finger currently pressed on the game
+        # a pause button at the top left, next to the spare lives, for touch screens
+        self.pause_rect = pygame.Rect(184, 14, 46, 46)
 
         self.play_button = Button(self, "Play")
 
@@ -58,7 +65,7 @@ class CucumberInvasion:
             self.dt = min(self.clock.tick() * 60 / 1000, 4.0)
             self._check_events()
 
-            if self.stats.game_active and pygame.time.get_ticks() >= self.paused_until:
+            if self.stats.game_active and not self.paused and pygame.time.get_ticks() >= self.paused_until:
                 self.cat.update(self.dt)
                 self._update_bullets()
                 self._update_cucumber()
@@ -74,7 +81,15 @@ class CucumberInvasion:
             elif event.type == pygame.KEYUP:
                 self._check_keyup_events(event)
 
+            elif event.type == getattr(pygame, "WINDOWFOCUSLOST", -1):
+                # the player clicked or switched away from the game: stop the clock until they're back
+                self._set_paused(True)
+
             elif event.type == pygame.MOUSEBUTTONDOWN:
+                if self.stats.game_active and (self.paused or self.pause_rect.collidepoint(event.pos)):
+                    # the pause button toggles; while paused, a tap anywhere resumes
+                    self._set_paused(not self.paused)
+                    continue
                 self.pointer_down = True
                 if self.stats.game_active:
                     self.cat.target_x = event.pos[0]
@@ -90,7 +105,7 @@ class CucumberInvasion:
                 # reported button state can stay "pressed", so plain mouse moves would steer the cat),
                 # and never while an arrow key is held: the keyboard always wins.
                 keys_held = self.cat.moving_left or self.cat.moving_right
-                if self.stats.game_active and self.pointer_down and event.buttons[0] and not keys_held:
+                if self.stats.game_active and not self.paused and self.pointer_down and event.buttons[0] and not keys_held:
                     self.cat.target_x = event.pos[0]
 
     def _check_play_button(self, mouse_pos):
@@ -108,12 +123,39 @@ class CucumberInvasion:
 
             self._create_fleet()
             self.cat.center_cat()
+            self.paused = False
 
             pygame.mouse.set_visible(False)
+            self._notify_site("start")
+
+    def _set_paused(self, paused):
+        if not self.stats.game_active or paused == self.paused:
+            return
+        self.paused = paused
+        # let go of everything, so nothing keeps moving on its own after resuming
+        self.cat.moving_left = self.cat.moving_right = False
+        self.cat.target_x = None
+        self.pointer_down = False
+        pygame.mouse.set_visible(paused)
+
+    def _notify_site(self, kind, **data):
+        """Tell the web page around the game (the arcade window on the website) that a game started or ended,
+        so it can run the leaderboard. Does nothing outside the browser."""
+        if sys.platform != "emscripten":
+            return
+        try:
+            import platform
+            platform.window.parent.postMessage(json.dumps({"source": "cucumber-invasion", "type": kind, **data}), "*")
+        except Exception as e:
+            print("Couldn't reach the page:", e)
 
 
     def _check_keydown_events(self, event):
-        if event.key == pygame.K_RIGHT:
+        if event.key == pygame.K_p and self.stats.game_active:
+            self._set_paused(not self.paused)
+        elif self.paused:
+            return
+        elif event.key == pygame.K_RIGHT:
             self.cat.target_x = None
             self.cat.moving_right = True
         elif event.key == pygame.K_LEFT:
@@ -148,7 +190,11 @@ class CucumberInvasion:
 
         self.sb.show_score()
 
-        if not self.stats.game_active:
+        if self.stats.game_active:
+            self.sb.show_pause_button(self.pause_rect, self.paused)
+            if self.paused:
+                self.sb.show_paused()
+        else:
             if self.stats.games_played:
                 self.sb.show_game_over()
             self.play_button.draw_button()
@@ -255,8 +301,10 @@ class CucumberInvasion:
             self.paused_until = pygame.time.get_ticks() + 500
         else:
             self.stats.game_active = False
+            self.paused = False
             self.stats.save_high_score()
             pygame.mouse.set_visible(True)
+            self._notify_site("over", score=self.stats.score, level=self.stats.level)
 
     def _check_cucumbers_bottom(self):
         screen_rect = self.screen.get_rect()

@@ -34,6 +34,9 @@ template otherwise assumes 16:9 and the game looks squashed on phones.
 ## Running it
 
 The page has to be served over http(s); opening `index.html` straight from disk
-won't load the game. Locally: `python3 -m http.server` in the site folder, then
-open http://localhost:8000. Any static host works (GitHub Pages, Netlify, ...).
+won't load the game. Locally, run `npx wrangler dev` in the site folder (that also
+runs the leaderboard and contact form), then open **http://127.0.0.1:8787**.
+Don't use the `localhost` address Wrangler prints: on `localhost` pygbag assumes
+its own development server is running and tries to fetch pygame from
+http://localhost:8000, so the game never starts.
 The Python runtime itself (a few MB) is fetched from pygbag's CDN on first play.

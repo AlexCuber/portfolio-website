@@ -21,9 +21,16 @@ class Settings:
         self.text_color = (27, 19, 64)
         self.accent_color = (230, 40, 160)
 
-        # How quickly the game speeds up, and how much more each cucumber is worth, per level
+        # How quickly the game speeds up per level: the cucumbers take big steps for the first few levels, so the
+        # game picks up quickly, then everything speeds up 10% per level, easing to 6% per level after level 15.
+        self.early_levels = 4
+        self.early_speedup = 1.25
         self.speedup_scale = 1.1
-        self.score_scale = 1.5
+        self.late_level = 15
+        self.late_speedup = 1.06
+        # A cucumber is worth 50 x level² points (50, 200, 450, ... 5,000 on level 10), so a long game
+        # ends in the millions without the score running away from level to level
+        self.points_base = 50
 
         self.initialize_dynamic_settings()
 
@@ -34,9 +41,13 @@ class Settings:
         self.cucumber_speed = 1.5
         self.fleet_direction = 1
         self.cucumber_points = 50
+        self.levels_cleared = 0
 
     def increase_speed(self):
-        self.cat_speed *= self.speedup_scale
-        self.bullet_speed *= self.speedup_scale
-        self.cucumber_speed *= self.speedup_scale
-        self.cucumber_points = int(self.cucumber_points * self.score_scale)
+        self.levels_cleared += 1
+        late = self.levels_cleared >= self.late_level
+        scale = self.late_speedup if late else self.speedup_scale
+        self.cucumber_speed *= self.early_speedup if self.levels_cleared <= self.early_levels else scale
+        self.cat_speed *= scale
+        self.bullet_speed *= scale
+        self.cucumber_points = self.points_base * (self.levels_cleared + 1) ** 2

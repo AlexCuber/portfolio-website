@@ -1,6 +1,7 @@
 /**
  * The site's Cloudflare Worker (configured in wrangler.jsonc). Every page and file is served from the static assets;
- * this script only answers /api/contact, the contact form endpoint:
+ * this script only answers /api/leaderboard (the game's all-time top 10, see leaderboard.js) and /api/contact,
+ * the contact form endpoint:
  *
  *   GET  -> { siteKey }  the public Turnstile key, so the page needs no hard-coded keys
  *   POST -> checks the message and emails it to you through Resend; your address never reaches the browser
@@ -13,12 +14,16 @@
  *   CONTACT_FROM          sender on your verified domain, e.g. "Website <contact@example.com>"
  * Optional:
  *   RATE_LIMIT            KV namespace binding (see wrangler.jsonc): limits each visitor to 3 messages an hour
+ *   LEADERBOARD           KV namespace binding for the game's leaderboard (the same namespace works)
+ *   LEADERBOARD_SECRET    signs the leaderboard's run tickets; without it the Turnstile secret is used
  *   CONTACT_DRY_RUN = "1" log the email instead of sending it (local testing, in .dev.vars)
  *
  * Spam protection, in order: same-site check, honeypot field, "filled in too fast" check, field validation,
  * Turnstile, rate limit, and a DNS check that the sender's email domain can receive mail.
  * Bot submissions that trip the honeypot or the speed check get a fake "sent" so they learn nothing.
  */
+
+import { leaderboard } from "./leaderboard.js";
 
 const MAX_PER_HOUR = 3;
 const MIN_FILL_MS = 3000;
@@ -30,6 +35,7 @@ const fail = (error, status = 400) => json({ ok: false, error }, status);
 export default {
   async fetch(request, env) {
     const { pathname } = new URL(request.url);
+    if (pathname === "/api/leaderboard" || pathname === "/api/leaderboard/start") return leaderboard(request, env, pathname);
     if (pathname === "/api/contact") {
       if (request.method === "GET") return json({ siteKey: env.TURNSTILE_SITE_KEY || null });
       if (request.method === "POST") return contact(request, env);

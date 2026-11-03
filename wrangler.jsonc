@@ -1,5 +1,5 @@
 // Cloudflare Worker for the website: serves every file in this folder as static assets, and runs src/worker.js
-// for /api/contact (the contact form). Cloudflare's Git build runs `npx wrangler deploy`, which reads this file.
+// for /api/contact (the contact form) and /api/leaderboard (the game's top 10). Cloudflare's Git build runs `npx wrangler deploy`, which reads this file.
 {
   // must match your Worker's name in the Cloudflare dashboard (Workers & Pages)
   "name": "portfolio-website",
@@ -15,5 +15,9 @@
 
   // Optional rate limit (3 messages per visitor per hour). Create a KV namespace in the dashboard
   // (Storage & Databases -> KV -> Create), paste its ID below, remove the two // and add a comma after the } above.
-  "kv_namespaces": [{ "binding": "RATE_LIMIT", "id": "0cd04d03c1a043a28a131159c33435f6" }]
+  // The game's leaderboard (src/leaderboard.js) keeps its top 10 in the same KV namespace, under keys starting "lb:".
+  "kv_namespaces": [
+    { "binding": "RATE_LIMIT", "id": "0cd04d03c1a043a28a131159c33435f6" },
+    { "binding": "LEADERBOARD", "id": "0cd04d03c1a043a28a131159c33435f6" }
+  ]
 }
