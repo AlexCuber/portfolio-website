@@ -310,6 +310,28 @@ html[data-theme="night"] .polaroid.lit { box-shadow: 0 0 70px -12px rgba(185,140
 /* ───── Coffee ───── */
 .coffee-grid { display: grid; grid-template-columns: .9fr 1.1fr; gap: 56px; align-items: center; }
 .coffee-grid .polaroid { max-width: 360px; justify-self: center; position: relative; }
+/* the coffee card is a mug: a rounder base, a handle on the right cut from the same ceramic, and the photo printed
+   onto the glaze; the steam rises from the top. The shadow is a drop-shadow, so it follows the handle too */
+.polaroid.mug { --mug: var(--paper); --edge: #100C28; --edge-k: 14%; background: var(--mug); border-color: transparent; border-radius: 22px 22px 40px 40px; margin-right: 50px;
+  box-shadow: none; filter: drop-shadow(0 0 .6px rgba(16,12,40,.3)) drop-shadow(0 2px 3px rgba(16,12,40,.07)) drop-shadow(0 14px 24px rgba(16,12,40,.17)); }
+.polaroid.mug:hover { box-shadow: none; }
+/* at night the mug is a shade lighter than the cards, with a faint rim of light, so it stands off the dark page */
+html[data-theme="night"] .polaroid.mug { --mug: #232236; --edge: #000; --edge-k: 35%; filter: drop-shadow(0 0 .6px rgba(255,255,255,.4)) drop-shadow(0 14px 26px rgba(0,0,0,.7)); }
+/* the photo is printed on the mug: a little muted, with softly faded edges instead of a hard frame */
+.polaroid.mug img { border-radius: 14px 14px 30px 30px; filter: saturate(.86) contrast(.93);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 1.6%, #000 98.4%, transparent), linear-gradient(transparent, #000 1.6%, #000 98.4%, transparent);
+  -webkit-mask-composite: source-in; mask-image: linear-gradient(90deg, transparent, #000 1.6%, #000 98.4%, transparent), linear-gradient(transparent, #000 1.6%, #000 98.4%, transparent);
+  mask-composite: intersect; }
+/* round ceramic: a soft shade along both sides of the mug only, so the middle of the photo stays untouched */
+.polaroid.mug::before { content: ""; position: absolute; inset: 0; z-index: 1; border-radius: inherit; pointer-events: none;
+  background: linear-gradient(90deg, rgba(16,12,40,.12), rgba(16,12,40,0) 9%, rgba(16,12,40,0) 91%, rgba(16,12,40,.14)); }
+html[data-theme="night"] .polaroid.mug::before { background: linear-gradient(90deg, rgba(0,0,0,.3), rgba(0,0,0,0) 9%, rgba(0,0,0,0) 91%, rgba(0,0,0,.35)); }
+/* the handle: a half ring of the same ceramic (a half ellipse with an elliptical hole cut out by a mask). Where it
+   joins, it has the same shade as the mug's side; it catches the light on its outer curve */
+.polaroid.mug::after { content: ""; position: absolute; left: 100%; top: 24%; width: 64px; height: 150px; pointer-events: none;
+  border-radius: 0 64px 64px 0 / 0 75px 75px 0;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--mug), var(--edge) var(--edge-k)), var(--mug) 50%, color-mix(in srgb, var(--mug), var(--edge) calc(var(--edge-k) * .5)));
+  -webkit-mask-image: radial-gradient(36px 49px at 0 50%, transparent 97%, #000 100%); mask-image: radial-gradient(36px 49px at 0 50%, transparent 97%, #000 100%); }
 .steam { position: absolute; top: -26px; left: 50%; display: flex; gap: 9px; transform: translateX(-50%); }
 .steam i { width: 6px; height: 24px; border-radius: 999px; background: var(--muted); opacity: 0; animation: steam 2.6s ease-in-out infinite; }
 .steam i:nth-child(2) { animation-delay: .5s; height: 30px; }
@@ -320,7 +342,8 @@ html[data-theme="night"] .polaroid.lit { box-shadow: 0 0 70px -12px rgba(185,140
 .bmc { display: inline-flex; align-items: center; gap: 10px; background: #FFDD00; color: #1D1D1F; border-radius: 999px; padding: 14px 26px; font: 600 1.05rem var(--font); letter-spacing: -0.01em; text-decoration: none; box-shadow: 0 10px 30px -12px rgba(230,170,0,.8); transition: transform .25s var(--ease), box-shadow .25s; }
 .bmc:hover { transform: translateY(-2px); box-shadow: 0 16px 36px -12px rgba(230,170,0,.95); }
 .bmc:active { transform: scale(.97); }
-.bmc .cup { font-size: 1.3rem; animation: bob 2.8s ease-in-out infinite; }
+/* the official Buy Me a Coffee cup (assets/bmc-cup.png: their logo, cut out of its yellow square) */
+.bmc .cup { width: auto; height: 24px; margin: -3px 0; flex: none; animation: bob 2.8s ease-in-out infinite; }
 
 /* ───── Contact ───── */
 .contact { text-align: center; padding-bottom: 60px; }
@@ -344,6 +367,16 @@ html[data-theme="night"] .big-card { box-shadow: 0 0 0 1px var(--hair), var(--sh
 .cf-bottom { display: flex; justify-content: center; }
 .cf-turnstile { display: flex; justify-content: center; max-height: 0; overflow: hidden; opacity: 0; transition: max-height .4s var(--ease), opacity .4s; }
 .cf-turnstile.show { max-height: 90px; opacity: 1; }
+.plane { width: 24px; height: 23px; margin: -4px -2px -4px 0; overflow: visible; }
+/* speed lines behind the paper plane: barely there at rest; on hover they fade in and slide up behind the plane,
+   which nudges forward, then keep whooshing */
+.plane .streak { opacity: .18; transform: translate(-2px, 2px); transition: opacity .3s var(--ease), transform .3s var(--ease); }
+.plane .craft { transition: transform .3s var(--ease); }
+.btn:hover .plane .craft { transform: translate(1.5px, -1.5px); }
+.btn:hover .plane .streak { opacity: 1; transform: none; animation: whoosh .5s .3s ease-in-out infinite alternate; }
+.btn:hover .plane .streak:nth-of-type(2) { animation-delay: .45s; }
+.btn:hover .plane .streak:nth-of-type(3) { animation-delay: .6s; }
+@keyframes whoosh { to { transform: translate(-1.5px, 1.5px); opacity: .5; } }
 .contact-form .btn[disabled] { opacity: .6; cursor: progress; transform: none; }
 .cf-status { min-height: 1.4em; margin: 0 !important; font-size: .92rem !important; color: rgba(255,255,255,.75); text-align: center; max-width: none !important; }
 .cf-status.ok { color: #9CF0C8; }
@@ -477,12 +510,12 @@ dialog[open] { animation: pop .5s var(--ease); }
     <button class="flip" id="flip" aria-label="Switch between day and night mode">
       <span class="side front">
         <img src="assets/oleksandr-pro.jpg" alt="Oleksandr, portrait in a dark red blazer" width="880" height="1100">
-        <span class="caption">Day mode</span>
+        <!--<span class="caption">Day mode</span>/-->
       </span>
       <span class="side back">
         <!-- night portrait: two candidates, oleksandr-pro-dark.jpg and oleksandr-pro-dark2.jpg -->
         <img src="assets/oleksandr-pro-dark.jpg" alt="Oleksandr, portrait in a dark red blazer against a dark background" width="880" height="1100">
-        <span class="caption">Night mode</span>
+        <!--<span class="caption">Night mode</span>/-->
       </span>
     </button>
   </div>
@@ -542,7 +575,7 @@ dialog[open] { animation: pop .5s var(--ease); }
 
 <section class="wrap reveal" id="coffee">
   <div class="coffee-grid">
-    <figure class="polaroid">
+    <figure class="polaroid mug">
       <div class="steam" aria-hidden="true"><i></i><i></i><i></i></div>
       <!--<img src="assets/oleksandr-coffee.jpg" data-dark alt="Oleksandr on a sofa drinking coffee from a yellow Lego-head mug" loading="lazy" width="700" height="875">
       -->
@@ -553,7 +586,7 @@ dialog[open] { animation: pop .5s var(--ease); }
       <h2>Powered by curiosity<br><span class="soft">(and quite a lot of coffee)</span></h2>
       <p>Every project on this page started the same way: a mug in hand and a "what if…?" If something here made you smile, you can toss a coffee into the fuel reserve, it will be converted into sensors, LEDs and late-night prototypes.</p>
       <a class="bmc" id="bmc" href="https://buymeacoffee.com/sasha.maks" target="_blank" rel="noopener">
-        <span class="cup" aria-hidden="true">☕</span> Buy me a coffee
+        <img class="cup" src="assets/bmc-cup.png" alt="" width="17" height="24"> Buy me a coffee
       </a>
     </div>
   </div>
@@ -574,7 +607,7 @@ dialog[open] { animation: pop .5s var(--ease); }
       <!-- the anti-bot check: invisible, and only takes up space if Cloudflare asks for a click -->
       <div class="cf-turnstile" id="cf-turnstile"></div>
       <div class="cf-bottom">
-        <button class="btn" type="submit" id="cf-send">Send message ✨</button>
+        <button class="btn" type="submit" id="cf-send">Send message <svg class="plane" viewBox="10 0 27 26" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="streak" d="M14.5 14 11.5 17"/><path class="streak" d="M20.5 17.5 16 22"/><path class="streak" d="M25.5 21.5 23 24"/><g class="craft"><path d="M35.5 2.5 24.5 13.5"/><path d="M35.5 2.5 28.5 21.5l-4-8-8-4z"/></g></svg></button>
       </div>
       <p class="cf-status" id="cf-status" role="status"></p>
     </form>
