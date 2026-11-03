@@ -27,6 +27,10 @@ class Cucumber(Sprite):
         self.rect.x = self.x
     
     def check_edges(self):
+        # Only the wall the fleet is heading towards counts. Right after turning around, a cucumber can still
+        # touch that wall (positions are rounded to whole pixels, and steps are tiny on fast screens); counting
+        # it again would flip and drop the fleet every frame, making it plunge down for a moment.
         screen_rect = self.screen.get_rect()
-        if self.rect.right >= screen_rect.right or self.rect.left <= screen_rect.left:
-            return True
+        if self.settings.fleet_direction > 0:
+            return self.rect.right >= screen_rect.right
+        return self.rect.left <= screen_rect.left
