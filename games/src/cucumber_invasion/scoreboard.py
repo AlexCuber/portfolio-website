@@ -44,7 +44,7 @@ class Scoreboard:
         self.score_rect = self.score_image.get_rect(midtop=(self.screen_rect.centerx, 10))
 
     def prep_high_score(self):
-        self.high_score_image = self._label("BEST", self.stats.high_score, "right", self.best_font, self.best_caption_font)
+        self.high_score_image = self._label("YOUR BEST", self.stats.high_score, "right", self.best_font, self.best_caption_font)
         self.high_score_rect = self.high_score_image.get_rect(topright=(self.screen_rect.right - 20, 14))
         self.prep_level()   # the level sits just left of the best score, so it moves when that number grows
 

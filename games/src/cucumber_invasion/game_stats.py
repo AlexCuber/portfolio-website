@@ -4,7 +4,9 @@ import sys
 class GameStats:
     """Statistics for Cucumber Invasion"""
 
-    HIGH_SCORE_KEY = "cucumber_invasion_high_score"
+    # "_v2": personal bests from before the scoring change (when each level was worth 50% more and scores ran into
+    # the hundreds of millions) aren't comparable, so they are left behind
+    HIGH_SCORE_KEY = "cucumber_invasion_high_score_v2"
 
     def __init__(self, ai_game):
         self.settings = ai_game.settings

@@ -5,9 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="Oleksandr Maksimov — data & machine learning engineer who builds glowing, beeping, useful things.">
 <title>Oleksandr Maksimov · I build things that think</title>
-<link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
-<link rel="icon" href="/assets/icons/icon-192.png" type="image/png" sizes="192x192">
-<link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png">
+<!-- "?v=2": browsers (Safari especially) cache site icons for a long time; changing the number makes them fetch the new one -->
+<link rel="icon" href="/assets/icons/icon-32.png?v=2" type="image/png" sizes="32x32">
+<link rel="icon" href="/assets/icons/icon-192.png?v=2" type="image/png" sizes="192x192">
+<link rel="icon" href="/favicon.ico?v=2" sizes="16x16 32x32 48x48">
+<link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png?v=2">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..800&display=swap" rel="stylesheet">
@@ -582,7 +584,7 @@ dialog[open] { animation: pop .5s var(--ease); }
         <p><strong>I like signals other people throw away.</strong> By day I wrangle manufacturing data, train cost-prediction models and teach wearables to understand movement. The common thread: taking something noisy and real [factory floors, bank accounts, ankle sensors, the air in my room] and making it <span class="mini-hl">make sense</span>.</p>
         <p>Away from the keyboard I'm usually exploring: hiking somewhere green, hunting down <span class="mini-hl">light installations</span> after dark, or adding one more specimen to a slowly growing mineral collection. I just like building stuff — software, circuits, furniture, whatever's in reach.</p>
         <div class="stats">
-          <div class="stat" style="--c: var(--pink)"><b data-count="8">0</b><span>projects shipped</span></div>
+          <div class="stat" style="--c: var(--pink)"><b data-count="8">0</b><span>projects displayed</span></div>
           <div class="stat" style="--c: var(--mint)"><b data-count="2152">0</b><span>km walked this year</span></div>
           <div class="stat" style="--c: var(--sky)"><b data-count="too many">0</b><span>specimens collected</span></div>
         </div>
@@ -759,8 +761,6 @@ dialog[open] { animation: pop .5s var(--ease); }
 <script>
 const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const COLORS = ["#FF5DA2", "#FFD23F", "#2EC4B6", "#FF8A3D", "#5B7CFF"];
-const INK = "#1B1340";
-const LW = 2.4;   /* outline weight in the thumbnail scenes */
 /* Canvas roundRect only exists from Safari / iOS 16; without it every thumbnail animation stops */
 if (!CanvasRenderingContext2D.prototype.roundRect) {
   CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
@@ -936,7 +936,10 @@ const STARFIELD = (() => {
   return Array.from({ length: 90 }, () => [rnd() * 24, 25 + rnd() * 65, .3 + rnd() * .7]);
 })();
 
-/* Animated canvas thumbnails — one tiny scene per project */
+/* Animated canvas thumbnails, one small scene per project, in the same language as the star map: thin luminous
+   lines, soft glows and glassy shapes (no outlines) on the project's colour */
+const hexA = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${n >> 8 & 255},${n & 255},${a})`; };
+const GOLD = "#FFD98A", PASTELS = ["#FFD98A", "#9EF0E4", "#FFB3D1", "#C9D6FF"];
 function draw(cv, p, t) {
   const r = cv.getBoundingClientRect();
   const dpr = Math.min(devicePixelRatio || 1, 2);
@@ -945,110 +948,175 @@ function draw(cv, p, t) {
   if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
   const x = cv.getContext("2d");
   x.setTransform(dpr, 0, 0, dpr, 0, 0);
+  x.lineJoin = "round"; x.lineCap = "round";
+  /* glows: canvas blur ignores the pixel ratio, so scale it by hand */
+  const glow = (color, blur) => { x.shadowColor = color; x.shadowBlur = blur * dpr; };
+  const noGlow = () => { x.shadowBlur = 0; };
+
+  /* each project's own colour with a light sheen, as the cards have always had */
   x.fillStyle = p.c; x.fillRect(0, 0, w, h);
   const sheen = x.createLinearGradient(0, 0, w * .4, h);
   sheen.addColorStop(0, "rgba(255,255,255,.22)"); sheen.addColorStop(1, "rgba(27,19,64,.08)");
   x.fillStyle = sheen; x.fillRect(0, 0, w, h);
-  /* compact scenes stay centred instead of stretching across wide frames (the project window is 16:7) */
+  /* compact scenes stay centred instead of stretching across wide frames (the project window is 16:9) */
   if (["rank", "air", "invaders"].includes(p.art) && w > h * 2) { x.translate((w - h * 1.9) / 2, 0); w = h * 1.9; }
-  x.lineWidth = LW; x.strokeStyle = INK; x.lineJoin = "round"; x.lineCap = "round";
-  const pal = COLORS.filter(c => c !== p.c);
-  const shape = (fn, fill) => { x.beginPath(); fn(); x.fillStyle = fill; x.fill(); x.stroke(); };
+  const tint = mix(p.c, "#FFFFFF", .55);
 
   if (p.art === "pipes") {
-    /* messy dots flow through pipes into a tidy grid */
+    /* messy data flows in along three channels and settles, cell by cell, into a tidy table */
+    const jx = w * .555, jy = h * .5;
     for (let i = 0; i < 3; i++) {
       const y = h * (.25 + i * .25);
-      shape(() => x.roundRect(w * .06, y - 9, w * .42, 18, 9), "#fff");
+      x.strokeStyle = "rgba(255,255,255,.08)"; x.lineWidth = 12;
+      x.beginPath(); x.moveTo(w * .07, y); x.lineTo(w * .46, y); x.stroke();
+      x.strokeStyle = "rgba(255,255,255,.3)"; x.lineWidth = 1;
+      x.beginPath(); x.moveTo(w * .07, y); x.lineTo(w * .46, y); x.bezierCurveTo(w * .51, y, w * .5, jy, jx, jy); x.stroke();
       for (let k = 0; k < 3; k++) {
-        const px = w * .08 + ((t * 55 + k * 52 + i * 31) % (w * .38));
-        shape(() => x.arc(px, y + Math.sin(t * 5 + k + i) * 3, 5, 0, 7), pal[(i + k) % pal.length]);
+        const px = w * .08 + ((t * 55 + k * 52 + i * 31) % (w * .37));
+        const c = PASTELS[(i + k) % PASTELS.length];
+        glow(c, 8); x.fillStyle = c;
+        x.beginPath(); x.arc(px, y + Math.sin(t * 5 + k + i) * 3, 2.6, 0, 7); x.fill(); noGlow();
       }
-      x.beginPath(); x.moveTo(w * .48, y); x.lineTo(w * .56, h * .5); x.stroke();
     }
+    glow(tint, 10); x.fillStyle = "#fff"; x.beginPath(); x.arc(jx, jy, 2.4, 0, 7); x.fill(); noGlow();
+    const step = t * 2;
     for (let gy = 0; gy < 3; gy++) for (let gx = 0; gx < 3; gx++) {
-      const on = Math.floor(t * 2) % 9 === gy * 3 + gx;
-      shape(() => x.roundRect(w * .6 + gx * w * .115, h * .22 + gy * h * .2, w * .095, h * .155, 6), on ? "#FFD23F" : "#fff");
+      const age = ((step - (gy * 3 + gx)) % 9 + 9) % 9, lit = Math.max(0, 1 - age / 2.2);
+      const cx = w * .6 + gx * w * .115, cy = h * .22 + gy * h * .2, cw = w * .095, ch = h * .155;
+      x.fillStyle = `rgba(255,255,255,${.06 + lit * .1})`;
+      if (lit > .05) { glow(hexA(GOLD, .8), 14 * lit); x.fillStyle = hexA(GOLD, .18 + lit * .55); }
+      x.beginPath(); x.roundRect(cx, cy, cw, ch, 5); x.fill(); noGlow();
+      x.strokeStyle = lit > .05 ? hexA(GOLD, .5 + lit * .5) : "rgba(255,255,255,.22)"; x.lineWidth = 1; x.stroke();
     }
   } else if (p.art === "forecast") {
-    /* a cost curve draws itself, uncertainty narrowing as phases pass */
+    /* a cost curve draws itself, its uncertainty band narrowing as the production phases pass */
     const pts = [], n = 34;
     for (let i = 0; i <= n; i++) { const u = i / n; pts.push([w * (.08 + u * .78), h * (.78 - u * .5 - Math.sin(u * 9) * .06)]); }
-    const prog = reduce ? 1 : (t * .22) % 1.15;
-    x.save(); x.globalAlpha = .35; x.beginPath();
-    pts.forEach(([px, py], i) => { const u = i / n, s = (1 - u) * h * .13 + 3; i ? x.lineTo(px, py - s) : x.moveTo(px, py - s); });
-    [...pts].reverse().forEach(([px, py], i) => { const u = 1 - i / n, s = (1 - u) * h * .13 + 3; x.lineTo(px, py + s); });
-    x.closePath(); x.fillStyle = "#fff"; x.fill(); x.restore();
-    x.setLineDash([7, 7]); x.beginPath(); x.moveTo(w * .08, h * .28); x.lineTo(w * .86, h * .28); x.strokeStyle = "#FFD23F"; x.stroke(); x.setLineDash([]); x.strokeStyle = INK;
+    const prog = reduce ? 1 : (t * .22) % 1.15, upto = Math.max(2, Math.ceil(Math.min(prog, 1) * n));
+    x.strokeStyle = "rgba(255,255,255,.28)"; x.lineWidth = 1;
+    x.beginPath(); x.moveTo(w * .08, h * .1); x.lineTo(w * .08, h * .9); x.lineTo(w * .92, h * .9); x.stroke();
+    const band = x.createLinearGradient(w * .08, 0, w * .86, 0);
+    band.addColorStop(0, "rgba(255,255,255,.2)"); band.addColorStop(1, "rgba(255,255,255,.07)");
     x.beginPath();
-    pts.slice(0, Math.max(2, Math.ceil(Math.min(prog, 1) * n))).forEach(([px, py], i) => i ? x.lineTo(px, py) : x.moveTo(px, py));
-    x.lineWidth = LW * 1.35; x.stroke(); x.lineWidth = LW;
-    const tip = pts[Math.max(1, Math.ceil(Math.min(prog, 1) * n) - 1)];
-    shape(() => x.arc(tip[0], tip[1], 7 + Math.sin(t * 6) * 2, 0, 7), "#FFD23F");
-    x.beginPath(); x.moveTo(w * .08, h * .9); x.lineTo(w * .9, h * .9); x.moveTo(w * .08, h * .9); x.lineTo(w * .08, h * .1); x.stroke();
+    pts.forEach(([px, py], i) => { const s = (1 - i / n) * h * .13 + 3; i ? x.lineTo(px, py - s) : x.moveTo(px, py - s); });
+    [...pts].reverse().forEach(([px, py], i) => { const s = (i / n) * h * .13 + 3; x.lineTo(px, py + s); });
+    x.closePath(); x.fillStyle = band; x.fill();
+    x.setLineDash([4, 5]); x.strokeStyle = hexA(GOLD, .75);
+    x.beginPath(); x.moveTo(w * .08, h * .28); x.lineTo(w * .88, h * .28); x.stroke(); x.setLineDash([]);
+    glow("rgba(255,255,255,.7)", 8); x.strokeStyle = "#fff"; x.lineWidth = 2;
+    x.beginPath(); pts.slice(0, upto).forEach(([px, py], i) => i ? x.lineTo(px, py) : x.moveTo(px, py)); x.stroke(); noGlow();
+    const [tx, ty] = pts[upto - 1], ping = (t * 1.2) % 1;
+    x.strokeStyle = hexA(GOLD, 1 - ping); x.lineWidth = 1; x.beginPath(); x.arc(tx, ty, 4 + ping * 12, 0, 7); x.stroke();
+    glow(GOLD, 12); x.fillStyle = GOLD; x.beginPath(); x.arc(tx, ty, 4.2, 0, 7); x.fill(); noGlow();
   } else if (p.art === "rank") {
-    /* bars shuffle themselves into a ranked list, winner gets the star */
+    /* glassy bars shuffle themselves into a ranked list; the winner glows gold under a twinkling star */
     const hts = [.62, .3, .85, .45, .72, .38], order = [2, 4, 0, 3, 5, 1];
-    const ph = reduce ? 1 : (Math.sin(t * .9) + 1) / 2;
+    const ph = reduce ? 1 : (Math.sin(t * .9) + 1) / 2, base = h * .84;
+    x.strokeStyle = "rgba(255,255,255,.3)"; x.lineWidth = 1;
+    x.beginPath(); x.moveTo(w * .08, base); x.lineTo(w * .92, base); x.stroke();
     hts.forEach((ht, i) => {
-      const sorted = order.indexOf(i), cur = i + (sorted - i) * ph;
-      const bx = w * .12 + cur * w * .13, bh = h * .55 * ht;
-      shape(() => x.roundRect(bx, h * .82 - bh, w * .09, bh, 7), i === 2 ? "#FFD23F" : (i % 2 ? "#fff" : pal[i % pal.length]));
-      if (i === 2) {
-        x.save(); x.translate(bx + w * .045, h * .82 - bh - 16); x.rotate(Math.sin(t * 2) * .2);
-        x.font = "800 18px system-ui"; x.textAlign = "center"; x.fillStyle = INK; x.fillText("★", 0, 0); x.restore();
+      const cur = i + (order.indexOf(i) - i) * ph, bx = w * .12 + cur * w * .13, bw = w * .09, bh = h * .58 * ht, top = base - bh;
+      const win = i === 2, g = x.createLinearGradient(0, top, 0, base);
+      g.addColorStop(0, win ? "#FFE7A8" : "rgba(255,255,255,.34)"); g.addColorStop(1, win ? hexA("#F2B53A", .55) : "rgba(255,255,255,.06)");
+      if (win) glow(hexA(GOLD, .9), 18);
+      x.fillStyle = g; x.beginPath(); x.roundRect(bx, top, bw, bh, 5); x.fill(); noGlow();
+      x.fillStyle = win ? "#fff" : "rgba(255,255,255,.6)"; x.fillRect(bx + 3, top, bw - 6, 1);   /* light catching the top edge */
+      if (win) {
+        const s = 6 + Math.sin(t * 3) * 1.5, sx = bx + bw / 2, sy = top - 14;
+        glow(GOLD, 10); x.fillStyle = "#fff"; x.beginPath();
+        for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4 + t * .6, rr = k % 2 ? s * .3 : s; x.lineTo(sx + Math.cos(a) * rr, sy + Math.sin(a) * rr); }
+        x.closePath(); x.fill(); noGlow();
       }
     });
-    x.beginPath(); x.moveTo(w * .08, h * .82); x.lineTo(w * .92, h * .82); x.stroke();
   } else if (p.art === "wave") {
-    /* three IMU axes scroll by; one spike raises the fall flag */
-    const spike = (t % 4) > 3.2;
+    /* motion data from the ankle sensor streams in from the right; the newest slice sits in the analysis window and
+       the classifier beside it lights up the activity it recognises: walking, running, cycling, or a fall */
+    const ACTS = ["Walking", "Running", "Cycling", "Fall"], seg = 1.15, speed = .32;
+    const sw = w * .6, winX = sw * .7, winW = sw * .3;
+    const act = s => ((Math.floor(s / seg) % 4) + 4) % 4;
+    /* stream position of a point on screen: the right edge is "now", older data drifts off to the left */
+    const sAt = px => (reduce ? 2.3 : t * speed) + (px - sw) / w * 1.1;
+    const shape = (a, s, k) => {
+      const local = ((s / seg) % 1 + 1) % 1, ph = s * 40 + k * 1.9;
+      if (a === 0) return Math.sin(ph * .55) * .05 + Math.sin(ph * 1.1) * .02;                 /* walking: steady stride */
+      if (a === 1) return Math.sin(ph * 1.05) * .085 + Math.sin(ph * 2.3) * .03;               /* running: faster, bigger */
+      if (a === 2) return Math.sin(ph * .32 + k) * .06;                                         /* cycling: smooth circles */
+      const hit = Math.exp(-(((local - .35) / .05) ** 2));                                        /* fall: a spike, then still */
+      return (k === 2 ? -1 : .6) * hit * .19 + Math.sin(ph * 3) * .008 * (local < .35 ? 1 : .3);
+    };
+    /* one activity blends into the next over a short stretch, as a real wearer changes pace */
+    const sample = (s, k) => {
+      const a = act(s), local = ((s / seg) % 1 + 1) % 1, blend = Math.min(1, local / .12);
+      return blend >= 1 ? shape(a, s, k) : shape((a + 3) % 4, s, k) * (1 - blend) + shape(a, s, k) * blend;
+    };
+    const now = act(sAt(winX + winW / 2)), colors = ["rgba(255,255,255,.95)", "rgba(42,26,74,.6)", "#FFF3C4"];
+    x.fillStyle = "rgba(255,255,255,.12)"; x.beginPath(); x.roundRect(winX, h * .1, winW, h * .8, 6); x.fill();
+    x.strokeStyle = "rgba(255,255,255,.45)"; x.lineWidth = 1; x.stroke();
     for (let k = 0; k < 3; k++) {
-      const y0 = h * (.24 + k * .25);
+      const y0 = h * (.27 + k * .23);
       x.beginPath();
-      for (let xx = 0; xx <= w; xx += 5) {
-        const u = xx / w + t * .4 + k;
-        let yy = y0 + Math.sin(u * 14) * h * .035 + Math.sin(u * 31) * h * .02;
-        if (k === 2 && spike && xx > w * .55 && xx < w * .7) yy += Math.sin((xx - w * .55) / (w * .15) * Math.PI) * h * .16;
-        xx ? x.lineTo(xx, yy) : x.moveTo(xx, yy);
-      }
-      x.strokeStyle = ["#fff", "#FFD23F", INK][k]; x.lineWidth = LW * 1.15; x.stroke();
+      for (let px = 0; px <= sw; px += 2) { const yy = y0 - sample(sAt(px), k) * h; px ? x.lineTo(px, yy) : x.moveTo(px, yy); }
+      glow(colors[k], 5); x.strokeStyle = colors[k]; x.lineWidth = 1.5; x.stroke(); noGlow();
     }
-    x.strokeStyle = INK; x.lineWidth = LW;
-    const wx = w * (.1 + ((t * .12) % .64));
-    x.save(); x.globalAlpha = .25; x.fillStyle = "#fff"; x.fillRect(wx, h * .08, w * .22, h * .84); x.restore();
-    x.strokeRect(wx, h * .08, w * .22, h * .84);
-    if (spike) { shape(() => x.arc(w * .63, h * .5, 13, 0, 7), "#FF5DA2"); x.font = "800 15px system-ui"; x.textAlign = "center"; x.fillStyle = "#fff"; x.fillText("!", w * .63, h * .5 + 5); }
+    /* window -> classifier */
+    const cx0 = w * .655, ay = h * .5;
+    x.strokeStyle = "rgba(255,255,255,.6)"; x.lineWidth = 1.2;
+    x.beginPath(); x.moveTo(sw + 4, ay); x.lineTo(cx0 - 6, ay); x.moveTo(cx0 - 11, ay - 4); x.lineTo(cx0 - 6, ay); x.lineTo(cx0 - 11, ay + 4); x.stroke();
+    const pw = w * .3, ph = h * .15, gap = h * .045, top = h * .5 - (ph * 4 + gap * 3) / 2;
+    x.font = `600 ${Math.round(h * .065)}px Inter, system-ui, sans-serif`; x.textAlign = "left"; x.textBaseline = "middle";
+    ACTS.forEach((label, i) => {
+      const py = top + i * (ph + gap), on = i === now, fall = i === 3;
+      if (on) glow(fall ? "rgba(255,60,90,.8)" : "rgba(255,255,255,.8)", 12);
+      x.fillStyle = on ? (fall ? "#FF4D6D" : "#fff") : "rgba(255,255,255,.14)";
+      x.beginPath(); x.roundRect(cx0, py, pw, ph, ph / 2); x.fill(); noGlow();
+      x.fillStyle = on ? (fall ? "#fff" : "#9A4A12") : "rgba(255,255,255,.75)";
+      x.fillText(label, cx0 + ph * .55, py + ph / 2 + 1);
+      if (on) { x.beginPath(); x.arc(cx0 + pw - ph * .5, py + ph / 2, ph * .16, 0, 7); x.fill(); }
+    });
+    x.textBaseline = "alphabetic";
   } else if (p.art === "air") {
-    /* the lamp breathes rings while CO₂ creeps up the meter */
+    /* the lamp breathes light in the colour of the air while CO₂ creeps up the meter */
     const lvl = reduce ? .5 : (Math.sin(t * .6) + 1) / 2;
-    const lc = lvl < .5 ? "#2EC4B6" : lvl < .8 ? "#FFD23F" : "#FF5DA2";
+    const lc = lvl < .5 ? "#5FF0D8" : lvl < .8 ? "#FFD98A" : "#FF7BA9";
+    const lx = w * .38, ly = h * .42;
+    const aura = x.createRadialGradient(lx, ly, 0, lx, ly, h * (.42 + Math.sin(t * 2) * .03));
+    aura.addColorStop(0, hexA(lc, .55)); aura.addColorStop(1, hexA(lc, 0));
+    x.fillStyle = aura; x.fillRect(0, 0, w, h);
     for (let i = 0; i < 3; i++) {
-      const rr = ((t * .35 + i / 3) % 1);
-      x.save(); x.globalAlpha = (1 - rr) * .6; x.beginPath(); x.arc(w * .38, h * .44, 14 + rr * h * .42, 0, 7); x.strokeStyle = "#fff"; x.lineWidth = LW; x.stroke(); x.restore();
+      const rr = (t * .35 + i / 3) % 1;
+      x.strokeStyle = `rgba(255,255,255,${(1 - rr) * .45})`; x.lineWidth = 1;
+      x.beginPath(); x.arc(lx, ly, 14 + rr * h * .4, 0, 7); x.stroke();
     }
-    x.strokeStyle = INK;
-    shape(() => x.roundRect(w * .33, h * .55, w * .1, h * .2, 6), "#fff");
-    shape(() => x.arc(w * .38, h * .44, 15, 0, 7), lc);
-    for (let i = 0; i < 6; i++) {
-      const py = h - ((t * 26 + i * 43) % (h * .8));
-      shape(() => x.arc(w * (.6 + (i % 3) * .11), py, 3.5, 0, 7), "#fff");
+    x.strokeStyle = "rgba(255,255,255,.35)"; x.lineWidth = 1.5;
+    x.beginPath(); x.moveTo(lx, ly + 14); x.lineTo(lx, h * .72); x.stroke();
+    x.fillStyle = "rgba(255,255,255,.16)"; x.beginPath(); x.roundRect(lx - w * .05, h * .72, w * .1, h * .05, 4); x.fill();
+    const orb = x.createRadialGradient(lx - 4, ly - 4, 1, lx, ly, 14);
+    orb.addColorStop(0, "#fff"); orb.addColorStop(1, lc);
+    glow(lc, 22); x.fillStyle = orb; x.beginPath(); x.arc(lx, ly, 13, 0, 7); x.fill(); noGlow();
+    for (let i = 0; i < 7; i++) {
+      const py = h - ((t * 24 + i * 37) % (h * .82)), a = Math.min(1, (h - py) / (h * .2)) * .7;
+      x.fillStyle = `rgba(255,255,255,${a})`; x.beginPath(); x.arc(w * (.6 + (i % 3) * .085) + Math.sin(t + i) * 4, py, 1.8, 0, 7); x.fill();
     }
-    shape(() => x.roundRect(w * .82, h * .15, w * .08, h * .66, 8), "#fff");
-    x.save(); x.beginPath(); x.roundRect(w * .82, h * .15, w * .08, h * .66, 8); x.clip();
-    x.fillStyle = lc; x.fillRect(w * .82, h * .81 - lvl * h * .64, w * .08, lvl * h * .66); x.restore();
-    x.font = `800 ${Math.round(h * .09)}px system-ui`; x.fillStyle = INK; x.textAlign = "left"; x.fillText("CO₂", w * .8, h * .93);
+    const mx = w * .82, my = h * .14, mw = w * .07, mh = h * .66;
+    x.fillStyle = "rgba(255,255,255,.07)"; x.beginPath(); x.roundRect(mx, my, mw, mh, mw / 2); x.fill();
+    x.strokeStyle = "rgba(255,255,255,.3)"; x.lineWidth = 1; x.stroke();
+    x.save(); x.beginPath(); x.roundRect(mx, my, mw, mh, mw / 2); x.clip();
+    const fill = x.createLinearGradient(0, my + mh, 0, my);
+    fill.addColorStop(0, hexA(lc, .5)); fill.addColorStop(1, lc);
+    x.fillStyle = fill; x.fillRect(mx, my + mh - lvl * mh, mw, lvl * mh); x.restore();
+    x.fillStyle = "rgba(255,255,255,.7)"; x.font = `600 ${Math.round(h * .075)}px Inter, system-ui, sans-serif`; x.textAlign = "center";
+    x.fillText("CO₂", mx + mw / 2, h * .93);
   } else if (p.art === "plotter") {
     /* the pen draws an owl around eyes that are already on the paper, lifting between strokes; the gantry follows */
-    const ph = h * .72, pw = Math.min(w * .6, ph * 1.15), px = (w - pw) / 2, py = h * .14;
+    const ink = "#2A2440";
+    const ph = h * .66, pw = Math.min(w * .56, ph * 1.15), px = (w - pw) / 2, py = h * .18;
     const at = ([u, v]) => [px + u * pw, py + v * ph];
-    shape(() => x.roundRect(px - 8, py - 8, pw + 16, ph + 16, 6), "#fff");
-    /* the eyes: big rings with dark pupils and a glint */
+    glow("rgba(0,0,0,.35)", 18); x.fillStyle = "#FBFAF6"; x.beginPath(); x.roundRect(px - 8, py - 8, pw + 16, ph + 16, 4); x.fill(); noGlow();
     [.39, .61].forEach(u => {
       const [ex, ey] = at([u, .36]), r = ph * .1;
-      x.beginPath(); x.arc(ex, ey, r, 0, 7); x.lineWidth = 1.6; x.stroke();
-      x.beginPath(); x.arc(ex, ey, r * .5, 0, 7); x.fillStyle = INK; x.fill();
-      x.beginPath(); x.arc(ex + r * .18, ey - r * .18, r * .14, 0, 7); x.fillStyle = "#fff"; x.fill();
+      x.strokeStyle = ink; x.lineWidth = 1.2; x.beginPath(); x.arc(ex, ey, r, 0, 7); x.stroke();
+      x.fillStyle = ink; x.beginPath(); x.arc(ex, ey, r * .5, 0, 7); x.fill();
+      x.fillStyle = "#fff"; x.beginPath(); x.arc(ex + r * .18, ey - r * .18, r * .14, 0, 7); x.fill();
     });
     const cycle = t % 11, k = reduce ? PLOT.total : Math.min(cycle / 9, 1) * PLOT.total;
     let tx, ty, penDown = false;
@@ -1066,12 +1134,18 @@ function draw(cv, p, t) {
       const f = reduce ? 1 : Math.min(1, (cycle - 9) / 1.2), e = f * f * (3 - 2 * f), [hx, hy] = at([0, 0]);
       tx += (hx - tx) * e; ty += (hy - ty) * e; penDown = false;
     }
-    x.lineWidth = 1.6; x.stroke(); x.lineWidth = LW;
-    x.beginPath(); x.moveTo(w * .1, py - 16); x.lineTo(w * .9, py - 16); x.moveTo(w * .1, py + ph + 16); x.lineTo(w * .9, py + ph + 16); x.stroke();
-    shape(() => x.roundRect(tx - 4, py - 22, 8, ph + 44, 4), "#fff");
-    shape(() => x.roundRect(tx - 9, ty - 9, 18, 18, 4), "#FFD23F");
-    /* pink pen tip only while the pen is down on the paper */
-    if (penDown && k < PLOT.total) { x.beginPath(); x.arc(tx, ty, 3, 0, 7); x.fillStyle = "#FF5DA2"; x.fill(); }
+    x.strokeStyle = ink; x.lineWidth = 1.3; x.stroke();
+    /* the machine: a thin rail above and below the paper, and the gantry, an upright bar riding along them, carrying
+       the pen head; the pen drops to draw and lifts (with a shadow) to travel */
+    const r1 = py - 12, r2 = py + ph + 12;
+    x.strokeStyle = "rgba(255,255,255,.6)"; x.lineWidth = 1.5;
+    x.beginPath(); x.moveTo(w * .1, r1); x.lineTo(w * .9, r1); x.moveTo(w * .1, r2); x.lineTo(w * .9, r2); x.stroke();
+    glow("rgba(0,0,0,.3)", 8);
+    x.fillStyle = "rgba(255,255,255,.92)"; x.beginPath(); x.roundRect(tx - 4, r1 - 6, 8, r2 - r1 + 12, 3); x.fill();
+    const lift = penDown && k < PLOT.total ? 0 : 3;
+    x.fillStyle = GOLD; x.beginPath(); x.roundRect(tx - 9, ty - 9 - lift, 18, 18, 4); x.fill(); noGlow();
+    x.fillStyle = "#3B3A55"; x.beginPath(); x.arc(tx, ty - lift, 3.4, 0, 7); x.fill();   /* the pen, seen from above */
+    if (penDown && k < PLOT.total) { glow("#FF5DA2", 6); x.fillStyle = "#FF5DA2"; x.beginPath(); x.arc(tx, ty, 1.6, 0, 7); x.fill(); noGlow(); }
   } else if (p.art === "stars") {
     /* real stars around the celestial pole turn like a time-lapse: the Plough, Cassiopeia and the Little Dipper circle Polaris */
     const px = w * .5, py = h * .4, sc = Math.min(w, h * 1.6) * .0062;
@@ -1091,21 +1165,24 @@ function draw(cv, p, t) {
       x.fillStyle = "rgba(255,255,255,.25)"; x.beginPath(); x.arc(sx, sy, 4.5, 0, 7); x.fill();
       x.fillStyle = "#fff"; x.beginPath(); x.arc(sx, sy, 1.9, 0, 7); x.fill();
     });
-    /* rolling hills in front, so the sky sits above a horizon */
-    x.strokeStyle = INK; x.lineWidth = LW;
+    /* rolling hills in front, so the sky sits above a horizon; a faint rim of skylight along the ridge */
     x.beginPath(); x.moveTo(0, h);
     for (let xx = 0; xx <= w; xx += 6) x.lineTo(xx, h * .86 - Math.sin(xx / w * 5 + .8) * h * .05 - Math.sin(xx / w * 13) * h * .015);
-    x.lineTo(w, h); x.closePath(); x.fillStyle = "#14123A"; x.fill(); x.stroke();
+    x.lineTo(w, h); x.closePath(); x.fillStyle = "#14123A"; x.fill();
+    x.strokeStyle = "rgba(255,255,255,.14)"; x.lineWidth = 1; x.stroke();
   } else if (p.art === "invaders") {
-    /* the cucumber fleet marches side to side while the cat fires back */
+    /* the cucumber fleet marches side to side, red eyes glowing, while the cat fires back */
     const march = reduce ? 0 : Math.sin(t * 1.3) * w * .07;
     const cw = Math.max(9, w * .04), ch = cw * 2.3;
     for (let r = 0; r < 2; r++) for (let k = 0; k < 6; k++) {
       const cx = w * (.2 + k * .12) + march, cy = h * (.24 + r * .25) + Math.sin(t * 4 + k + r) * 2;
       x.save(); x.translate(cx, cy); x.rotate(.18);
-      shape(() => x.roundRect(-cw / 2, -ch / 2, cw, ch, cw / 2), "#7BC043");
+      const skin = x.createLinearGradient(-cw / 2, 0, cw / 2, 0);
+      skin.addColorStop(0, "#3F8F2A"); skin.addColorStop(.45, "#8FD95A"); skin.addColorStop(1, "#3A7D25");
+      x.fillStyle = skin; x.beginPath(); x.roundRect(-cw / 2, -ch / 2, cw, ch, cw / 2); x.fill();
+      x.fillStyle = "rgba(255,255,255,.22)"; x.beginPath(); x.roundRect(-cw * .22, -ch * .38, cw * .14, ch * .7, cw * .07); x.fill();
       /* glowing red eyes, pulsing slightly out of step from cucumber to cucumber */
-      x.shadowColor = "#FF1E3C"; x.shadowBlur = cw * (.6 + .35 * Math.sin(t * 5 + k * 1.7 + r));
+      x.shadowColor = "#FF1E3C"; x.shadowBlur = cw * (.6 + .35 * Math.sin(t * 5 + k * 1.7 + r)) * dpr;
       x.fillStyle = "#FF3B55"; x.beginPath(); x.arc(-cw * .18, -ch * .14, cw * .16, 0, 7); x.arc(cw * .2, -ch * .14, cw * .16, 0, 7); x.fill();
       x.shadowBlur = 0; x.fillStyle = "#FFD0D6"; x.beginPath(); x.arc(-cw * .2, -ch * .16, cw * .05, 0, 7); x.arc(cw * .18, -ch * .16, cw * .05, 0, 7); x.fill();
       x.restore();
@@ -1114,16 +1191,20 @@ function draw(cv, p, t) {
     const R = h * .1, catY = h * .86;
     for (let i = 0; i < 3; i++) {
       const ph = reduce ? .3 + i * .2 : (t * 1.1 + i / 3) % 1;
-      shape(() => x.rect(catAt(t - ph / 1.1) - 4, catY - R - ph * h * .62, 8, 8), "#FF5DA2");
+      glow("rgba(230,30,110,.7)", 8); x.fillStyle = "#F0287A";
+      x.beginPath(); x.roundRect(catAt(t - ph / 1.1) - 2.5, catY - R - ph * h * .62, 5, 11, 2.5); x.fill(); noGlow();
     }
-    const cx = catAt(t);
-    shape(() => { x.moveTo(cx - R * .95, catY - R * .2); x.lineTo(cx - R * .75, catY - R * 1.35); x.lineTo(cx - R * .15, catY - R * .8); x.closePath(); }, "#2A0E45");
-    shape(() => { x.moveTo(cx + R * .95, catY - R * .2); x.lineTo(cx + R * .75, catY - R * 1.35); x.lineTo(cx + R * .15, catY - R * .8); x.closePath(); }, "#2A0E45");
-    shape(() => x.ellipse(cx, catY, R * 1.05, R * .95, 0, 0, 7), "#2A0E45");
-    x.fillStyle = "#fff"; x.beginPath(); x.ellipse(cx, catY + R * .5, R * .65, R * .38, 0, 0, 7); x.fill();
+    const cx = catAt(t), fur = x.createLinearGradient(0, catY - R * 1.35, 0, catY + R);
+    fur.addColorStop(0, "#6A56B0"); fur.addColorStop(1, "#2C2158");
+    x.fillStyle = fur; x.beginPath();
+    x.moveTo(cx - R * .95, catY - R * .2); x.lineTo(cx - R * .75, catY - R * 1.35); x.lineTo(cx - R * .15, catY - R * .8);
+    x.lineTo(cx + R * .15, catY - R * .8); x.lineTo(cx + R * .75, catY - R * 1.35); x.lineTo(cx + R * .95, catY - R * .2); x.closePath(); x.fill();
+    x.beginPath(); x.ellipse(cx, catY, R * 1.05, R * .95, 0, 0, 7); x.fill();
+    x.strokeStyle = "rgba(255,255,255,.22)"; x.lineWidth = 1; x.beginPath(); x.ellipse(cx, catY, R * 1.05, R * .95, 0, Math.PI * 1.1, Math.PI * 1.9); x.stroke();
+    x.fillStyle = "rgba(255,255,255,.92)"; x.beginPath(); x.ellipse(cx, catY + R * .5, R * .62, R * .36, 0, 0, 7); x.fill();
     [-1, 1].forEach(sd => {
-      x.beginPath(); x.arc(cx + sd * R * .4, catY - R * .15, R * .22, 0, 7); x.fillStyle = "#fff"; x.fill();
-      x.beginPath(); x.arc(cx + sd * R * .4, catY - R * .15, R * .1, 0, 7); x.fillStyle = INK; x.fill();
+      x.beginPath(); x.arc(cx + sd * R * .4, catY - R * .15, R * .21, 0, 7); x.fillStyle = "#fff"; x.fill();
+      x.beginPath(); x.arc(cx + sd * R * .4, catY - R * .15, R * .1, 0, 7); x.fillStyle = "#1B1340"; x.fill();
     });
   }
 }
