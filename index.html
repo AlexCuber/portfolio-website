@@ -184,41 +184,57 @@ dialog.arcade { width: min(1040px, 100% - 24px); max-height: calc(100dvh - 24px)
 .arcade-bar h3 { font-size: 1.15rem; font-weight: 650; }
 .arcade-bar .keys { display: flex; gap: 10px; flex-wrap: wrap; font-size: .82rem; color: rgba(255,255,255,.65); }
 .arcade-bar kbd { font: 600 .76rem var(--font); background: rgba(255,255,255,.12); color: #fff; border: 1px solid rgba(255,255,255,.16); border-bottom-width: 2px; border-radius: 6px; padding: 1px 7px; }
-.arcade-bar a { margin-left: auto; color: #FF9CC6; font-weight: 600; font-size: .85rem; text-decoration: none; }
-.arcade-bar a:hover { text-decoration: underline; }
-@media (max-width: 640px) { .arcade-bar a { margin-left: 0; } }
+.arcade-box { position: relative; }
+.bar-btns { margin-left: auto; display: flex; gap: 8px; }
+.bar-btns button { font: 600 .85rem var(--font); color: #fff; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.16); border-radius: 999px; padding: 5px 12px; cursor: pointer; transition: background .2s; }
+.bar-btns button:hover { background: rgba(255,255,255,.2); }
+@media (max-width: 640px) { .bar-btns { margin-left: 0; } }
 .screen { position: relative; aspect-ratio: 3 / 2; max-height: calc(100dvh - 140px); margin: 0 12px 12px; background: #B0DFE5; border-radius: 18px; overflow: hidden; }
 .screen iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; }
-.lb-open { margin-left: auto; font: 600 .85rem var(--font); color: #fff; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.16); border-radius: 999px; padding: 5px 12px; cursor: pointer; transition: background .2s; }
-.lb-open:hover { background: rgba(255,255,255,.2); }
-.lb-open + a { margin-left: 0; }
-@media (max-width: 640px) { .lb-open { margin-left: 0; } }
-/* leaderboard: a dark glass panel over the game */
-.lb { position: absolute; inset: 0; z-index: 2; display: grid; grid-template-columns: minmax(0, 1fr); place-items: center; padding: 3%; background: rgba(11,10,20,.55); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+/* full screen: the bar on top and the game as big as fits below it, still 3:2. Browsers that can't put an element
+   full screen (iPhones) get the .full class instead, which stretches the window over the whole page */
+.arcade-box:fullscreen, dialog.arcade.full .arcade-box { display: flex; flex-direction: column; width: 100%; height: 100%; background: #0B0A14; }
+.arcade-box:fullscreen .screen, dialog.arcade.full .screen { flex: 1; min-height: 0; aspect-ratio: auto; max-height: none; background: none; border-radius: 0; container-type: size; }
+.arcade-box:fullscreen .screen iframe, dialog.arcade.full .screen iframe { width: min(100cqw, 150cqh); height: min(100cqh, 66.667cqw); margin: auto; border-radius: 18px; }
+dialog.arcade.full { width: 100vw; max-width: none; height: 100dvh; max-height: none; margin: 0; border: 0; border-radius: 0; overflow: hidden; }
+/* leaderboard: styled like the game's own score tables. The game's font is pygame's FreeSans Bold, a Helvetica
+   look-alike; its colours are the navy text, pink captions and green Play button. The top 3 get the same gold,
+   silver and bronze coins as the table on the game's start screen (games/src/cucumber_invasion/scoreboard.py) */
+.lb { position: absolute; inset: 0; z-index: 2; display: grid; grid-template-columns: minmax(0, 1fr); place-items: center; padding: 3%; background: rgba(230,240,241,.5); -webkit-backdrop-filter: blur(5px); backdrop-filter: blur(5px); }
 .lb[hidden] { display: none; }
 /* on phones the game is small, so the leaderboard covers the whole screen instead */
 @media (max-width: 640px) { .lb { position: fixed; padding: 16px; } .lb-form input { font-size: 16px; } }
-.lb-card { width: min(440px, 100%); max-height: 100%; overflow: auto; padding: 20px 22px; border-radius: 16px; background: rgba(20,18,36,.92); border: 1px solid rgba(255,255,255,.12); box-shadow: 0 24px 60px -20px rgba(0,0,0,.7); display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
-.lb-card h4 { margin: 0; font-size: 1.15rem; font-weight: 650; letter-spacing: -0.02em; }
-.lb-note { margin: 0; font-size: .9rem; color: rgba(255,255,255,.75); }
+.lb-card { --ink: #1B1340; --pink: #E628A0; --game-font: "Helvetica Neue", Helvetica, Arial, sans-serif; width: min(520px, 100%); max-height: 100%; overflow: auto; padding: 18px 20px 14px; border-radius: 18px; background: rgba(255,255,255,.95); box-shadow: 0 20px 50px -18px rgba(27,19,64,.5); color: var(--ink); font-family: var(--game-font); font-weight: 700; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.lb-card h4 { margin: 0; text-align: center; font: 700 1.1rem var(--game-font); color: var(--pink); }
+.lb-note { margin: 0; text-align: center; font-size: .92rem; line-height: 1.4; }
 .lb-note:empty { display: none; }
-.lb-note.ok { color: #9CF0C8; } .lb-note.err { color: #FFB4C8; }
+.lb-note.ok { color: #0E8A3A; } .lb-note.err { color: #D3164A; }
 .lb-form { display: flex; gap: 8px; }
 .lb-form[hidden] { display: none; }
-.lb-form input { flex: 1; min-width: 0; width: 100%; font: 500 .95rem var(--font); color: #fff; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.18); border-radius: 12px; padding: 9px 12px; }
-.lb-form input:focus { outline: none; border-color: rgba(255,255,255,.55); }
-.lb-form .btn { padding: 9px 18px; }
-.lb-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; counter-reset: rank; }
-.lb-list li { counter-increment: rank; display: grid; grid-template-columns: 2em 1fr auto; gap: 10px; align-items: baseline; padding: 6px 10px; border-radius: 10px; font-size: .92rem; }
-.lb-list li::before { content: counter(rank); font-weight: 650; color: rgba(255,255,255,.5); font-variant-numeric: tabular-nums; }
-.lb-list li:nth-child(1)::before { content: "🥇"; } .lb-list li:nth-child(2)::before { content: "🥈"; } .lb-list li:nth-child(3)::before { content: "🥉"; }
-.lb-list li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lb-list li b { font-weight: 650; font-variant-numeric: tabular-nums; }
-.lb-list li small { display: block; font-size: .72rem; color: rgba(255,255,255,.5); font-weight: 500; }
-.lb-list li.me { background: rgba(255,93,162,.2); }
-.lb-list li.empty { display: block; color: rgba(255,255,255,.6); }
-.lb-list li.empty::before { content: none; }
-.lb-back { justify-self: center; font: 600 .88rem var(--font); color: #fff; background: none; border: 0; cursor: pointer; padding: 4px 8px; opacity: .8; }
+.lb-form input { flex: 1; min-width: 0; width: 100%; font: 700 1rem var(--game-font); text-transform: uppercase; color: var(--ink); background: #fff; border: 2px solid #CFCBE3; border-radius: 10px; padding: 8px 12px; }
+.lb-form input::placeholder { color: #A9A5C2; }
+.lb-form input:focus { outline: none; border-color: var(--pink); }
+/* the game's Play button: a plain bright green block */
+.lb-play { font: 700 1.05rem var(--game-font); color: #fff; background: #00FF00; border: 0; border-radius: 0; padding: 8px 20px; cursor: pointer; text-shadow: 0 1px 1px rgba(0,80,0,.45); }
+.lb-play:hover { background: #00E600; }
+.lb-play:disabled { opacity: .6; cursor: default; }
+.lb-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.lb-list li { --face: #F1F0F7; --rim: #CFCBE3; --metal: var(--ink); display: grid; grid-template-columns: 26px 2.7em minmax(0, max-content) minmax(14px, 1fr) auto 3.6em; gap: 9px; align-items: baseline; padding: 5px 8px; border-radius: 10px; font-size: 1rem; color: var(--metal); text-transform: uppercase; }
+.lb-list li.r1 { --face: #FFCE40; --rim: #DE9C18; --metal: #B07000; }
+.lb-list li.r2 { --face: #DEE3EC; --rim: #9EA8BA; --metal: #646E84; }
+.lb-list li.r3 { --face: #ECA46A; --rim: #BE7036; --metal: #9C521C; }
+.lb-coin { align-self: center; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: .78rem; background: radial-gradient(circle at 32% 28%, rgba(255,255,255,.8) 0 14%, transparent 30%), var(--face); border: 3px solid var(--rim); box-shadow: inset 0 0 0 1.5px var(--face), inset 0 0 0 2.5px var(--rim); }
+.lb-list li:not(.r1):not(.r2):not(.r3) .lb-ord { color: var(--pink); }
+.lb-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* the dotted line from the name to the score, in square dots like the game's */
+.lb-dots { height: 4px; background: linear-gradient(90deg, var(--rim) 4px, transparent 0) 0 0 / 10px 4px repeat-x; }
+.lb-list li b { font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+.lb-list li small { font-size: .66rem; color: #8E89AC; text-align: right; white-space: nowrap; }
+.lb-list li.me { background: rgba(230,40,160,.1); box-shadow: inset 0 0 0 2px rgba(230,40,160,.35); }
+.lb-list li.empty { display: block; text-align: center; padding: 10px; }
+.lb-back { justify-self: center; font: 700 .9rem var(--game-font); color: var(--ink); background: none; border: 0; cursor: pointer; padding: 4px 8px; opacity: .75; }
+/* phones: the coin alone shows the rank, and the level is left out, so names have room */
+@media (max-width: 640px) { .lb-list li { grid-template-columns: 26px minmax(0, max-content) minmax(10px, 1fr) auto; gap: 8px; padding: 5px 4px; } .lb-list li :is(.lb-ord, small) { display: none; } }
 .lb-back:hover { opacity: 1; text-decoration: underline; }
 dialog.arcade .m-close { top: 11px; right: 12px; background: rgba(255,255,255,.12); color: #fff; box-shadow: none; }
 dialog.arcade .m-close:hover { background: rgba(255,255,255,.22); }
@@ -284,9 +300,15 @@ html[data-theme="night"] .note .mini-hl { background: linear-gradient(transparen
 .stat b { display: block; width: fit-content; font-size: clamp(1.8rem, 3.2vw, 2.4rem); font-weight: 700; letter-spacing: -0.04em; line-height: 1.1; font-variant-numeric: tabular-nums; background: linear-gradient(120deg, var(--c), color-mix(in srgb, var(--c) 50%, var(--sky))); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .stat span { font-size: .85rem; font-weight: 500; color: var(--muted); }
 .about > *, .hero > *, .coffee-grid > * { min-width: 0; }
-.cloud { display: flex; flex-wrap: wrap; gap: 10px; align-content: start; }
-.sticky { border: 1px solid color-mix(in srgb, var(--c) 32%, transparent); border-radius: 999px; padding: 9px 16px; font-weight: 500; font-size: .95rem; background: color-mix(in srgb, var(--c) 13%, var(--paper)); color: var(--text); user-select: none; transition: transform .35s var(--spring), background .3s, box-shadow .3s; }
-.sticky:hover { transform: translateY(-3px) scale(1.04); background: color-mix(in srgb, var(--c) 24%, var(--paper)); box-shadow: 0 10px 24px -12px var(--c); }
+/* Interest stickers: one neutral, softly raised pill each, with a two-tone icon in the colour of what it stands for */
+.cloud { display: flex; flex-wrap: wrap; gap: 10px; align-content: start; margin: 0; padding: 0; list-style: none; }
+.interest { display: inline-flex; align-items: center; gap: 9px; padding: 8px 16px 8px 11px; border-radius: 999px; background: var(--paper); border: 1px solid var(--hair); box-shadow: 0 1px 2px rgba(16,12,40,.04), 0 6px 16px -10px rgba(16,12,40,.18); font-weight: 500; font-size: .94rem; color: var(--text); user-select: none; transition: transform .35s var(--spring), box-shadow .35s, border-color .35s, background .6s; }
+.interest svg { flex: none; width: 21px; height: 21px; color: var(--c); transition: transform .45s var(--spring); }
+.interest svg .f { fill: color-mix(in srgb, var(--c) 24%, transparent); }
+.interest:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--c) 35%, transparent); box-shadow: 0 2px 4px rgba(16,12,40,.04), 0 14px 26px -14px color-mix(in srgb, var(--c) 70%, transparent); }
+.interest:hover svg { transform: rotate(-10deg) scale(1.12); }
+html[data-theme="night"] .interest { box-shadow: none; }
+html[data-theme="night"] .interest svg { color: color-mix(in srgb, var(--c) 78%, #fff); }   /* a touch lighter, so every icon reads on the dark page */
 
 /* Mineral shelf: Apple-style product tiles. Each specimen floats in its own soft rounded tile with a faint wash of its
    colour at the bottom; hovering lifts it and sets off sparkles in its colour. Sizes use cqw (percent of the grid's width). */
@@ -439,6 +461,15 @@ dialog[open] { animation: pop .5s var(--ease); }
 .m-body h3 { font-size: 1.85rem; letter-spacing: -0.035em; }
 .m-label { font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .12em; color: var(--accent); margin: 24px 0 6px; }
 .m-body p { color: var(--muted); margin: 0; line-height: 1.65; }
+.models { display: grid; gap: 10px; }
+.models div { background: var(--fill); border-radius: 16px; padding: 14px 16px; }
+.models b { display: block; color: var(--text); font-size: .95rem; font-weight: 600; margin-bottom: 3px; }
+.models span { display: block; color: var(--muted); font-size: .92rem; line-height: 1.6; }
+.results { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.results div { border: 1px solid var(--hair); border-radius: 16px; padding: 12px 14px; }
+.results b { display: block; color: var(--text); font-size: 1.45rem; font-weight: 600; letter-spacing: -0.02em; }
+.results span { display: block; color: var(--muted); font-size: .82rem; line-height: 1.45; }
+.m-body .results-note { font-size: .82rem; margin-top: 8px; }
 .pipeline { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 5px; margin-top: 8px; }
 .pipeline span { background: var(--fill); font-size: .8rem; font-weight: 500; padding: 5px 12px; border-radius: 999px; }
 .pipeline i { font-style: normal; font-size: .8rem; color: var(--muted); opacity: .7; }
@@ -598,7 +629,7 @@ dialog[open] { animation: pop .5s var(--ease); }
         </figure>
     </div>
     <div class="about-side">
-      <div class="cloud" id="cloud" aria-label="Interests"></div>
+      <ul class="cloud" id="cloud" aria-label="Interests"></ul>
       <div class="shelf">
         <h3>The mineral shelf 🔎</h3>
         <p>A few favourites from my own collection. Click for a closer inspection.</p>
@@ -676,6 +707,15 @@ dialog[open] { animation: pop .5s var(--ease); }
     <p id="m-context"></p>
     <div class="m-label">What I did</div>
     <p id="m-role"></p>
+    <div id="m-models-wrap" hidden>
+      <div class="m-label">The models</div>
+      <div class="models" id="m-models"></div>
+    </div>
+    <div id="m-results-wrap" hidden>
+      <div class="m-label">How well it works</div>
+      <div class="results" id="m-results"></div>
+      <p class="results-note" id="m-results-note"></p>
+    </div>
     <div class="m-label">Pipeline</div>
     <div class="pipeline" id="m-pipeline"></div>
     <div class="m-label">Toolbox</div>
@@ -683,28 +723,33 @@ dialog[open] { animation: pop .5s var(--ease); }
   </div>
 </dialog>
 <dialog id="arcade" class="arcade" aria-labelledby="arcade-title">
+  <!-- everything goes full screen together (a dialog itself can't), so the leaderboard keeps working there -->
+  <div class="arcade-box" id="arcade-box">
   <button class="m-close" id="arcade-close" aria-label="Close the game">✕</button>
   <div class="arcade-bar">
     <h3 id="arcade-title"></h3>
     <div class="keys"><span><kbd>←</kbd> <kbd>→</kbd> move</span><span><kbd>Space</kbd> shoot</span><span><kbd>P</kbd> pause</span><span>or drag &amp; tap on touch screens</span></div>
-    <button class="lb-open" id="lb-open">🏆 Top 10</button>
-    <a id="arcade-full" href="#" target="_blank" rel="noopener">Open full screen ↗</a>
+    <div class="bar-btns">
+      <button type="button" id="lb-open">🏆 Top 10</button>
+      <button type="button" id="arcade-full" aria-pressed="false">⛶ Full screen</button>
+    </div>
   </div>
   <div class="screen">
     <iframe id="arcade-frame" title="Playable game" allow="autoplay; fullscreen"></iframe>
     <!-- the all-time leaderboard: opens after a game ends, or from the Top 10 button -->
     <div class="lb" id="lb" hidden>
       <div class="lb-card" role="dialog" aria-labelledby="lb-title">
-        <h4 id="lb-title">🏆 All-time top 10</h4>
+        <h4 id="lb-title">🏆 ALL-TIME TOP 10</h4>
         <p class="lb-note" id="lb-note" aria-live="polite"></p>
         <form class="lb-form" id="lb-form" hidden>
           <input id="lb-name" maxlength="18" placeholder="anonymous" autocomplete="nickname" aria-label="Your name for the leaderboard">
-          <button class="btn play" type="submit" id="lb-send">Add me</button>
+          <button class="lb-play" type="submit" id="lb-send">Add me</button>
         </form>
         <ol class="lb-list" id="lb-list"></ol>
         <button class="lb-back" id="lb-back">Back to the game</button>
       </div>
     </div>
+  </div>
   </div>
 </dialog>
 <dialog id="maker" class="maker" aria-labelledby="maker-title">
@@ -842,12 +887,26 @@ const projects = [
     role: "Designed the full pipeline: windowed continuous tri-axial IMU streams, extracted time-domain and FFT features, built task-specific classifiers and regressors, and tuned the fall detector for recall with post-processing to keep false alarms down.",
     pipeline: ["IMU stream", "Windowing", "FFT features", "Task-specific models", "Activity + metrics + fall flag"],
     tech: ["FFT", "Windowing", "Classification", "Regression", "Threshold tuning", "Feature engineering"] },
-  { title: "The air quality guardian", cats: "hardware ml", tag: "Hardware & IoT", c: "#B98CFF", art: "air",
-    desc: "An ESP32 station that watches the air in my room, predicts when CO₂ will hit the red zone, and turns a smart lamp into the warning light.",
-    context: "CO₂ builds up fast in a closed room. I wanted temperature, humidity, CO₂ and particle levels visible in real time, with a warning mechanism before the air goes bad, not after.",
-    role: "Built the whole thing: ESP32 sensor acquisition with an on-device display, Wi-Fi logging to a local MySQL database, rolling time-series features feeding an XGBoost model that forecasts minutes until the CO₂ threshold. A smart-lamp alert that changes color depending on the air quality metrics over the home network.",
-    pipeline: ["Sensors", "ESP32", "MySQL", "XGBoost forecast", "Lamp alert"],
-    tech: ["ESP32", "MySQL", "Sensor integration", "IoT", "XGBoost", "Time-series features"] },
+  { title: "The air quality guardian", cats: "hardware ml", tag: "Hardware & IoT", c: "#B98CFF", art: "air", modalArt: "airStory",
+    desc: "An ESP32 station that watches the air in my room, forecasts how long until the window needs opening, and turns a smart lamp into the warning light.",
+    context: "CO₂ builds up fast in a closed room: one person can take a bedroom past the recommended 1000 ppm within an hour. I wanted the air visible in real time and, more usefully, a warning before it goes bad: “open the window in about 25 minutes”, updated with every reading.",
+    role: "Built the whole system. MicroPython firmware for an ESP32 reads three sensors (SGP30 for eCO₂ and VOCs, SHT40 for temperature and humidity, PMS5003 for fine dust) and shows the live forecast on an OLED. A FastAPI server on a home mini PC logs every 30-second reading to MySQL, re-runs the forecast, retrains the learned model nightly and serves a live status page. A WiZ smart lamp, driven over UDP on the home Wi-Fi, turns orange at 800 ppm and red at 1000, then restores whatever light it had before.",
+    models: [
+      ["Physics baseline", "A closed room is a box that people breathe into while outdoor air leaks in: dC/dt = g − λ(C − C_out). A 15-minute rolling slope gives the generation rate g; the room's air exchange λ and the outdoor level are learned from its own overnight decays. Solving the equation gives the minutes until 1000 ppm, or shows that CO₂ will level off below it. It works from the first ten minutes, with no training data."],
+      ["XGBoost survival model", "An accelerated-failure-time model (survival:aft) predicts the minutes until the limit from rolling time-series features: CO₂ level and slopes over 5, 15 and 40 minutes, acceleration, humidity and temperature trends, VOCs, time of day, and time since the window was last opened. The physics answer is the trees' starting point, so they only learn the corrections."],
+      ["Censoring done right", "Often the limit is never reached, because the window was opened or people left first. Those moments become right-censored labels (“it took longer than 25 minutes”) rather than being dropped or read as “it never got bad”. Otherwise the model would learn that the air stays fresh, because I always open the window in time."],
+      ["Blend and promotion", "While CO₂ is visibly rising, the forecast is the geometric mean of both models, whose errors are partly independent. The model retrains every night, but only takes over if it beats physics by 5% on the held-out last quarter of the history without being worse during the countdown."],
+      ["Airing out", "With the window open, the same physics runs in reverse. A detector with hysteresis spots the fast exponential decay and counts down to fresh air, so the display can say “close the window”."]
+    ],
+    results: [
+      ["14.5 min", "mean forecast error, vs 26.9 for physics alone"],
+      ["7.2 min", "mean error during the countdown (physics: 8.8)"],
+      ["78%", "of forecasts within 25% of the truth (physics: 71%)"],
+      ["0.947", "concordance index (physics: 0.906)"]
+    ],
+    resultsNote: "Measured on six weeks of a simulated room, scoring only the last quarter, which the model never saw in training. In the real room, the nightly report decides which model runs.",
+    pipeline: ["Sensors", "ESP32 + OLED", "FastAPI + MySQL", "Rolling features", "Physics + XGBoost survival", "Forecast + lamp"],
+    tech: ["ESP32", "XGBoost survival", "Physics model", "Censoring", "Time-series features", "FastAPI", "MySQL", "MicroPython", "WiZ over UDP"] },
   { title: "Star maps from a moment in time", cats: "data", tag: "Data viz · Astronomy", c: "#2B2D72", art: "stars",
     sky: true,
     desc: "The night sky exactly as it looked from any place at any moment, drawn from a real star catalogue and turned into a print-ready poster. Make your own right here.",
@@ -972,14 +1031,14 @@ function draw(cv, p, t) {
       x.strokeStyle = "rgba(255,255,255,.3)"; x.lineWidth = 1;
       x.beginPath(); x.moveTo(w * .07, y); x.lineTo(w * .46, y); x.bezierCurveTo(w * .51, y, w * .5, jy, jx, jy); x.stroke();
       for (let k = 0; k < 3; k++) {
-        const px = w * .08 + ((t * 55 + k * 52 + i * 31) % (w * .37));
+        const px = w * .08 + ((t * 30 + k * 52 + i * 31) % (w * .37));
         const c = PASTELS[(i + k) % PASTELS.length];
         glow(c, 8); x.fillStyle = c;
-        x.beginPath(); x.arc(px, y + Math.sin(t * 5 + k + i) * 3, 2.6, 0, 7); x.fill(); noGlow();
+        x.beginPath(); x.arc(px, y + Math.sin(t * 3 + k + i) * 3, 2.6, 0, 7); x.fill(); noGlow();
       }
     }
     glow(tint, 10); x.fillStyle = "#fff"; x.beginPath(); x.arc(jx, jy, 2.4, 0, 7); x.fill(); noGlow();
-    const step = t * 2;
+    const step = t * 1.1;
     for (let gy = 0; gy < 3; gy++) for (let gx = 0; gx < 3; gx++) {
       const age = ((step - (gy * 3 + gx)) % 9 + 9) % 9, lit = Math.max(0, 1 - age / 2.2);
       const cx = w * .6 + gx * w * .115, cy = h * .22 + gy * h * .2, cw = w * .095, ch = h * .155;
@@ -992,7 +1051,7 @@ function draw(cv, p, t) {
     /* a cost curve draws itself, its uncertainty band narrowing as the production phases pass */
     const pts = [], n = 34;
     for (let i = 0; i <= n; i++) { const u = i / n; pts.push([w * (.08 + u * .78), h * (.78 - u * .5 - Math.sin(u * 9) * .06)]); }
-    const prog = reduce ? 1 : (t * .22) % 1.15, upto = Math.max(2, Math.ceil(Math.min(prog, 1) * n));
+    const prog = reduce ? 1 : (t * .13) % 1.15, upto = Math.max(2, Math.ceil(Math.min(prog, 1) * n));
     x.strokeStyle = "rgba(255,255,255,.28)"; x.lineWidth = 1;
     x.beginPath(); x.moveTo(w * .08, h * .1); x.lineTo(w * .08, h * .9); x.lineTo(w * .92, h * .9); x.stroke();
     const band = x.createLinearGradient(w * .08, 0, w * .86, 0);
@@ -1005,13 +1064,13 @@ function draw(cv, p, t) {
     x.beginPath(); x.moveTo(w * .08, h * .28); x.lineTo(w * .88, h * .28); x.stroke(); x.setLineDash([]);
     glow("rgba(255,255,255,.7)", 8); x.strokeStyle = "#fff"; x.lineWidth = 2;
     x.beginPath(); pts.slice(0, upto).forEach(([px, py], i) => i ? x.lineTo(px, py) : x.moveTo(px, py)); x.stroke(); noGlow();
-    const [tx, ty] = pts[upto - 1], ping = (t * 1.2) % 1;
+    const [tx, ty] = pts[upto - 1], ping = (t * .8) % 1;
     x.strokeStyle = hexA(GOLD, 1 - ping); x.lineWidth = 1; x.beginPath(); x.arc(tx, ty, 4 + ping * 12, 0, 7); x.stroke();
     glow(GOLD, 12); x.fillStyle = GOLD; x.beginPath(); x.arc(tx, ty, 4.2, 0, 7); x.fill(); noGlow();
   } else if (p.art === "rank") {
     /* glassy bars shuffle themselves into a ranked list; the winner glows gold under a twinkling star */
     const hts = [.62, .3, .85, .45, .72, .38], order = [2, 4, 0, 3, 5, 1];
-    const ph = reduce ? 1 : (Math.sin(t * .9) + 1) / 2, base = h * .84;
+    const ph = reduce ? 1 : (Math.sin(t * .5) + 1) / 2, base = h * .84;
     x.strokeStyle = "rgba(255,255,255,.3)"; x.lineWidth = 1;
     x.beginPath(); x.moveTo(w * .08, base); x.lineTo(w * .92, base); x.stroke();
     hts.forEach((ht, i) => {
@@ -1022,26 +1081,26 @@ function draw(cv, p, t) {
       x.fillStyle = g; x.beginPath(); x.roundRect(bx, top, bw, bh, 5); x.fill(); noGlow();
       x.fillStyle = win ? "#fff" : "rgba(255,255,255,.6)"; x.fillRect(bx + 3, top, bw - 6, 1);   /* light catching the top edge */
       if (win) {
-        const s = 6 + Math.sin(t * 3) * 1.5, sx = bx + bw / 2, sy = top - 14;
+        const s = 6 + Math.sin(t * 2) * 1.5, sx = bx + bw / 2, sy = top - 14;
         glow(GOLD, 10); x.fillStyle = "#fff"; x.beginPath();
-        for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4 + t * .6, rr = k % 2 ? s * .3 : s; x.lineTo(sx + Math.cos(a) * rr, sy + Math.sin(a) * rr); }
+        for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4 + t * .35, rr = k % 2 ? s * .3 : s; x.lineTo(sx + Math.cos(a) * rr, sy + Math.sin(a) * rr); }
         x.closePath(); x.fill(); noGlow();
       }
     });
   } else if (p.art === "wave") {
-    /* motion data from the ankle sensor streams in from the right; the newest slice sits in the analysis window and
-       the classifier beside it lights up the activity it recognises: walking, running, cycling, or a fall */
-    const ACTS = ["Walking", "Running", "Cycling", "Fall"], seg = 1.15, speed = .32;
+    /* motion data from the ankle sensor drifts in slowly from the right; the newest slice sits in the analysis window,
+       and a single label beside it quietly fades to the activity it recognises: walking, running, cycling, or a fall */
+    const ACTS = ["Walking", "Running", "Cycling", "Fall"], seg = .27, speed = .12;   /* about 2.3 s per activity */
     const sw = w * .6, winX = sw * .7, winW = sw * .3;
     const act = s => ((Math.floor(s / seg) % 4) + 4) % 4;
     /* stream position of a point on screen: the right edge is "now", older data drifts off to the left */
     const sAt = px => (reduce ? 2.3 : t * speed) + (px - sw) / w * 1.1;
     const shape = (a, s, k) => {
-      const local = ((s / seg) % 1 + 1) % 1, ph = s * 40 + k * 1.9;
+      const local = ((s / seg) % 1 + 1) % 1, ph = s * 70 + k * 1.9;
       if (a === 0) return Math.sin(ph * .55) * .05 + Math.sin(ph * 1.1) * .02;                 /* walking: steady stride */
       if (a === 1) return Math.sin(ph * 1.05) * .085 + Math.sin(ph * 2.3) * .03;               /* running: faster, bigger */
       if (a === 2) return Math.sin(ph * .32 + k) * .06;                                         /* cycling: smooth circles */
-      const hit = Math.exp(-(((local - .35) / .05) ** 2));                                        /* fall: a spike, then still */
+      const hit = Math.exp(-(((local - .35) / .1) ** 2));                                        /* fall: a spike, then still */
       return (k === 2 ? -1 : .6) * hit * .19 + Math.sin(ph * 3) * .008 * (local < .35 ? 1 : .3);
     };
     /* one activity blends into the next over a short stretch, as a real wearer changes pace */
@@ -1062,18 +1121,20 @@ function draw(cv, p, t) {
     const cx0 = w * .655, ay = h * .5;
     x.strokeStyle = "rgba(255,255,255,.6)"; x.lineWidth = 1.2;
     x.beginPath(); x.moveTo(sw + 4, ay); x.lineTo(cx0 - 6, ay); x.moveTo(cx0 - 11, ay - 4); x.lineTo(cx0 - 6, ay); x.lineTo(cx0 - 11, ay + 4); x.stroke();
-    const pw = w * .3, ph = h * .15, gap = h * .045, top = h * .5 - (ph * 4 + gap * 3) / 2;
-    x.font = `600 ${Math.round(h * .065)}px Inter, system-ui, sans-serif`; x.textAlign = "left"; x.textBaseline = "middle";
-    ACTS.forEach((label, i) => {
-      const py = top + i * (ph + gap), on = i === now, fall = i === 3;
-      if (on) glow(fall ? "rgba(255,60,90,.8)" : "rgba(255,255,255,.8)", 12);
-      x.fillStyle = on ? (fall ? "#FF4D6D" : "#fff") : "rgba(255,255,255,.14)";
-      x.beginPath(); x.roundRect(cx0, py, pw, ph, ph / 2); x.fill(); noGlow();
-      x.fillStyle = on ? (fall ? "#fff" : "#9A4A12") : "rgba(255,255,255,.75)";
-      x.fillText(label, cx0 + ph * .55, py + ph / 2 + 1);
-      if (on) { x.beginPath(); x.arc(cx0 + pw - ph * .5, py + ph / 2, ph * .16, 0, 7); x.fill(); }
-    });
-    x.textBaseline = "alphabetic";
+    /* one output label: the name fades out at the end of an activity and the next one fades in */
+    const pw = w * .3, ph = h * .17, py = ay - ph / 2;
+    const frac = ((sAt(winX + winW / 2) / seg) % 1 + 1) % 1, fade = reduce ? 1 : .4 + .6 * Math.max(0, Math.min(1, frac / .1, (1 - frac) / .07));   /* only dims briefly as the name changes */
+    /* the label is the same clear glass as the analysis window, with soft white text */
+    /* a fall turns the label a red-stained white: text, dot and outline alike */
+    const fallen = now === 3, ink = fallen ? "#FFA3B2" : "#fff";
+    x.fillStyle = fallen ? "rgba(255,130,155,.2)" : "rgba(255,255,255,.08)"; x.beginPath(); x.roundRect(cx0, py, pw, ph, ph / 2); x.fill();
+    x.strokeStyle = fallen ? "rgba(255,163,178,.95)" : "rgba(255,255,255,.35)"; x.lineWidth = 1; x.stroke();
+    x.globalAlpha = fade * (fallen ? .95 : .7);   /* the everyday activities stay quiet; a fall stands out */
+    x.fillStyle = ink;
+    x.beginPath(); x.arc(cx0 + ph * .5, ay, ph * .13, 0, 7); x.fill();
+    x.font = `600 ${Math.round(h * .068)}px Inter, system-ui, sans-serif`; x.textAlign = "left"; x.textBaseline = "middle";
+    x.fillText(ACTS[now], cx0 + ph * .85, ay + 1);
+    x.globalAlpha = 1; x.textBaseline = "alphabetic";
   } else if (p.art === "air") {
     /* the lamp breathes light in the colour of the air while CO₂ creeps up the meter */
     const lvl = reduce ? .5 : (Math.sin(t * .6) + 1) / 2;
@@ -1106,6 +1167,138 @@ function draw(cv, p, t) {
     x.fillStyle = fill; x.fillRect(mx, my + mh - lvl * mh, mw, lvl * mh); x.restore();
     x.fillStyle = "rgba(255,255,255,.7)"; x.font = `600 ${Math.round(h * .075)}px Inter, system-ui, sans-serif`; x.textAlign = "center";
     x.fillText("CO₂", mx + mw / 2, h * .93);
+  } else if (p.art === "airStory") {
+    /* the expanded card tells the whole story, in a 20-second loop: the station sends its readings, the chart forecasts
+       when CO₂ will pass the limit, the lamp turns orange and then red, the window opens and CO₂ falls back to fresh air */
+    const NORMAL = "#F2F6FF", WARN = "#FFD98A", ALERT = "#FF7BA9", MINT = "#9EF0E4";   /* normal: a clean white, so orange stands out */
+    /* the CO₂ curve over one loop, u from 0 to 1 (2.5 hours): a closed room passes 1000 ppm at uX, the window is open
+       from uA to uC, and the room starts filling up again after */
+    const uX = .55, uA = .6, uC = .8, k = 1.2234, kv = 13.5;
+    const cA = 1500 - 980 * Math.exp(-k * uA), cC = 450 + (cA - 450) * Math.exp(-kv * (uC - uA));
+    const cAt = v => v <= uA ? 1500 - 980 * Math.exp(-k * v)
+      : v <= uC ? 450 + (cA - 450) * Math.exp(-kv * (v - uA)) : 1500 - (1500 - cC) * Math.exp(-k * (v - uC));
+    const uF = uA + Math.log((cA - 450) / 150) / kv;   /* back below 600 ppm: fresh */
+    const loopS = 20, runS = 17, tt = reduce ? 0 : t % loopS;
+    const u = reduce ? .42 : Math.min(1, tt / runS);
+    const fade = reduce ? 1 : Math.max(0, Math.min(1, (loopS - tt) / .8, tt / .4));
+    const c = cAt(u), down = u > uA;
+    const level = down ? (c >= 950 ? 2 : c >= 750 ? 1 : 0) : (c >= 1000 ? 2 : c >= 800 ? 1 : 0);   /* with hysteresis */
+    const lc = [NORMAL, WARN, ALERT][level];
+    const fs = Math.max(9, Math.round(h * .052)), font = (wt, s) => `${wt} ${s}px Inter, system-ui, sans-serif`;
+    const clamp = v => Math.max(0, Math.min(1, v)), ease = v => v * v * (3 - 2 * v);
+
+    /* the chart */
+    const L = w * .34, R = w * .95, T0 = h * .22, B = h * .86, lo = 400, hi = 1150;
+    const X = v => L + v * (R - L), Y = ppm => B - (ppm - lo) / (hi - lo) * (B - T0);
+    x.strokeStyle = "rgba(255,255,255,.3)"; x.lineWidth = 1;
+    x.beginPath(); x.moveTo(L, B); x.lineTo(R, B); x.stroke();
+    [[800, WARN, "800"], [1000, ALERT, "1000 ppm"]].forEach(([ppm, col, label]) => {
+      x.strokeStyle = hexA(col, .75); x.beginPath(); x.moveTo(L, Y(ppm)); x.lineTo(R, Y(ppm)); x.stroke();
+      /* labelled at the left end, where the curve is still low (and clear of the window's close button) */
+      x.fillStyle = "rgba(255,255,255,.75)"; x.font = font(500, Math.max(8, Math.round(fs * .8))); x.textAlign = "left";
+      x.fillText(label, L + 2, Y(ppm) - 4);
+    });
+    x.globalAlpha = fade;
+    if (u > uA) {   /* when the window was open */
+      x.fillStyle = hexA(MINT, .16); x.fillRect(X(uA), T0, X(Math.min(u, uC)) - X(uA), B - T0);
+    }
+    const line = [];
+    for (let v = 0; v <= u; v += .004) line.push([X(v), Y(cAt(v))]);
+    line.push([X(u), Y(c)]);
+    x.fillStyle = "rgba(255,255,255,.1)"; x.beginPath(); x.moveTo(X(0), B);
+    line.forEach(([a, b]) => x.lineTo(a, b)); x.lineTo(X(u), B); x.closePath(); x.fill();
+    glow("rgba(255,255,255,.7)", 7); x.strokeStyle = "#fff"; x.lineWidth = 2;
+    x.beginPath(); line.forEach(([a, b], i) => i ? x.lineTo(a, b) : x.moveTo(a, b)); x.stroke(); noGlow();
+    /* the forecast: where CO₂ is heading, dashed, to the moment it passes the limit (or, airing out, gets fresh) */
+    const target = u < uX ? [uX, 1000, ALERT] : u > uA && u < uF ? [uF, 600, MINT] : null;
+    if (target) {
+      x.setLineDash([4, 4]); x.strokeStyle = "rgba(255,255,255,.75)"; x.lineWidth = 1.5;
+      x.beginPath(); x.moveTo(X(u), Y(c));
+      for (let v = u; v <= target[0]; v += .004) x.lineTo(X(v), Y(cAt(v)));
+      x.stroke(); x.setLineDash([]);
+      const ping = (t * .9) % 1, mx = X(target[0]), my = Y(target[1]);
+      x.strokeStyle = hexA(target[2], 1 - ping); x.lineWidth = 1; x.beginPath(); x.arc(mx, my, 4 + ping * 10, 0, 7); x.stroke();
+      glow(target[2], 10); x.fillStyle = target[2]; x.beginPath(); x.arc(mx, my, 4, 0, 7); x.fill(); noGlow();
+    }
+
+    /* the station, bottom left: its little screen shows the reading it sends */
+    const sx = w * .175, sy = h * .64, sw2 = w * .11, sh = h * .2;
+    x.globalAlpha = 1;
+    glow("rgba(0,0,0,.25)", 10); x.fillStyle = "rgba(27,19,64,.6)"; x.beginPath(); x.roundRect(sx, sy, sw2, sh, 6); x.fill(); noGlow();
+    x.strokeStyle = "rgba(255,255,255,.3)"; x.lineWidth = 1; x.stroke();
+    x.fillStyle = "#0B0A1A"; x.beginPath(); x.roundRect(sx + sw2 * .1, sy + sh * .16, sw2 * .8, sh * .52, 3); x.fill();
+    x.fillStyle = "#fff"; x.font = font(600, Math.max(8, Math.round(sh * .33))); x.textAlign = "center"; x.textBaseline = "middle";
+    x.fillText(String(Math.round(c)), sx + sw2 / 2, sy + sh * .43);
+    x.fillStyle = "rgba(255,255,255,.55)"; x.font = font(500, Math.max(7, Math.round(sh * .15)));
+    x.fillText("CO₂ ppm", sx + sw2 / 2, sy + sh * .85); x.textBaseline = "alphabetic";
+    /* a reading every second or so: Wi-Fi arcs, then a dot flying to the chart, which pings when it lands */
+    const q = reduce ? .3 : (t % 1.1) / 1.1, ax0 = sx + sw2 * .85, ay0 = sy - 3;
+    for (let i = 0; i < 3; i++) {
+      const on = clamp(1 - Math.abs(q * 3 - i) * .8);
+      x.strokeStyle = `rgba(255,255,255,${.2 + on * .6})`; x.lineWidth = 1.3;
+      x.beginPath(); x.arc(ax0, ay0, 4 + i * 4, -Math.PI * .75, -Math.PI * .25); x.stroke();
+    }
+    if (q < .6) {
+      const f = ease(q / .6), bx = X(u), by = Y(c), cx1 = (ax0 + bx) / 2, cy1 = Math.min(ay0, by) - h * .22;
+      const px = (1 - f) ** 2 * ax0 + 2 * (1 - f) * f * cx1 + f * f * bx, py = (1 - f) ** 2 * ay0 + 2 * (1 - f) * f * cy1 + f * f * by;
+      glow("#fff", 8); x.fillStyle = "#fff"; x.beginPath(); x.arc(px, py, 2.6, 0, 7); x.fill(); noGlow();
+    }
+    x.globalAlpha = fade;
+    const landed = q >= .6 ? (q - .6) / .4 : 1;
+    if (landed < 1) { x.strokeStyle = `rgba(255,255,255,${1 - landed})`; x.lineWidth = 1; x.beginPath(); x.arc(X(u), Y(c), 4 + landed * 12, 0, 7); x.stroke(); }
+    glow(lc, 12); x.fillStyle = "#fff"; x.beginPath(); x.arc(X(u), Y(c), 4.4, 0, 7); x.fill(); noGlow();
+    x.globalAlpha = 1;
+
+    /* the window, top left: it swings open at the alert and air flows in, then it closes again */
+    const wx = w * .035, wy = h * .14, ww = w * .12, wh = h * .44, pw2 = ww / 2;
+    const open = reduce ? 0 : ease(clamp((u - uA) / .03)) * (1 - ease(clamp((u - uC) / .03)));
+    const sky = x.createLinearGradient(0, wy, 0, wy + wh);
+    sky.addColorStop(0, "rgba(201,214,255,.55)"); sky.addColorStop(1, "rgba(158,240,228,.35)");
+    x.fillStyle = sky; x.fillRect(wx, wy, ww, wh);
+    x.fillStyle = "rgba(255,255,255,.18)"; x.fillRect(wx, wy, pw2, wh);   /* the left pane stays shut */
+    /* the right pane: glass while shut; open, the gap fills with daylight and the pane swings out past the frame */
+    x.fillStyle = `rgba(255,255,255,${.18 * (1 - open)})`; x.fillRect(wx + pw2, wy, pw2, wh);
+    const day = x.createLinearGradient(0, wy, 0, wy + wh);
+    day.addColorStop(0, hexA("#FFFFFF", .55 * open)); day.addColorStop(1, hexA(MINT, .45 * open));
+    x.fillStyle = day; x.fillRect(wx + pw2, wy, pw2, wh);
+    x.strokeStyle = "rgba(255,255,255,.8)"; x.lineWidth = 1.5; x.strokeRect(wx, wy, ww, wh);
+    x.beginPath(); x.moveTo(wx + pw2, wy); x.lineTo(wx + pw2, wy + wh); x.stroke();
+    if (open > .02) {
+      const hx = wx + ww, d = pw2 * .75 * open, g = wh * .09 * open;
+      x.fillStyle = "rgba(255,255,255,.2)";
+      x.beginPath(); x.moveTo(hx, wy); x.lineTo(hx + d, wy - g); x.lineTo(hx + d, wy + wh + g); x.lineTo(hx, wy + wh); x.closePath(); x.fill();
+      x.strokeStyle = "rgba(255,255,255,.85)"; x.lineWidth = 1.4; x.stroke();
+    }
+    x.fillStyle = "rgba(255,255,255,.5)"; x.fillRect(wx - 4, wy + wh, ww + 8, 3);   /* the sill */
+    for (let i = 0; i < 5 && open > .05; i++) {   /* fresh air flowing in through the gap */
+      const ph = (t * .5 + i / 5) % 1, ox = wx + pw2 * 1.3 + ph * w * .16, oy = wy + wh * (.14 + i * .17);
+      glow(MINT, 4); x.strokeStyle = hexA(MINT, Math.sin(ph * Math.PI) * open); x.lineWidth = 1.8; x.beginPath();
+      for (let s = 0; s <= 1; s += .1) { const px = ox + s * w * .06, py = oy + Math.sin(s * 6 + t * 3 + i) * 3; s ? x.lineTo(px, py) : x.moveTo(px, py); }
+      x.stroke(); noGlow();
+    }
+
+    /* the lamp, hanging between them, glowing in the air's colour */
+    const lx = w * .23, ly = h * .3, br = Math.max(6, h * .052);
+    x.strokeStyle = "rgba(255,255,255,.45)"; x.lineWidth = 1.2; x.beginPath(); x.moveTo(lx, 0); x.lineTo(lx, ly - br - 3); x.stroke();
+    const aura = x.createRadialGradient(lx, ly, 0, lx, ly, h * (.3 + level * .05 + Math.sin(t * 2) * .015));
+    aura.addColorStop(0, hexA(lc, level ? .6 : .4)); aura.addColorStop(1, hexA(lc, 0));
+    x.fillStyle = aura; x.beginPath(); x.arc(lx, ly, h * .4, 0, 7); x.fill();
+    x.fillStyle = "rgba(255,255,255,.55)"; x.beginPath(); x.roundRect(lx - br * .45, ly - br - 4, br * .9, 5, 2); x.fill();
+    const orb = x.createRadialGradient(lx - br * .3, ly - br * .3, 1, lx, ly, br);
+    orb.addColorStop(0, "#fff"); orb.addColorStop(1, lc);
+    glow(lc, 18); x.fillStyle = orb; x.beginPath(); x.arc(lx, ly, br, 0, 7); x.fill(); noGlow();
+
+    /* what the forecast says right now, in a glass label above the chart */
+    const mins = v => { const m = (v - u) * 150; return m < 10 ? Math.max(1, Math.round(m)) : Math.round(m / 5) * 5; };
+    const say = u < uX - .004 ? `open the window in ~${mins(uX)} min` : u < uA ? "over 1000 ppm: open the window now"
+      : u < uF ? `airing out · fresh in ~${mins(uF)} min` : u < uC ? "fresh again · close the window" : "the air is fresh";
+    x.font = font(600, fs); x.textBaseline = "middle"; x.textAlign = "left";
+    const ph = fs * 2.1, pwid = x.measureText(say).width + ph * 1.45, py0 = h * .045;
+    x.fillStyle = level === 2 && !down ? "rgba(255,123,169,.22)" : "rgba(255,255,255,.12)";
+    x.beginPath(); x.roundRect(L, py0, pwid, ph, ph / 2); x.fill();
+    x.strokeStyle = "rgba(255,255,255,.4)"; x.lineWidth = 1; x.stroke();
+    glow(lc, 6); x.fillStyle = lc; x.beginPath(); x.arc(L + ph * .5, py0 + ph / 2, ph * .16, 0, 7); x.fill(); noGlow();
+    x.fillStyle = "#fff"; x.fillText(say, L + ph * .9, py0 + ph / 2 + 1); x.textBaseline = "alphabetic";
   } else if (p.art === "plotter") {
     /* the pen draws an owl around eyes that are already on the paper, lifting between strokes; the gantry follows */
     const ink = "#2A2440";
@@ -1172,27 +1365,27 @@ function draw(cv, p, t) {
     x.strokeStyle = "rgba(255,255,255,.14)"; x.lineWidth = 1; x.stroke();
   } else if (p.art === "invaders") {
     /* the cucumber fleet marches side to side, red eyes glowing, while the cat fires back */
-    const march = reduce ? 0 : Math.sin(t * 1.3) * w * .07;
+    const march = reduce ? 0 : Math.sin(t * .8) * w * .07;
     const cw = Math.max(9, w * .04), ch = cw * 2.3;
     for (let r = 0; r < 2; r++) for (let k = 0; k < 6; k++) {
-      const cx = w * (.2 + k * .12) + march, cy = h * (.24 + r * .25) + Math.sin(t * 4 + k + r) * 2;
+      const cx = w * (.2 + k * .12) + march, cy = h * (.24 + r * .25) + Math.sin(t * 2.5 + k + r) * 2;
       x.save(); x.translate(cx, cy); x.rotate(.18);
       const skin = x.createLinearGradient(-cw / 2, 0, cw / 2, 0);
       skin.addColorStop(0, "#3F8F2A"); skin.addColorStop(.45, "#8FD95A"); skin.addColorStop(1, "#3A7D25");
       x.fillStyle = skin; x.beginPath(); x.roundRect(-cw / 2, -ch / 2, cw, ch, cw / 2); x.fill();
       x.fillStyle = "rgba(255,255,255,.22)"; x.beginPath(); x.roundRect(-cw * .22, -ch * .38, cw * .14, ch * .7, cw * .07); x.fill();
       /* glowing red eyes, pulsing slightly out of step from cucumber to cucumber */
-      x.shadowColor = "#FF1E3C"; x.shadowBlur = cw * (.6 + .35 * Math.sin(t * 5 + k * 1.7 + r)) * dpr;
+      x.shadowColor = "#FF1E3C"; x.shadowBlur = cw * (.6 + .35 * Math.sin(t * 3 + k * 1.7 + r)) * dpr;
       x.fillStyle = "#FF3B55"; x.beginPath(); x.arc(-cw * .18, -ch * .14, cw * .16, 0, 7); x.arc(cw * .2, -ch * .14, cw * .16, 0, 7); x.fill();
       x.shadowBlur = 0; x.fillStyle = "#FFD0D6"; x.beginPath(); x.arc(-cw * .2, -ch * .16, cw * .05, 0, 7); x.arc(cw * .18, -ch * .16, cw * .05, 0, 7); x.fill();
       x.restore();
     }
-    const catAt = s => w * .5 + (reduce ? 0 : Math.sin(s * .8) * w * .3);
+    const catAt = s => w * .5 + (reduce ? 0 : Math.sin(s * .5) * w * .3);
     const R = h * .1, catY = h * .86;
-    for (let i = 0; i < 3; i++) {
-      const ph = reduce ? .3 + i * .2 : (t * 1.1 + i / 3) % 1;
+    for (let i = 0; i < 2; i++) {
+      const ph = reduce ? .3 + i * .3 : (t * .55 + i / 2) % 1;
       glow("rgba(230,30,110,.7)", 8); x.fillStyle = "#F0287A";
-      x.beginPath(); x.roundRect(catAt(t - ph / 1.1) - 2.5, catY - R - ph * h * .62, 5, 11, 2.5); x.fill(); noGlow();
+      x.beginPath(); x.roundRect(catAt(t - ph / .55) - 2.5, catY - R - ph * h * .62, 5, 11, 2.5); x.fill(); noGlow();
     }
     const cx = catAt(t), fur = x.createLinearGradient(0, catY - R * 1.35, 0, catY + R);
     fur.addColorStop(0, "#6A56B0"); fur.addColorStop(1, "#2C2158");
@@ -1232,10 +1425,21 @@ function openModal(p) {
   document.getElementById("m-title").textContent = p.title;
   document.getElementById("m-context").textContent = p.context;
   document.getElementById("m-role").textContent = p.role;
+  const block = ([name, text]) => {  /* a name over a line of text: a model, or a result */
+    const d = document.createElement("div"), b = document.createElement("b"), s = document.createElement("span");
+    b.textContent = name; s.textContent = text; d.append(b, s);
+    return d;
+  };
+  document.getElementById("m-models-wrap").hidden = !p.models;
+  document.getElementById("m-models").replaceChildren(...(p.models || []).map(block));
+  document.getElementById("m-results-wrap").hidden = !p.results;
+  document.getElementById("m-results").replaceChildren(...(p.results || []).map(block));
+  document.getElementById("m-results-note").textContent = p.resultsNote || "";
   document.getElementById("m-pipeline").innerHTML = p.pipeline.map(s => `<span>${s}</span>`).join("<i>→</i>");
   document.getElementById("m-meta").innerHTML = p.tech.map(t => `<span>${t}</span>`).join("");
   document.getElementById("m-thumb").style.setProperty("--c", p.c);
-  mPainter = p.sky ? null : { cv: document.getElementById("m-canvas"), p };
+  /* a project can tell more in its open window than on its card (modalArt), e.g. the air guardian's whole loop */
+  mPainter = p.sky ? null : { cv: document.getElementById("m-canvas"), p: p.modalArt ? { ...p, art: p.modalArt } : p };
   setVideo(p.video);
   const action = p.play ? { label: "▶ Play it right here", note: "Real Python, running in your browser. First load takes a few seconds.", run: () => openArcade(p) }
     : p.sky ? { label: "✨ Make your own star map", note: "A small sample of the tool: any place, any moment.", run: openMaker }
@@ -1294,10 +1498,10 @@ const frame = document.getElementById("arcade-frame");
 function openArcade(p) {
   modal.close();
   document.getElementById("arcade-title").textContent = "🥒 " + p.title;
-  document.getElementById("arcade-full").href = p.play;
   frame.addEventListener("load", () => {
     frame.focus();
-    frame.contentWindow.addEventListener("keydown", e => { if (e.key === "Escape") arcade.close(); });
+    /* in full screen, Escape just leaves full screen */
+    frame.contentWindow.addEventListener("keydown", e => { if (e.key === "Escape" && !document.fullscreenElement) arcade.close(); });
   }, { once: true });
   frame.src = p.play;
   arcade.showModal();
@@ -1308,7 +1512,30 @@ arcade.addEventListener("close", () => {
   if (frame.contentWindow) frame.contentWindow.onbeforeunload = null;
   frame.src = "about:blank";
   lbShow(false); lbRun = null;
+  setFull(false);
 });
+
+/* Full screen: the game window's contents (bar, game and leaderboard) go full screen together, so the leaderboard
+   still works there. Where the browser can't do that (iPhones), the window stretches over the whole page instead. */
+const arcadeBox = document.getElementById("arcade-box"), fullBtn = document.getElementById("arcade-full");
+const isFull = () => document.fullscreenElement === arcadeBox || arcade.classList.contains("full");
+function syncFull() {
+  const on = isFull();
+  fullBtn.textContent = on ? "Exit full screen" : "⛶ Full screen";
+  fullBtn.setAttribute("aria-pressed", on);
+  if (arcade.open && lbEl.hidden) frame.focus();
+}
+function setFull(on) {
+  if (!on) {
+    arcade.classList.remove("full");
+    if (document.fullscreenElement === arcadeBox) document.exitFullscreen().catch(() => {});
+  } else if (document.fullscreenEnabled && arcadeBox.requestFullscreen) {
+    arcadeBox.requestFullscreen().catch(() => { arcade.classList.add("full"); syncFull(); });
+  } else arcade.classList.add("full");
+  syncFull();
+}
+fullBtn.addEventListener("click", () => setFull(!isFull()));
+document.addEventListener("fullscreenchange", syncFull);
 
 /* All-time leaderboard. The game tells this page when a game starts and ends (postMessage, see _notify_site in
    games/src/cucumber_invasion/main.py). At the start the page gets a signed run ticket from /api/leaderboard/start;
@@ -1323,13 +1550,15 @@ function lbRender(mine) {
   lbList.replaceChildren();
   if (!lbTop) { lbList.innerHTML = `<li class="empty">The leaderboard couldn't load right now.</li>`; return; }
   if (!lbTop.length) { lbList.innerHTML = `<li class="empty">No scores yet. Be the first!</li>`; return; }
+  /* each row: coin, 1ST / 2ND ..., name, dotted line, score and level (the level is hidden on phones) */
+  const part = (tag, cls, text) => { const el = document.createElement(tag); if (cls) el.className = cls; el.textContent = text; return el; };
   lbTop.forEach((e, i) => {
-    const li = document.createElement("li"), name = document.createElement("span"), score = document.createElement("b");
-    name.textContent = e.name;
-    score.textContent = lbFmt(e.score);
-    const lvl = document.createElement("small"); lvl.textContent = `level ${e.level}`; score.appendChild(lvl);
-    li.append(name, score);
-    if (i + 1 === mine) li.className = "me";
+    const rank = i + 1, li = document.createElement("li");
+    li.append(part("span", "lb-coin", rank), part("span", "lb-ord", rank + (["ST", "ND", "RD"][rank - 1] || "TH")),
+      part("span", "lb-name", e.name), part("span", "lb-dots", ""), part("b", "", lbFmt(e.score)), part("small", "", `lv ${e.level}`));
+    li.querySelectorAll(".lb-coin, .lb-dots").forEach(el => el.setAttribute("aria-hidden", "true"));
+    li.classList.toggle(`r${rank}`, rank <= 3);
+    li.classList.toggle("me", rank === mine);
     lbList.appendChild(li);
   });
 }
@@ -1383,14 +1612,25 @@ document.getElementById("lb-open").addEventListener("click", () => { lbForm.hidd
 document.getElementById("lb-back").addEventListener("click", () => lbShow(false));
 
 /* Interest stickers */
-const interests = ["🥾 Trail days", "✨ Light festivals", "💎 Mineral hunting", "🔨 Building stuff", "🗺️ Exploring", "🌿 Forest air", "🧩 Board games & puzzles", "🔌 Home tinkering"];
+/* each interest: a label, a colour that suits it, and a two-tone icon (24 x 24; shapes with class "f" get a soft fill) */
+const interests = [
+  ["Trail days", "#50739A", '<path class="f" d="M2.5 20 9 8.5l3.8 6.2L15.5 11l6 9z"/><path d="M2.5 20 9 8.5l3.8 6.2L15.5 11l6 9zM7.4 11.3 9 12.5l1.5-1.4"/>'],
+  ["Light festivals", "#E3A21A", '<path class="f" d="M11 3c.7 4.6 3 6.9 7.5 7.5C14 11.2 11.7 13.5 11 18c-.7-4.5-3-6.8-7.5-7.5C8 9.9 10.3 7.6 11 3z"/><path d="M11 3c.7 4.6 3 6.9 7.5 7.5C14 11.2 11.7 13.5 11 18c-.7-4.5-3-6.8-7.5-7.5C8 9.9 10.3 7.6 11 3zM19 15v5M16.5 17.5h5"/>'],
+  ["Mineral hunting", "#5E8EE0", '<path class="f" d="M7 4h10l4 5-9 11L3 9z"/><path d="M7 4h10l4 5-9 11L3 9zM3 9h18M10 4 8.5 9 12 20l3.5-11L14 4"/>'],   /* a pale sapphire */
+  ["Building stuff", "#F07A2E", '<path class="f" d="m13.5 3.5 7 7-3 3-7-7z"/><path d="m13.5 3.5 7 7-3 3-7-7zM12 8.5l-8 8a2.1 2.1 0 0 0 3 3l8-8"/>'],
+  ["Exploring", "#2F7BF5", '<circle class="f" cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="9"/><path d="m15.8 8.2-2.4 5.2-5.2 2.4 2.4-5.2z" fill="currentColor"/>'],
+  ["Forest air", "#2FA558", '<path class="f" d="M5 20c0-8.5 6-15 15-15 0 9-6.5 15-15 15z"/><path d="M5 20c0-8.5 6-15 15-15 0 9-6.5 15-15 15zM5 20l8.5-8.5M10.5 14.5H14M13.5 11.5V8"/>'],
+  ["Board games & puzzles", "#EB4766", '<rect class="f" x="4" y="4" width="16" height="16" rx="3.5"/><rect x="4" y="4" width="16" height="16" rx="3.5"/><circle cx="8.8" cy="8.8" r="1.2" fill="currentColor" stroke="none"/><circle cx="15.2" cy="15.2" r="1.2" fill="currentColor" stroke="none"/><circle cx="15.2" cy="8.8" r="1.2" fill="currentColor" stroke="none"/><circle cx="8.8" cy="15.2" r="1.2" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/>'],
+  ["Home tinkering", "#12A3B0", '<rect class="f" x="7" y="7" width="10" height="10" rx="2"/><rect x="7" y="7" width="10" height="10" rx="2"/><path d="M10 3v4M14 3v4M10 17v4M14 17v4M3 10h4M3 14h4M17 10h4M17 14h4"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/>']
+];
 const cloud = document.getElementById("cloud");
-interests.forEach((txt, i) => {
-  const s = document.createElement("span");
-  s.className = "sticky"; s.textContent = txt;
-  s.style.setProperty("--c", COLORS[i % COLORS.length]);
-  s.style.setProperty("--r", ((i * 37) % 11 - 5) + "deg");
-  cloud.appendChild(s);
+interests.forEach(([label, color, icon]) => {
+  const li = document.createElement("li");
+  li.className = "interest";
+  li.style.setProperty("--c", color);
+  li.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icon}</svg>`;
+  li.append(label);
+  cloud.appendChild(li);
 });
 
 /* The mineral shelf */

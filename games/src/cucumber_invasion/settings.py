@@ -20,6 +20,12 @@ class Settings:
         # Scoreboard settings
         self.text_color = (27, 19, 64)
         self.accent_color = (230, 40, 160)
+        # the top 3 table: (coin face, coin rim and dotted line, text) for gold, silver and bronze
+        self.medal_colors = [
+            ((255, 206, 64), (222, 156, 24), (176, 112, 0)),
+            ((222, 227, 236), (158, 168, 186), (100, 110, 132)),
+            ((236, 164, 106), (190, 112, 54), (156, 82, 28)),
+        ]
 
         # How quickly the game speeds up per level: the cucumbers take big steps for the first few levels, so the
         # game picks up quickly, then everything speeds up 10% per level, easing to 6% per level after level 15.

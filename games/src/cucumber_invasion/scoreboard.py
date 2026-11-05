@@ -17,11 +17,15 @@ class Scoreboard:
         self.best_font = pygame.font.SysFont(None, 34)
         self.best_caption_font = pygame.font.SysFont(None, 24)
         self.banner_font = pygame.font.SysFont(None, 110)
+        self.top_font = pygame.font.SysFont(None, 40)
+        self.coin_font = pygame.font.SysFont(None, 32)
 
         self.life_image = pygame.transform.smoothscale(ai_game.cat.image, (40, 40))
 
         self.banner = None
         self.banner_until = 0
+        self.top_image = None
+        self.top_version = -1
 
         self.prep_all()
 
@@ -82,6 +86,77 @@ class Scoreboard:
         self._panel(title_rect.union(line_rect).inflate(60, 40))
         self.screen.blit(title, title_rect)
         self.screen.blit(line, line_rect)
+
+    def show_top_scores(self, top_scores, above=None, below=None):
+        """The all-time top 3 (see top_scores.py), drawn like an old arcade high-score table, with its bottom edge at
+        `above` or its top edge at `below`. Hidden until the leaderboard has loaded."""
+        if top_scores.top is None:
+            return
+        if top_scores.version != self.top_version:
+            self.top_image = self._render_top(top_scores.top)
+            self.top_version = top_scores.version
+        rect = self.top_image.get_rect(centerx=self.screen_rect.centerx)
+        if above is not None:
+            rect.bottom = above
+        else:
+            rect.top = below
+        self._panel(rect)
+        self.screen.blit(self.top_image, rect)
+
+    def _render_top(self, top):
+        width, pad_x, pad_y, row_h = 720, 30, 16, 44
+        caption = self.small_font.render("ALL-TIME TOP 3", True, self.settings.accent_color)
+        rows_top = pad_y + caption.get_height() + 10
+        surf = pygame.Surface((width, rows_top + row_h * max(len(top), 1) + pad_y - 6), pygame.SRCALPHA)
+        surf.blit(caption, caption.get_rect(midtop=(width // 2, pad_y)))
+        if not top:
+            line = self.top_font.render("NO SCORES YET. BE THE FIRST!", True, self.settings.text_color)
+            surf.blit(line, line.get_rect(midtop=(width // 2, rows_top)))
+        rank_x, name_x = pad_x + 50, pad_x + 124
+        for i, entry in enumerate(top):
+            y = rows_top + i * row_h
+            face, rim, ink = self.settings.medal_colors[i]
+            # a gold, silver or bronze coin, then the whole row in that colour
+            coin = self._coin(i + 1, face, rim, ink)
+            surf.blit(coin, coin.get_rect(midleft=(pad_x, y + 14)))
+            rank = self.top_font.render(("1ST", "2ND", "3RD")[i], True, ink)
+            score = self.top_font.render(f"{entry['score']:,}", True, ink)
+            score_rect = score.get_rect(topright=(width - pad_x, y))
+            name = self._fit_name(entry["name"].upper(), score_rect.left - 40 - name_x, ink)
+            surf.blit(rank, (rank_x, y))
+            surf.blit(name, (name_x, y))
+            surf.blit(score, score_rect)
+            # a dotted line from the name to the score, in square "pixels"
+            dot_y = y + score.get_height() - 12
+            for x in range(name_x + name.get_width() + 12, score_rect.left - 10, 14):
+                surf.fill(rim, (x, dot_y, 5, 5))
+        return surf
+
+    def _coin(self, number, face, rim, ink, size=38):
+        """A round medal with its number on it. Drawn 4x bigger and scaled down, so the edges come out smooth."""
+        big = pygame.Surface((size * 4, size * 4), pygame.SRCALPHA)
+        c, r = size * 2, size * 2
+        pygame.draw.circle(big, rim, (c, c), r)
+        pygame.draw.circle(big, face, (c, c), r - 12)
+        pygame.draw.circle(big, rim, (c, c), r - 26, 4)          # the raised inner ring
+        pygame.draw.arc(big, (255, 255, 255, 190), big.get_rect().inflate(-44, -44), 1.9, 2.9, 9)   # a shine, top left
+        coin = pygame.transform.smoothscale(big, (size, size))
+        digit = self.coin_font.render(str(number), True, ink)
+        coin.blit(digit, digit.get_rect(center=(size // 2 + 1, size // 2 + 1)))
+        return coin
+
+    def _fit_name(self, name, max_width, color):
+        """Render a name, shortened with "..." if it doesn't fit. Characters the font can't draw become "?"."""
+        def render(text):
+            try:
+                return self.top_font.render(text, True, color)
+            except (pygame.error, UnicodeError):
+                return self.top_font.render(text.encode("ascii", "replace").decode(), True, color)
+        image = render(name)
+        while image.get_width() > max_width and len(name) > 1:
+            name = name[:-1]
+            image = render(name.rstrip() + "...")
+        return image
 
     def show_pause_button(self, rect, paused):
         """A round button at the top: two bars while playing, a play triangle while paused."""

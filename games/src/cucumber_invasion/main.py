@@ -7,7 +7,8 @@
 # cleared, spare lives, and a high score that is remembered in the browser.
 # P (or the on-screen pause button) pauses the game, and it pauses itself when the
 # game window loses focus. When a game starts and ends it tells the website, which
-# runs the all-time leaderboard (see _notify_site).
+# runs the all-time leaderboard (see _notify_site). The top 3 of that leaderboard are shown above the Play button
+# (and below it after a game), to give players a score to beat (see top_scores.py).
 import asyncio
 import json
 import sys
@@ -20,6 +21,7 @@ from cucumber import Cucumber
 from game_stats import GameStats
 from button import Button
 from scoreboard import Scoreboard
+from top_scores import TopScores
 
 class CucumberInvasion:
 
@@ -48,6 +50,7 @@ class CucumberInvasion:
 
         self.stats = GameStats(self)
         self.sb = Scoreboard(self)
+        self.top_scores = TopScores()
         self.paused_until = 0
         self.paused = False
         self.pointer_down = False   # mouse button / finger currently pressed on the game
@@ -64,6 +67,7 @@ class CucumberInvasion:
             # browser and freezes the page in Safari. dt is 1.0 for a 60 fps frame.
             self.dt = min(self.clock.tick() * 60 / 1000, 4.0)
             self._check_events()
+            self.top_scores.update(idle=not self.stats.game_active)
 
             if self.stats.game_active and not self.paused and pygame.time.get_ticks() >= self.paused_until:
                 self.cat.update(self.dt)
@@ -84,6 +88,11 @@ class CucumberInvasion:
             elif event.type == getattr(pygame, "WINDOWFOCUSLOST", -1):
                 # the player clicked or switched away from the game: stop the clock until they're back
                 self._set_paused(True)
+
+            elif event.type == getattr(pygame, "WINDOWFOCUSGAINED", -1):
+                # back from the website's leaderboard (maybe with a new entry): show the latest top 3
+                if not self.stats.game_active:
+                    self.top_scores.refresh()
 
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if self.stats.game_active and (self.paused or self.pause_rect.collidepoint(event.pos)):
@@ -197,6 +206,9 @@ class CucumberInvasion:
         else:
             if self.stats.games_played:
                 self.sb.show_game_over()
+                self.sb.show_top_scores(self.top_scores, below=self.play_button.rect.bottom + 24)
+            else:
+                self.sb.show_top_scores(self.top_scores, above=self.play_button.rect.top - 24)
             self.play_button.draw_button()
 
         pygame.display.flip()
@@ -305,6 +317,7 @@ class CucumberInvasion:
             self.stats.save_high_score()
             pygame.mouse.set_visible(True)
             self._notify_site("over", score=self.stats.score, level=self.stats.level)
+            self.top_scores.refresh()
 
     def _check_cucumbers_bottom(self):
         screen_rect = self.screen.get_rect()
