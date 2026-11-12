@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="Oleksandr Maksimov — data & machine learning engineer who builds glowing, beeping, useful things.">
-<title>Oleksandr Maksimov · I build things that think</title>
+<title>Oleksandr Maksimov · my builds</title>
 <!-- "?v=2": browsers (Safari especially) cache site icons for a long time; changing the number makes them fetch the new one -->
 <link rel="icon" href="/assets/icons/icon-32.png?v=2" type="image/png" sizes="32x32">
 <link rel="icon" href="/assets/icons/icon-192.png?v=2" type="image/png" sizes="192x192">
@@ -551,7 +551,6 @@ dialog[open] { animation: pop .5s var(--ease); }
     <div class="nav-links">
       <a href="#projects">Projects</a>
       <a href="#about">About</a>
-      <a href="#coffee">Coffee</a>
       <a href="#contact">Say hi</a>
       <button class="lamp keep" id="lamp" aria-label="Lights on" title="Lights on">
         <svg class="i-bulb" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.6.5 1 1.2 1.1 2V16h5v-.2c.1-.8.5-1.5 1.1-2A6 6 0 0 0 12 3z"/></svg>
@@ -608,7 +607,7 @@ dialog[open] { animation: pop .5s var(--ease); }
 </section>
 
 <section class="wrap reveal" id="about">
-  <div class="sec-head"><h2><small>The human behind it</small>About me</h2></div>
+  <div class="sec-head"><h2><small>My projects</small>About me</h2></div>
   <div class="about">
     <div class="about-main">
       <div class="note">
@@ -616,7 +615,7 @@ dialog[open] { animation: pop .5s var(--ease); }
         <p>Away from the keyboard I'm usually exploring: hiking somewhere green, hunting down <span class="mini-hl">light installations</span> after dark, or adding one more specimen to a slowly growing mineral collection. I just like building stuff — software, circuits, furniture, whatever's in reach.</p>
         <div class="stats">
           <div class="stat" style="--c: var(--pink)"><b data-count="8">0</b><span>projects displayed</span></div>
-          <div class="stat" style="--c: var(--mint)"><b data-count="2152">0</b><span>km walked this year</span></div>
+          <div class="stat" style="--c: var(--mint)"><b data-count="2214">0</b><span>km walked this year</span></div>
           <div class="stat" style="--c: var(--sky)"><b data-count="too many">0</b><span>specimens collected</span></div>
         </div>
       </div>
@@ -869,6 +868,32 @@ const projects = [
     role: "Built reusable PySpark transformations, automated data-quality checks and aggregation logic on Databricks, producing analytics-ready feature tables used by dashboards and downstream ML workflows.",
     pipeline: ["Raw systems", "Validation", "Transformations", "Feature tables", "Dashboards + ML"],
     tech: ["SQL", "Databricks", "PySpark", "Data modelling", "automated quality checks"] },
+  { title: "The air quality guardian", cats: "hardware ml", tag: "Hardware & IoT", c: "#B98CFF", art: "air", modalArt: "airStory",
+    desc: "An ESP32 station that watches the air in my room, forecasts how long until the window needs opening, and turns a smart lamp into the warning light.",
+    context: "CO₂ builds up fast in a closed room: one person can take a bedroom past the recommended 1000 ppm within an hour. I wanted the air visible in real time and, more usefully, a warning before it goes bad: “open the window in about 25 minutes”, updated with every reading.",
+    role: "Built the whole system. MicroPython firmware for an ESP32 reads three sensors (SGP30 for eCO₂ and VOCs, SHT40 for temperature and humidity, PMS5003 for fine dust) and shows the live forecast on an OLED. A FastAPI server on a home mini PC logs every 30-second reading to MySQL, re-runs the forecast, retrains the learned model nightly and serves a live status page. A WiZ smart lamp, driven over UDP on the home Wi-Fi, turns orange at 800 ppm and red at 1000, then restores whatever light it had before.",
+    models: [
+      ["Physics baseline", "A closed room is a box that people breathe into while outdoor air leaks in: dC/dt = g − λ(C − C_out). A 15-minute rolling slope gives the generation rate g; the room's air exchange λ and the outdoor level are learned from its own overnight decays. Solving the equation gives the minutes until 1000 ppm, or shows that CO₂ will level off below it. It works from the first ten minutes, with no training data."],
+      ["XGBoost survival model", "An accelerated-failure-time model (survival:aft) predicts the minutes until the limit from rolling time-series features: CO₂ level and slopes over 5, 15 and 40 minutes, acceleration, humidity and temperature trends, VOCs, time of day, and time since the window was last opened. The physics answer is the trees' starting point, so they only learn the corrections."],
+      /*["Censoring done right", "Often the limit is never reached, because the window was opened or people left first. Those moments become right-censored labels (“it took longer than 25 minutes”) rather than being dropped or read as “it never got bad”. Otherwise the model would learn that the air stays fresh, because I always open the window in time."],*/
+      ["Model selection", "While CO₂ is visibly rising, the forecast is the geometric mean of both models, whose errors are partly independent. The model retrains every night, but only takes over if it beats physics model by 5%."],
+      ["Airing out", "With the window open, the same physics runs in reverse. A detector with hysteresis (memory of previous conditions) spots the fast exponential decay and counts down to fresh air, so the display can say “close the window”."]
+    ],
+    results: [
+      ["14.5 min", "mean forecast error, vs 26.9 for physics alone"],
+      ["7.2 min", "mean error during the countdown (physics: 8.8)"],
+      ["78%", "of forecasts within 25% of the truth (physics: 71%)"]
+    ],
+    resultsNote: "Measured on six weeks of a simulated room, scoring only the last quarter, which the model never saw in training. In the real room, the nightly report decides which model runs.",
+    pipeline: ["Sensors", "ESP32 + OLED", "FastAPI + MySQL", "Rolling features", "Physics + XGBoost survival", "Forecast + lamp"],
+    tech: ["ESP32", "XGBoost survival", "Physics model", "Censoring", "Time-series features", "FastAPI", "MySQL", "MicroPython", "WiZ over UDP"] },
+  { title: "CNC pen plotter", cats: "hardware", tag: "Hardware · Generative art", c: "#7FD8F0", art: "plotter",
+    video: "assets/plotter.mp4",
+    desc: "A home-built pen plotter that turns photos and algorithms into line drowings with Gcode. Uses algorithms such as Voronoi stippling, and Traveling salesman for continuous path creation.",
+    context: "I built a small CNC-style pen plotter using stepper motors for X/Y movement, a servo for pen lift on the Z axis, 3D-printed mechanical parts, a wooden base, and an Arduino Uno for motion control. The project combines my interest in programming, physical systems, and creative experimentation.",
+    role: "3D printed parts and assembled the machine and developed the software pipeline that converts generated artwork into plottable motion. The machine is powered using Arduino UNO board. In Python, I implemented weighted Voronoi stippling to transform images into point distributions, then used a Travelling-Salesman approach to order the points into a continuous path before converting the result into G-code. I am extending the system with random fields, abstract generative methods, and techniques for turning photographs into (continuous) line drawings.",
+    pipeline: ["Machine design", "3D-printed parts + wooden base", "X/Y steppers + servo pen lift", "Arduino motion control", "Image → Voronoi dots", "TSP single-line path", "G-code", "Finished drawing"],
+    tech: ["Arduino UNO", "Python", "Voronoi stippling", "TSP optimisation", "G-code", "Stepper motors", "Servo control", "3D printing"] },
   { title: "The mould cost prediction", cats: "ml", tag: "Machine learning", c: "#FF5DA2", art: "forecast",
     desc: "Staged models that predict the final cost of a mould while it's still being made, in order to act on it early on.",
     context: "Mould cost only becomes known at the end of production, but planning needs estimates early, in order to mitigate potential high costs of the final product.",
@@ -887,26 +912,6 @@ const projects = [
     role: "Designed the full pipeline: windowed continuous tri-axial IMU streams, extracted time-domain and FFT features, built task-specific classifiers and regressors, and tuned the fall detector for recall with post-processing to keep false alarms down.",
     pipeline: ["IMU stream", "Windowing", "FFT features", "Task-specific models", "Activity + metrics + fall flag"],
     tech: ["FFT", "Windowing", "Classification", "Regression", "Threshold tuning", "Feature engineering"] },
-  { title: "The air quality guardian", cats: "hardware ml", tag: "Hardware & IoT", c: "#B98CFF", art: "air", modalArt: "airStory",
-    desc: "An ESP32 station that watches the air in my room, forecasts how long until the window needs opening, and turns a smart lamp into the warning light.",
-    context: "CO₂ builds up fast in a closed room: one person can take a bedroom past the recommended 1000 ppm within an hour. I wanted the air visible in real time and, more usefully, a warning before it goes bad: “open the window in about 25 minutes”, updated with every reading.",
-    role: "Built the whole system. MicroPython firmware for an ESP32 reads three sensors (SGP30 for eCO₂ and VOCs, SHT40 for temperature and humidity, PMS5003 for fine dust) and shows the live forecast on an OLED. A FastAPI server on a home mini PC logs every 30-second reading to MySQL, re-runs the forecast, retrains the learned model nightly and serves a live status page. A WiZ smart lamp, driven over UDP on the home Wi-Fi, turns orange at 800 ppm and red at 1000, then restores whatever light it had before.",
-    models: [
-      ["Physics baseline", "A closed room is a box that people breathe into while outdoor air leaks in: dC/dt = g − λ(C − C_out). A 15-minute rolling slope gives the generation rate g; the room's air exchange λ and the outdoor level are learned from its own overnight decays. Solving the equation gives the minutes until 1000 ppm, or shows that CO₂ will level off below it. It works from the first ten minutes, with no training data."],
-      ["XGBoost survival model", "An accelerated-failure-time model (survival:aft) predicts the minutes until the limit from rolling time-series features: CO₂ level and slopes over 5, 15 and 40 minutes, acceleration, humidity and temperature trends, VOCs, time of day, and time since the window was last opened. The physics answer is the trees' starting point, so they only learn the corrections."],
-      ["Censoring done right", "Often the limit is never reached, because the window was opened or people left first. Those moments become right-censored labels (“it took longer than 25 minutes”) rather than being dropped or read as “it never got bad”. Otherwise the model would learn that the air stays fresh, because I always open the window in time."],
-      ["Blend and promotion", "While CO₂ is visibly rising, the forecast is the geometric mean of both models, whose errors are partly independent. The model retrains every night, but only takes over if it beats physics by 5% on the held-out last quarter of the history without being worse during the countdown."],
-      ["Airing out", "With the window open, the same physics runs in reverse. A detector with hysteresis spots the fast exponential decay and counts down to fresh air, so the display can say “close the window”."]
-    ],
-    results: [
-      ["14.5 min", "mean forecast error, vs 26.9 for physics alone"],
-      ["7.2 min", "mean error during the countdown (physics: 8.8)"],
-      ["78%", "of forecasts within 25% of the truth (physics: 71%)"],
-      ["0.947", "concordance index (physics: 0.906)"]
-    ],
-    resultsNote: "Measured on six weeks of a simulated room, scoring only the last quarter, which the model never saw in training. In the real room, the nightly report decides which model runs.",
-    pipeline: ["Sensors", "ESP32 + OLED", "FastAPI + MySQL", "Rolling features", "Physics + XGBoost survival", "Forecast + lamp"],
-    tech: ["ESP32", "XGBoost survival", "Physics model", "Censoring", "Time-series features", "FastAPI", "MySQL", "MicroPython", "WiZ over UDP"] },
   { title: "Star maps from a moment in time", cats: "data", tag: "Data viz · Astronomy", c: "#2B2D72", art: "stars",
     sky: true,
     desc: "The night sky exactly as it looked from any place at any moment, drawn from a real star catalogue and turned into a print-ready poster. Make your own right here.",
@@ -914,18 +919,11 @@ const projects = [
     role: "Started with a Mollweide projection of ten well-known constellations, then rebuilt it as an observer's view. The Python script loads the HYG catalogue (about 120,000 stars) and the 88 constellation figures from Stellarium, converts every star from celestial coordinates (RA/Dec) to the altitude and azimuth seen from a given latitude, longitude and local time with astropy, finds the time zone with timezonefinder, keeps only what is above the horizon, and draws it on a polar projection with the zenith in the centre. Star size and glow scale with brightness, and the map is exported as a 300 dpi transparent PNG, round or square. For this site I ported the maths to JavaScript, so the map above is the live sky over Copenhagen and you can make your own.",
     pipeline: ["HYG catalogue", "Constellation figures", "RA/Dec → Alt/Az", "Above the horizon", "Polar projection", "Glow by magnitude", "300 dpi print"],
     tech: ["Python", "astropy", "pandas", "matplotlib", "NumPy", "timezonefinder", "JavaScript canvas"] },
-  { title: "CNC pen plotter", cats: "hardware", tag: "Hardware · Generative art", c: "#7FD8F0", art: "plotter",
-    video: "assets/plotter.mp4",
-    desc: "A home-built pen plotter that turns photos and algorithms into line drowings with Gcode. Uses algorithms such as Voronoi stippling, and Traveling salesman for continuous path creation.",
-    context: "I built a small CNC-style pen plotter using stepper motors for X/Y movement, a servo for pen lift on the Z axis, 3D-printed mechanical parts, a wooden base, and an Arduino Uno for motion control. The project combines my interest in programming, physical systems, and creative experimentation.",
-    role: "3D printed parts and assembled the machine and developed the software pipeline that converts generated artwork into plottable motion. The machine is powered using Arduino UNO board. In Python, I implemented weighted Voronoi stippling to transform images into point distributions, then used a Travelling-Salesman approach to order the points into a continuous path before converting the result into G-code. I am extending the system with random fields, abstract generative methods, and techniques for turning photographs into (continuous) line drawings.",
-    pipeline: ["Machine design", "3D-printed parts + wooden base", "X/Y steppers + servo pen lift", "Arduino motion control", "Image → Voronoi dots", "TSP single-line path", "G-code", "Finished drawing"],
-    tech: ["Arduino UNO", "Python", "Voronoi stippling", "TSP optimisation", "G-code", "Stepper motors", "Servo control", "3D printing"] },
   { title: "Cucumber Invasion", cats: "games", tag: "Game · Python", c: "#FFD23F", art: "invaders",
     play: "games/cucumber-invasion/index.html",
     desc: "A Space-Invaders-style pygame shooter where a brave cat resists a descending fleet of cucumbers. Playable right here on the page.",
-    context: "Cats famously leap out of their skin at the sight of a cucumber. I wanted to learn how real-time games are put together in Python, and give the cat a revenge it deserved.",
-    role: "Wrote the game manually in Python before AI boom with pygame: a frame-by-frame game loop, sprite groups for the fleet and the bullets, collision detection, a fleet that marches and drops at the screen edges, lives, and a scoreboard with levels that get faster (and worth more points) every time a fleet is wiped out. Then packaged it with pygbag so the same Python code runs in the browser on WebAssembly, with drag-and-tap controls added for phones.",
+    context: "Cats famously leap out of their skin at the sight of a cucumber. I wanted to learn how real-time games are put together in Python, using modular programming principles, and give the cat a revenge it deserved.",
+    role: "Wrote the game manually in Python (before the AI boom) with pygame: a frame-by-frame game loop, sprite groups for the fleet and the bullets, collision detection, a fleet that marches and drops at the screen edges, lives, and a scoreboard with levels that get faster every time a fleet is wiped out. Then packaged it with pygbag so the same Python code runs in the browser on WebAssembly, with drag-and-tap controls added for phones.",
     pipeline: ["Game loop", "Sprites + collisions", "pygame render", "WebAssembly"],
     tech: ["Python", "modular code", "pygame", "Sprite groups", "pygbag", "WebAssembly"] }
 ];
