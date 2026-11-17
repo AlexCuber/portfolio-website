@@ -1,10 +1,28 @@
 # Workout Log
 
 A gym logbook that installs on a phone's home screen and works offline. It is served at
-`/workout/` and is not linked from the main page. It asks search engines not to index it.
+`https://workout.omaksimov.com/` by its own small Cloudflare Worker, separate from the website.
+It is not linked from the main page and asks search engines not to index it.
 
-To install on an iPhone: open `https://omaksimov.com/workout/` in Safari, tap Share, then
+To install on an iPhone: open `https://workout.omaksimov.com/` in Safari, tap Share, then
 "Add to Home Screen".
+
+## One-time setup in Cloudflare
+
+Do this after this folder is on the `main` branch.
+
+1. Cloudflare dashboard, **Workers & Pages**, **Create application**, **Import a repository**,
+   and pick `AlexCuber/portfolio-website`.
+2. Name the Worker `workout-log`. It has to match `name` in `wrangler.jsonc`, or the build fails.
+3. Set **Root directory** to `workout`. Leave the deploy command as `npx wrangler deploy`.
+4. Save and deploy. The first deploy attaches `workout.omaksimov.com`; Cloudflare creates the
+   DNS record and the certificate.
+
+If that deploy stops at the domain step, add it by hand: the Worker's **Settings**,
+**Domains & Routes**, **Add**, **Custom Domain**, `workout.omaksimov.com`. Then retry the build.
+
+From then on every push to `main` redeploys both Workers. The website's Worker skips this
+folder (the `workout` line in the root `.assetsignore`), so the app exists at one address only.
 
 ## What is in this folder
 
@@ -16,6 +34,8 @@ To install on an iPhone: open `https://omaksimov.com/workout/` in Safari, tap Sh
 | `sw.js` | Saves the files on the phone so the app opens without a connection |
 | `manifest.webmanifest`, `icons/` | Name and icon for the home screen |
 | `fonts/` | Big Shoulders Display and Figtree, both under the SIL Open Font License (`fonts/OFL.txt`) |
+| `wrangler.jsonc` | The Worker: files only, address `workout.omaksimov.com`, no `workers.dev` copy |
+| `.assetsignore` | Keeps this README and the config out of the published files |
 
 There is no build step. Cloudflare publishes the folder as it is.
 
@@ -25,6 +45,9 @@ Workouts, sessions, measurements and settings are stored in the browser on the p
 (`localStorage`, key `workout-log-v1`). Nothing is sent to this site or anywhere else.
 Settings has "Save backup file" and "Restore from file"; the backup is the only copy
 outside the phone.
+
+The data belongs to the address. An app installed from a different address, including a
+`workers.dev` or preview link, starts empty. That is why `wrangler.jsonc` turns those off.
 
 ## Changing the app
 
@@ -42,4 +65,4 @@ on the offline cache and turns off syncing through Claude.
 
 ## Trying it locally
 
-`npx wrangler dev` in the site folder, then open http://127.0.0.1:8787/workout/.
+`npx wrangler dev` in this folder, then open http://127.0.0.1:8787/.

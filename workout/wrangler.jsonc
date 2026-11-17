@@ -1,0 +1,19 @@
+// Cloudflare Worker for the Workout Log app: serves every file in this folder as static assets at workout.omaksimov.com.
+// There is no script, only files. Cloudflare's Git build for this Worker uses this folder as its root directory and runs
+// `npx wrangler deploy`, which reads this file. The website's own Worker (../wrangler.jsonc) does not publish this folder.
+{
+  // must match this Worker's name in the Cloudflare dashboard (Workers & Pages)
+  "name": "workout-log",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "."
+  },
+  // the app's address; Cloudflare creates the DNS record and the certificate on the first deploy
+  "routes": [
+    { "pattern": "workout.omaksimov.com", "custom_domain": true }
+  ],
+  // no second copy on a *.workers.dev address or on preview links: an app added to the home screen from another address
+  // would keep its own, separate data
+  "workers_dev": false,
+  "preview_urls": false
+}
