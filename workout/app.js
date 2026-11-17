@@ -1371,10 +1371,10 @@ var LIBRARY = (function () {
     if (r) {
       var st = rStats(r), ld = lastDone(key), seen = {}, strip = '';
       r.items.forEach(function (it) { var k = exi(it.ex).illo; if (seen[k] || Object.keys(seen).length >= 5) return; seen[k] = 1; strip += '<div class="illo">' + illoSvg(k, null, true) + '</div>'; });
-      h += '<section class="card next"><div class="spread"><span class="label">Next up</span><span class="pill">' + (ld ? 'last done ' + fmtDate(ld.date) : 'not logged yet') + '</span></div>' +
+      h += '<section class="card next"><div class="spread"><span class="label">Next up</span><span class="next-last">' + (ld ? 'last done ' + fmtDate(ld.date) : 'not logged yet') + '</span></div>' +
         '<div><div class="next-title">' + esc(shortName(r.name)) + '</div>' + (r.focus ? '<p class="sub">' + esc(r.focus) + '</p>' : '') + '</div>' +
         (strip ? '<div class="strip">' + strip + '</div>' : '') +
-        '<div class="pills"><span class="pill">' + plural(st.n, 'exercise') + '</span>' + (st.sets ? '<span class="pill">' + st.sets + ' sets</span>' : '') + '<span class="pill">about ' + st.minutes + ' min</span></div>' +
+        '<p class="next-meta">' + plural(st.n, 'exercise') + (st.sets ? ' · ' + st.sets + ' sets' : '') + ' · about ' + st.minutes + ' min</p>' +
         '<button class="btn start block" type="button" data-act="start" data-key="' + esc(key) + '">' + IC.play + 'Start ' + esc(shortName(r.name)) + '</button></section>';
     }
     h += planCard();
@@ -1533,14 +1533,20 @@ var LIBRARY = (function () {
     function gam(c) { c = Math.max(0, Math.min(1, c)); var v = Math.round(255 * (c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055)); return (v < 16 ? '0' : '') + v.toString(16); }
     return '#' + gam(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s) + gam(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s) + gam(-0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s);
   }
-  /* the scale for "how close to the mark": faded orange when far off, green when there. The stops live in the stylesheet (--ramp for bars, --ramp-line for lines). */
+  /* the scale for "how close to the mark": orange when far off, green only close to the mark. The stops live in the stylesheet (--ramp for bars, --ramp-line for lines). */
   var rampMemo = {};
   function ramp(name, t) {
     var v = getComputedStyle(document.documentElement).getPropertyValue(name).trim(), st = rampMemo[v];
-    if (!st) { st = rampMemo[v] = v.split(/\s+/).filter(function (x) { return /^#[0-9a-f]{6}$/i.test(x); }).map(hex2lch); }
+    if (!st) {
+      /* each stop is #rrggbb or #rrggbb@position; without positions the stops are spread evenly */
+      st = rampMemo[v] = v.split(/\s+/).map(function (x) { var m = /^(#[0-9a-f]{6})(?:@([0-9.]+))?$/i.exec(x); return m ? { c: hex2lch(m[1]), p: m[2] == null ? null : +m[2] } : null; }).filter(Boolean);
+      st.forEach(function (x, k) { if (x.p == null) x.p = st.length > 1 ? k / (st.length - 1) : 0; });
+    }
     if (st.length < 2) return '#1aa858';
-    var q = Math.max(0, Math.min(1, t)) * (st.length - 1), i = Math.min(st.length - 2, Math.floor(q)), f = q - i, a = st[i], b = st[i + 1];
-    return lch2hex(a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f);
+    t = Math.max(0, Math.min(1, t));
+    var i = 0; while (i < st.length - 2 && t > st[i + 1].p) i++;
+    var a = st[i], b = st[i + 1], f = b.p > a.p ? Math.max(0, Math.min(1, (t - a.p) / (b.p - a.p))) : 1;
+    return lch2hex(a.c[0] + (b.c[0] - a.c[0]) * f, a.c[1] + (b.c[1] - a.c[1]) * f, a.c[2] + (b.c[2] - a.c[2]) * f);
   }
   function gradDefs(id, W, H, m) {
     return '<defs><linearGradient id="' + id + '-b" gradientUnits="userSpaceOnUse" x1="0" y1="' + m.t + '" x2="0" y2="' + (H - m.b) + '"><stop offset="0" style="stop-color:var(--teal)"/><stop offset="1" style="stop-color:var(--accent)"/></linearGradient></defs>';
@@ -1647,7 +1653,7 @@ var LIBRARY = (function () {
   }
   function badgesHtml(list) {
     return '<div class="badges">' + milestones(list).map(function (m) {
-      return '<div class="badge' + (m.got ? ' got' : '') + (m.next ? '' : ' full') + '"><i style="--p:' + Math.round((m.next ? m.pct : 1) * 100) + '"><b>' + m.show + '</b></i><span>' + esc(m.label) + '</span><span class="foot">' + (m.next ? (m.unit === 't' ? fmt(Math.round(m.value * 10) / 10) : Math.floor(m.value)) + ' of ' + m.next : 'all done') + '</span></div>';
+      return '<div class="badge' + (m.got ? ' got' : '') + (m.next ? '' : ' full') + '"><i style="--p:' + Math.round((m.next ? m.pct : 1) * 100) + '"><b>' + m.show + '</b>' + (m.got ? '<em class="tick">' + IC.check + '</em>' : '') + '</i><span>' + esc(m.label) + '</span><span class="foot">' + (m.next ? (m.unit === 't' ? fmt(Math.round(m.value * 10) / 10) : Math.floor(m.value)) + ' of ' + m.next : 'all done') + '</span></div>';
     }).join('') + '</div>';
   }
   function overviewView(list, demo) {
@@ -1672,8 +1678,8 @@ var LIBRARY = (function () {
     h += '</section>';
     h += '<section class="card"><h3>Hard sets per muscle</h3>' +
       '<div class="seg" role="group" aria-label="Period"><button type="button" data-act="mus-win" data-v="week" aria-pressed="' + (state.ui.musWin !== 'four') + '">This week</button><button type="button" data-act="mus-win" data-v="four" aria-pressed="' + (state.ui.musWin === 'four') + '">Average of 4 weeks</button></div>' +
-      '<p class="sub">Each bar fills toward the sets your plan gives that muscle in a week, going from orange to green as it gets there. Assisting work counts as half a set.</p>' + muscleBars(list) + '</section>';
-    h += '<section class="card"><div><h3>Milestones</h3><p class="sub">The ring shows how close the next one is.</p></div>' + badgesHtml(list) + '</section>';
+      '<p class="sub">Each bar fills toward the sets your plan gives that muscle in a week, staying orange most of the way and turning green as it gets close. Assisting work counts as half a set.</p>' + muscleBars(list) + '</section>';
+    h += '<section class="card"><div><h3>Milestones</h3><p class="sub">A tick marks a level you have reached. The ring shows how close the next one is.</p></div>' + badgesHtml(list) + '</section>';
     return h;
   }
   function liftsView(list) {
