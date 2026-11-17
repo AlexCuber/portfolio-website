@@ -11,6 +11,7 @@ src
 tools
 games/src
 games/README.md
+workout/README.md
 
 # Local-only files (also kept out of git): never publish them, even from a local deploy
 *.mov
