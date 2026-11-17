@@ -74,7 +74,12 @@ var ILLO = (function () {
     hands.forEach(function (h, i) {
       var o = front ? add(add(sh, perp, i === 0 ? -SW : SW), [0, 1], 1 + (p.sy || 0)) : sh;
       var r;
-      if (typeof h[0] === 'string') {
+      if (h[0] === 'st') {
+        var tg = [h[1], h[2]], dv = sub(tg, o), ds = Math.hypot(dv[0], dv[1]) || 0.01, mx = UA + FA - 0.4;
+        if (ds > mx) { tg = add(o, unit(dv), mx); ds = mx; }
+        var uu = unit(sub(tg, o));
+        r = { j: add(add(o, uu, ds * UA / (UA + FA)), [-uu[1], uu[0]], (h[3] == null ? 0.12 : h[3]) * ds), e: tg };
+      } else if (typeof h[0] === 'string') {
         var base = h[0] === 'fkr' ? (p.t == null ? -90 : p.t) + (p.curl || 0) : 0;
         var e = add(o, dir(base + h[1]), UA * (h[3] == null ? 1 : h[3]));
         r = { j: e, e: add(e, dir(base + h[2]), FA * (h[4] == null ? 1 : h[4])) };
@@ -99,7 +104,8 @@ var ILLO = (function () {
   }
   function mirror(l, cx) {
     var o = l.slice();
-    if (typeof l[0] === 'string') { o[1] = 180 - l[1]; o[2] = 180 - l[2]; }
+    if (l[0] === 'st') { o[1] = 2 * cx - l[1]; o[3] = -(l[3] == null ? 0.12 : l[3]); }
+    else if (typeof l[0] === 'string') { o[1] = 180 - l[1]; o[2] = 180 - l[2]; }
     else { o[0] = 2 * cx - l[0]; o[2] = -(l[2] == null ? 1 : l[2]); }
     return o;
   }
@@ -184,7 +190,22 @@ var ILLO = (function () {
     if (has(hot, 'abs') && !isBack) s += '<rect class="h" x="' + n1(w[0] - 3.9) + '" y="' + n1(sh[1] + 11.5) + '" width="7.8" height="' + n1(Math.max(4, hip[1] - sh[1] - 13.5)) + '" rx="2.6"/>';
     if (has(hot, 'back')) s += '<path class="h" d="M' + n1(sl[0] + 3.2) + ' ' + n1(sl[1] + 3) + 'L' + n1(sr[0] - 3.2) + ' ' + n1(sr[1] + 3) + 'L' + n1(w[0] + 4.6) + ' ' + n1(w[1] + 2) + 'L' + n1(w[0]) + ' ' + n1(w[1] + 6) + 'L' + n1(w[0] - 4.6) + ' ' + n1(w[1] + 2) + 'Z"/>';
     if (has(hot, 'lowback')) s += '<rect class="h" x="' + n1(w[0] - 4) + '" y="' + n1(w[1] + 1) + '" width="8" height="8" rx="2.6"/>';
-    if (has(hot, 'glutes') || has(hot, 'abductors')) s += dotc([hip[0] - 6.4, hip[1] - 1.5], 3.5, 'h') + dotc([hip[0] + 6.4, hip[1] - 1.5], 3.5, 'h');
+    if (has(hot, 'glutes') || has(hot, 'abductors')) s += isBack
+      ? '<ellipse class="h" cx="' + n1(hip[0] - 3.5) + '" cy="' + n1(hip[1] + 0.9) + '" rx="3.3" ry="3.7"/><ellipse class="h" cx="' + n1(hip[0] + 3.5) + '" cy="' + n1(hip[1] + 0.9) + '" rx="3.3" ry="3.7"/>'
+      : dotc([hip[0] - 6.4, hip[1] - 1.5], 3.5, 'h') + dotc([hip[0] + 6.4, hip[1] - 1.5], 3.5, 'h');
+    /* front or back? Front: eyes, chest line, a centre line and a bulge. Back: spine, shoulder blades and buttocks. */
+    var up = J.d2, P = function (ax, dn) { return add(add(sh, px, ax), up, -dn); }, Hq = function (ax, dn) { return [hip[0] + ax, hip[1] + dn]; };
+    var q = function (pt) { return n1(pt[0]) + ' ' + n1(pt[1]); };
+    if (isBack) {
+      s += '<path class="d" d="M' + q(P(0, 3)) + 'L' + q(w) + 'L' + q(Hq(0, -4.5)) + '"/>' +
+        '<path class="d" d="M' + q(P(-6.6, 5.2)) + 'L' + q(P(-3.4, 11)) + 'M' + q(P(6.6, 5.2)) + 'L' + q(P(3.4, 11)) + '"/>' +
+        '<path class="d" d="M' + q(Hq(0, -3.4)) + 'L' + q(Hq(0, 3.6)) + 'M' + q(Hq(-7, 0.4)) + 'Q' + q(Hq(-3.8, 6.2)) + ' ' + q(Hq(-0.2, 3.4)) + 'M' + q(Hq(7, 0.4)) + 'Q' + q(Hq(3.8, 6.2)) + ' ' + q(Hq(0.2, 3.4)) + '"/>';
+    } else {
+      s += dotc(add(add(J.head, px, -2.3), up, 0.4), 0.85, 'df') + dotc(add(add(J.head, px, 2.3), up, 0.4), 0.85, 'df') +
+        '<path class="d" d="M' + q(P(-7.8, 8.6)) + 'Q' + q(P(-4, 11.6)) + ' ' + q(P(-0.5, 9.2)) + 'M' + q(P(7.8, 8.6)) + 'Q' + q(P(4, 11.6)) + ' ' + q(P(0.5, 9.2)) + '"/>' +
+        '<path class="d" d="M' + q(P(0, 9.6)) + 'L' + q(Hq(0, -6.5)) + '"/>' +
+        '<path class="d" d="M' + q(Hq(-2.9, 2.6)) + 'Q' + q(Hq(0, 9)) + ' ' + q(Hq(2.9, 2.6)) + '"/>';
+    }
     for (i = 0; i < J.el.length; i++) {
       s += cap(J.so[i], J.el[i], 3.8, 3.1, 'b');
       if (has(hot, 'biceps') || has(hot, 'triceps')) s += cap(add(J.so[i], sub(J.el[i], J.so[i]), 0.2), add(J.so[i], sub(J.el[i], J.so[i]), 0.88), 2.5, 2, 'h');
@@ -284,20 +305,24 @@ var ILLO = (function () {
     b: { hip: [50, 73], t: -66, hands: [[60, 57, 1]], feet: [['fk', 72, 158, 100]] },
     props: function () { return { b: [post(60, 63, 60, G - 1), base(46, 74)], f: [C([60, 60.6], 2.7)] }; } };
   EX['pec-deck'] = { v: 'front', mirror: true, hot: ['chest'],
-    a: { hip: [60, 80], hands: [[20.5, 45, -1]], feet: [[53.5, AN, 1, 0, 0.3, 1]] },
-    b: { hip: [60, 80], hands: [[56, 49, -1, 0.5, 0.8]] },
+    a: { hip: [60, 80], hands: [['st', 19.5, 46.5, -0.1]], feet: [[53.5, AN, 1, 0, 0.3, 1]] },
+    m: { hands: [['st', 36, 53]] },
+    b: { hip: [60, 80], hands: [['st', 56.2, 55.5, 0.16]] },
     props: function (J) { var a = J.hand[0], b = J.hand[1]; return { b: [post(60, 90, 60, G - 1), base(46, 74), pad(46, 87.4, 74, 87.4), L(60, 20, 60, 46, 12, 'ep')], f: [L(a[0], a[1] - 9, a[0], a[1] + 7, 4, 'w'), L(b[0], b[1] - 9, b[0], b[1] + 7, 4, 'w')] }; } };
   EX['cable-fly'] = { v: 'front', mirror: true, hot: ['chest'],
-    a: { hip: [60, 58.3], hands: [[22.5, 25, -1]], feet: [[52.5, AN, 1]] },
-    b: { hip: [60, 58.3], hands: [[57, 55, -1, 0.66, 0.9]] },
+    a: { hip: [60, 58.3], hands: [['st', 22, 22.5, -0.12]], feet: [[52.5, AN, 1]] },
+    m: { hands: [['st', 31, 44]] },
+    b: { hip: [60, 58.3], hands: [['st', 56.4, 57.5, 0.13]] },
     props: function (J) { return { b: [L(6, 4, 6, G - 1, 4.5, 'e'), L(114, 4, 114, G - 1, 4.5, 'e'), pulley([8, 9]), pulley([112, 9]), cable([8, 9], J.hand[0]), cable([112, 9], J.hand[1])], f: [grip(J.hand[0]), grip(J.hand[1])] }; } };
   EX['low-to-high-cable-fly'] = { v: 'front', mirror: true, hot: ['chest'],
-    a: { hip: [60, 58.3], hands: [[33, 54, -1]], feet: [[52.5, AN, 1]] },
-    b: { hip: [60, 58.3], hands: [[56.5, 31, -1, 0.56, 0.82]] },
+    a: { hip: [60, 58.3], hands: [['st', 30.5, 55, 0.09]], feet: [[52.5, AN, 1]] },
+    m: { hands: [['st', 36.5, 39]] },
+    b: { hip: [60, 58.3], hands: [['st', 55.8, 30, 0.3]] },
     props: function (J) { return { b: [L(6, 46, 6, G - 1, 4.5, 'e'), L(114, 46, 114, G - 1, 4.5, 'e'), pulley([8, 101]), pulley([112, 101]), cable([8, 101], J.hand[0]), cable([112, 101], J.hand[1])], f: [grip(J.hand[0]), grip(J.hand[1])] }; } };
   EX['db-fly'] = { v: 'front', mirror: true, hot: ['chest'], ground: false,
-    a: { hip: [60, 66], hands: [[21, 33, -1]], feet: [[51, 103, 1, 0, 0.85, 0.75]] },
-    b: { hip: [60, 66], hands: [[55.5, 29, -1, 0.42, 0.62]] },
+    a: { hip: [60, 66], hands: [['st', 20.5, 34, -0.1]], feet: [[51, 103, 1, 0, 0.85, 0.75]] },
+    m: { hands: [['st', 34, 27]] },
+    b: { hip: [60, 66], hands: [['st', 55.4, 35.5, -0.22]] },
     props: function (J) { return { b: ['<rect x="47" y="6" width="26" height="76" rx="6" class="epf"/>'], f: [C(J.hand[0], 4.2), C(J.hand[1], 4.2)] }; } };
   EX['pullover'] = { v: 'side', hot: ['chest', 'back'],
     a: { hip: [78, 85], t: 180, hands: [['fk', 166, 176]], feet: [[102, AN, -1]] },
@@ -392,8 +417,9 @@ var ILLO = (function () {
     b: { hip: [60, 58.3], hands: [['fk', 192, 30]] },
     props: function (J) { return { f: [barFront(J.hand[0], J.hand[1], 12, 6)] }; } };
   EX['reverse-pec-deck'] = { v: 'back', mirror: true, hot: ['delts', 'back'],
-    a: { hip: [60, 80], hands: [[56, 49, -1, 0.5, 0.8]], feet: [[53.5, AN, 1, 0, 0.3, 1]] },
-    b: { hip: [60, 80], hands: [[20.5, 46, -1]] },
+    a: { hip: [60, 80], hands: [['st', 56.2, 55.5, 0.16]], feet: [[53.5, AN, 1, 0, 0.3, 1]] },
+    m: { hands: [['st', 36, 51]] },
+    b: { hip: [60, 80], hands: [['st', 19.5, 47, -0.1]] },
     props: function (J) { var a = J.hand[0], b = J.hand[1]; return { b: [post(60, 90, 60, G - 1), base(46, 74), pad(46, 87.4, 74, 87.4)], f: [L(a[0], a[1] - 9, a[0], a[1] + 7, 4, 'w'), L(b[0], b[1] - 9, b[0], b[1] + 7, 4, 'w')] }; } };
   EX['reverse-fly'] = { v: 'back', mirror: true, hot: ['delts', 'back'],
     a: { hip: [60, 58.3], hands: [['fk', 102, 96, 0.8, 0.8]], feet: [[52.5, AN, 1]] },
@@ -1030,6 +1056,38 @@ var LIBRARY = (function () {
     historyOf(exId).forEach(function (h) { if (h.id === excludeId) return; var v = metric(e, h.sets); if (best == null || v > best) best = v; });
     return best;
   }
+  /* records: what has been beaten so far for one exercise, given the sets done today */
+  function exPrev(exId, excludeId) {
+    var e = exi(exId), o = { n: 0, maxW: 0, best: null, maxVol: 0 };
+    historyOf(exId).forEach(function (h) {
+      if (h.id === excludeId) return; o.n++;
+      var v = 0; h.sets.forEach(function (x) { if (x.w > o.maxW) o.maxW = x.w; v += (x.w || 0) * x.r; });
+      if (v > o.maxVol) o.maxVol = v;
+      var m = metric(e, h.sets); if (o.best == null || m > o.best) o.best = m;
+    });
+    return o;
+  }
+  function recordsOf(exId, sets, excludeId) {
+    var e = exi(exId), out = { w: false, v: false, b: false, maxW: 0, vol: 0, best: null };
+    if (!sets.length) return out;
+    var prev = exPrev(exId, excludeId); if (!prev.n) return out;
+    sets.forEach(function (x) { if (x.w > out.maxW) out.maxW = x.w; out.vol += (x.w || 0) * x.r; });
+    out.best = metric(e, sets);
+    if (e.log === 'wr') { out.w = out.maxW > prev.maxW + 1e-9; out.v = out.vol > prev.maxVol + 1e-9; }
+    out.b = out.best > prev.best + 1e-9;
+    return out;
+  }
+  function itemRecords(it, d) {
+    if (d.editing) return { w: false, v: false, b: false };
+    return recordsOf(it.ex, rowSets({ ex: it.ex, rows: it.rows.filter(function (r) { return r.d; }) }), d.id);
+  }
+  function recordTags(e, rc, sets) {
+    var t = [];
+    if (rc.w) t.push('record weight ' + fmt(rc.maxW) + ' kg');
+    if (rc.v) t.push('record volume ' + compact(rc.vol) + ' kg');
+    if (rc.b) t.push(e.log === 'wr' ? 'best set ' + setsText(e, [topSet(e, sets)]) : e.log === 'bw' ? 'most reps in a set, ' + fmt(rc.best) : e.log === 'time' ? 'longest hold, ' + fmt(rc.best) + ' s' : 'longest yet, ' + fmt(rc.best) + ' min');
+    return t;
+  }
   function hint(it, e, last) {
     var range = repsText(it, e);
     if (!last) {
@@ -1143,18 +1201,18 @@ var LIBRARY = (function () {
     d.items.forEach(function (it) {
       var e = exi(it.ex), sets = rowSets(it); if (!sets.length) return;
       entries.push({ n: it.n, ex: it.ex, name: e.name, note: it.note || '', sets: sets });
-      var prior = historyOf(it.ex, before).map(function (h) { return metric(e, h.sets); });
-      if (prior.length && metric(e, sets) > Math.max.apply(null, prior) + 1e-9) prs.push({ name: e.name, text: setsText(e, sets) });
+      if (!d.editing) { var tags = recordTags(e, recordsOf(it.ex, sets, d.id), sets); if (tags.length) prs.push({ name: e.name, tags: tags }); }
     });
     if (!entries.length) return;
     var now = Date.now(), dur = d.editing ? d.dur : (function () { var x = (now - d.startedAt) / 1000; return x >= 60 && x <= 18000 ? Math.round(x) : null; })();
     var doc = { v: 2, id: d.id, key: d.key, name: d.name || (r ? shortName(r.name) : 'Workout'), date: d.date, startedAt: d.startedAt, finishedAt: d.editing ? (state.sessions[d.id] || {}).finishedAt || now : now,
       dur: dur, core: r ? r.core !== false : true, notes: d.notes || '', entries: entries, updatedAt: now };
+    var sameKey = before.filter(function (x) { return x.key === d.key; }), volRec = !d.editing && d.key !== 'free' && sameKey.length > 0 && volOf(doc) > Math.max.apply(null, sameKey.map(volOf)) + 1e-9;
     var wasFirst = !before.length, msBefore = milestones(before).filter(function (m) { return m.got; }).map(function (m) { return m.label + m.show; });
     state.sessions[d.id] = doc;
     var logged = d.key === 'free' ? d.items.filter(function (it) { return rowSets(it).length; }) : d.items;
     var same = r && r.items.length === d.items.length && r.items.every(function (it, i) { return it.ex === d.items[i].ex; });
-    summary = { id: d.id, key: d.key, name: doc.name, sets: countSets(doc), vol: volOf(doc), dur: dur, prs: prs, edited: d.editing, first: wasFirst,
+    summary = { id: d.id, key: d.key, name: doc.name, sets: countSets(doc), vol: volOf(doc), dur: dur, prs: prs, volRec: volRec, edited: d.editing, first: wasFirst,
       offer: d.editing ? null : (d.key === 'free' ? 'save' : (r && !same ? 'update' : null)), items: logged.map(function (it) { return { ex: it.ex, sets: Math.max(1, rowSets(it).length || it.sets), lo: it.lo, hi: it.hi, restSec: it.restSec < 30 ? exi(it.ex).restSec : it.restSec, link: it.link }; }),
       fresh: milestones(finished()).filter(function (m) { return m.got && msBefore.indexOf(m.label + m.show) < 0; }) };
     state.draft = null; stopRest();
@@ -1175,7 +1233,14 @@ var LIBRARY = (function () {
     x: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
     search: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>',
     check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
-    star: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2l2.7 5.6 6.1.8-4.5 4.3 1.1 6.1L12 17.1 6.6 20l1.1-6.1L3.2 9.6l6.1-.8z"/></svg>'
+    star: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2l2.7 5.6 6.1.8-4.5 4.3 1.1 6.1L12 17.1 6.6 20l1.1-6.1L3.2 9.6l6.1-.8z"/></svg>',
+    plus: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
+    bolt: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3L5 13.5h6L10 21l8-10.5h-6z"/></svg>',
+    flame: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c.6 3.2 2.3 4.6 3.7 6.3 1.3 1.6 2.3 3.3 2.3 5.5a6 6 0 0 1-12 0c0-1.7.6-3.1 1.6-4.3.3 1.3 1 2.1 2 2.5-.6-3.3.3-7 2.4-10z"/></svg>',
+    cal: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>',
+    target: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.5"/></svg>',
+    weight: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 20h11l1.5-9h-14z"/><path d="M9 11V8a3 3 0 0 1 6 0v3"/></svg>',
+    play: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>'
   };
   function illoSvg(key, t, live) { return '<svg viewBox="0 0 120 120" aria-hidden="true"' + (live ? ' data-illo="' + esc(key) + '"' : '') + '>' + ILLO.render(key, t == null ? ILLO.restT(key) : t) + '</svg>'; }
   function muscleNames(e, mainOnly) {
@@ -1188,15 +1253,18 @@ var LIBRARY = (function () {
     var rest = it.link ? 'then next' : (it.rest || restText(it.restSec));
     return it.sets + ' × ' + repsText(it, e) + (it.rir && it.rir !== '—' ? ' · RIR ' + it.rir : '') + (rest && rest !== '—' ? (/^then/.test(rest) ? ' · ' : ' · rest ') + rest : '');
   }
-  function toast(msg) {
-    var el = document.getElementById('toast'); el.textContent = msg; el.hidden = false;
-    clearTimeout(toastTimer); toastTimer = setTimeout(function () { el.hidden = true; }, 2600);
+  function toast(msg, rec) {
+    var el = document.getElementById('toast'); el.textContent = msg; el.className = 'toast' + (rec ? ' rec' : ''); el.hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { el.hidden = true; }, rec ? 3400 : 2600);
   }
-
   /* ================= top bars ================= */
+  var DAYS_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  var MONTHS_FULL = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   function chrome() {
-    var d = state.draft, live = d && !d.editing, bar = document.getElementById('bar'), wbar = document.getElementById('wbar');
+    var d = state.draft, live = d && !d.editing, bar = document.getElementById('bar'), wbar = document.getElementById('wbar'), tab = state.ui.tab, now = new Date();
     bar.hidden = !!live; wbar.hidden = !live;
+    document.getElementById('bar-title').textContent = tab === 'progress' ? 'Progress' : tab === 'exercises' ? 'Exercises' : DAYS_FULL[now.getDay()];
+    document.getElementById('bar-date').textContent = tab === 'progress' ? plural(Object.keys(state.sessions).length, 'workout') + ' logged' : tab === 'exercises' ? allEx().length + ' exercises' : now.getDate() + ' ' + MONTHS_FULL[now.getMonth()];
     if (!live) return;
     var p = draftProgress(), h = '';
     d.items.forEach(function (it) { h += '<span>'; it.rows.forEach(function (r) { h += '<i class="' + (r.d ? (r.pr ? 'on pr' : 'on') : '') + '"></i>'; }); h += '</span>'; });
@@ -1209,17 +1277,20 @@ var LIBRARY = (function () {
   function tickClock() { var d = state.draft, el = document.getElementById('wbar-clock'); if (d && !d.editing && el) el.textContent = fmtClock((Date.now() - d.startedAt) / 1000); }
 
   /* ================= log tab: home ================= */
+  function initials(name) { var w = shortName(name).trim().split(/\s+/); return (w.length > 1 ? w[0].charAt(0) + w[1].charAt(0) : w[0].slice(0, 2)).toUpperCase(); }
   function weekCard(f) {
     var ws = weekStart(today()), goal = state.settings.weeklyGoal || 4, h = '', n = 0, letters = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
     for (var i = 0; i < 7; i++) {
-      var dt = addDays(ws, i), day = f.filter(function (s) { return s.date === dt; }), core = day.filter(isCore).length;
-      n += core;
-      h += '<div class="day' + (day.length ? ' done' + (core ? '' : ' extra') : '') + (dt === today() ? ' today' : '') + '"><i>' + (day.length ? IC.check : '') + '</i>' + letters[i] + '</div>';
+      var dt = addDays(ws, i), day = f.filter(function (s) { return s.date === dt; });
+      n += day.filter(isCore).length;
+      h += '<div class="day' + (day.length ? ' done' : '') + (dt === today() ? ' today' : '') + '"><i>' + (day.length ? IC.check : '') + '</i>' + letters[i] + '</div>';
     }
-    var st = streakWeeks(f);
-    return '<section class="card"><div class="week"><div class="days" role="img" aria-label="' + n + ' of ' + goal + ' sessions done this week">' + h + '</div>' +
-      '<div class="week-n"><b>' + n + '/' + goal + '</b><span>this week</span></div></div>' +
-      (st >= 2 ? '<div class="pills"><span class="pill hot">' + st + ' weeks in a row</span></div>' : '') + '</section>';
+    var st = streakWeeks(f), C = 2 * Math.PI * 35, pct = Math.min(1, n / goal), left = goal - n;
+    var note = st >= 2 ? '<span class="pill hot">' + IC.flame + st + ' weeks in a row</span>' : '<span class="sub">' + (left <= 0 ? 'Weekly goal reached.' : left + ' more to reach this week’s goal.') + '</span>';
+    return '<section class="card"><div class="week"><div class="week-l"><div class="days" role="img" aria-label="' + n + ' of ' + goal + ' sessions done this week">' + h + '</div><div class="pills">' + note + '</div></div>' +
+      '<div class="ring"><svg viewBox="0 0 88 88" aria-hidden="true"><defs><linearGradient id="rg" gradientUnits="userSpaceOnUse" x1="44" y1="0" x2="44" y2="88"><stop offset="0" style="stop-color:var(--green)"/><stop offset="0.55" style="stop-color:var(--teal)"/><stop offset="1" style="stop-color:var(--accent)"/></linearGradient></defs>' +
+      '<circle class="trk" cx="44" cy="44" r="35"/>' + (pct > 0 ? '<circle class="ring-arc" cx="44" cy="44" r="35" style="stroke:url(#rg);--c:' + C.toFixed(1) + '" stroke-dasharray="' + C.toFixed(1) + '" stroke-dashoffset="' + (C * (1 - pct)).toFixed(1) + '"/>' : '') + '</svg>' +
+      '<div class="ring-n"><b>' + n + '/' + goal + '</b><span>this week</span></div></div></div></section>';
   }
   function homeView() {
     var key = nextKey(), r = key ? getRoutine(key) : null, f = finished(), h = weekCard(f);
@@ -1230,27 +1301,28 @@ var LIBRARY = (function () {
         '<div><div class="next-title">' + esc(shortName(r.name)) + '</div>' + (r.focus ? '<p class="sub">' + esc(r.focus) + '</p>' : '') + '</div>' +
         (strip ? '<div class="strip">' + strip + '</div>' : '') +
         '<div class="pills"><span class="pill">' + plural(st.n, 'exercise') + '</span>' + (st.sets ? '<span class="pill">' + st.sets + ' sets</span>' : '') + '<span class="pill">about ' + st.minutes + ' min</span></div>' +
-        '<button class="btn primary block" type="button" data-act="start" data-key="' + esc(key) + '">Start ' + esc(shortName(r.name)) + '</button></section>';
+        '<button class="btn start block" type="button" data-act="start" data-key="' + esc(key) + '">' + IC.play + 'Start ' + esc(shortName(r.name)) + '</button></section>';
     }
-    h += '<section class="card"><h3>Your sessions</h3><ul class="list">';
-    routineList().forEach(function (x) {
+    h += '<section class="card"><div><h3>Your sessions</h3><p class="sub">Tap one to start it. The pencil changes its exercises.</p></div><ul class="list">';
+    routineList().forEach(function (x, i) {
       var l = lastDone(x.id), s = rStats(x);
-      h += '<li><button class="item" type="button" data-act="start" data-key="' + esc(x.id) + '"><b>' + esc(x.name) + '</b><small>' + plural(s.n, 'exercise') + ' · ' + (l ? 'last done ' + fmtDate(l.date) : 'not logged yet') + '</small></button>' +
+      h += '<li><button class="item" type="button" data-act="start" data-key="' + esc(x.id) + '"><span class="avatar av' + (i % 5) + '" aria-hidden="true">' + esc(initials(x.name)) + '</span><span class="txt"><b>' + esc(x.name) + '</b><small>' + plural(s.n, 'exercise') + ' · ' + (l ? 'last done ' + fmtDate(l.date) : 'not logged yet') + '</small></span></button>' +
         '<button class="icon-btn" type="button" data-act="ed-open" data-key="' + esc(x.id) + '" aria-label="Edit ' + esc(x.name) + '">' + IC.edit + '</button></li>';
     });
-    h += '</ul><div class="row"><button class="btn" type="button" data-act="ed-new">New session</button><button class="btn" type="button" data-act="start" data-key="free">Empty workout</button></div>' +
-      '<p class="foot">Tap a session to start it. An empty workout lets you add exercises as you go.</p></section>';
+    h += '</ul></section>';
+    h += '<p class="sec-title">Something else</p><div class="actions">' +
+      '<button class="action" type="button" data-act="ed-new"><span class="ico">' + IC.plus + '</span><span><b>New session</b><small>Build your own from the exercise library</small></span></button>' +
+      '<button class="action alt" type="button" data-act="start" data-key="free"><span class="ico">' + IC.bolt + '</span><span><b>Empty workout</b><small>Start now and add exercises as you go</small></span></button></div>';
     if (f.length) {
       h += '<section class="card"><h3>Recent workouts</h3><ul class="list">';
       f.slice(-8).reverse().forEach(function (x) {
-        var du = durOf(x);
-        h += '<li><button class="item" type="button" data-act="open-session" data-id="' + esc(x.id) + '"><b>' + esc(x.name || 'Workout') + '</b><small>' + fmtDate(x.date) + ' · ' + countSets(x) + ' sets' + (du ? ' · ' + fmtDur(du) : '') + '</small></button><span class="chev" aria-hidden="true">›</span></li>';
+        var du = durOf(x), dd = toDate(x.date);
+        h += '<li><button class="item" type="button" data-act="open-session" data-id="' + esc(x.id) + '"><span class="date-tile" aria-hidden="true"><b>' + dd.getDate() + '</b><span>' + MONTHS[dd.getMonth()] + '</span></span><span class="txt"><b>' + esc(x.name || 'Workout') + '</b><small>' + DAYS[dd.getDay()] + ' · ' + countSets(x) + ' sets' + (du ? ' · ' + fmtDur(du) : '') + '</small></span></button><span class="chev" aria-hidden="true">›</span></li>';
       });
       h += '</ul></section>';
     }
     return h;
   }
-
   /* ================= log tab: session editor ================= */
   var RESTS = [0, 30, 45, 60, 75, 90, 120, 150, 180, 240, 300];
   function editorView() {
@@ -1315,12 +1387,18 @@ var LIBRARY = (function () {
         '<span class="last-hint' + (hi.up ? ' up' : '') + '">' + esc(hi.t) + '</span></div><div class="sets">';
       it.rows.forEach(function (s, i) { h += setRow(it, e, i, s, last ? last.sets : null); if (s.d && s.pr) anyPr = true; s.pop = false; });
       h += '</div>';
+      var rc = itemRecords(it, d), chips = '', nw = it.recNew || {};
+      if (rc.w) chips += '<span class="rec-chip' + (nw.w ? ' new' : '') + '">' + IC.star + 'Record weight · ' + fmt(rc.maxW) + ' kg</span>';
+      if (rc.v) chips += '<span class="rec-chip' + (nw.v ? ' new' : '') + '">' + IC.star + 'Record volume · ' + compact(rc.vol) + ' kg</span>';
+      if (rc.b && e.log !== 'wr') chips += '<span class="rec-chip' + (nw.b ? ' new' : '') + '">' + IC.star + (e.log === 'bw' ? 'Most reps yet · ' + fmt(rc.best) : e.log === 'time' ? 'Longest hold yet · ' + fmt(rc.best) + ' s' : 'Longest yet · ' + fmt(rc.best) + ' min') + '</span>';
+      if (chips) h += '<div class="recs">' + chips + '</div>';
+      it.recNew = null;
       if (e.weightHint) h += '<span class="unit-hint">' + esc(e.weightHint) + '</span>';
       if (e.log !== 'cardio') h += '<div class="row"><button class="btn quiet" type="button" data-act="add-set" data-u="' + it.u + '">+ Add set</button>' + (it.rows.length > 1 ? '<button class="btn quiet" type="button" data-act="del-set" data-u="' + it.u + '">Remove last set</button>' : '') + '</div>';
       h += '<input class="note-in" id="note-' + it.u + '" type="text" data-f="note" data-u="' + it.u + '" value="' + esc(it.note) + '" placeholder="Note (machine setting, swap used…)" aria-label="Note for ' + esc(e.name) + '"></section>';
     });
     h += '<button class="add-ex" type="button" data-act="add-ex">+ Add exercise</button>';
-    if (anyPr) h += '<p class="foot">A star marks a set that beats your previous best for that exercise.</p>';
+    if (anyPr) h += '<p class="foot">A star marks a set that beats your best set for that exercise so far.</p>';
     h += '<section class="card"><label class="label" for="draft-notes">Workout notes</label><textarea class="notes-in" id="draft-notes" data-f="notes" placeholder="Sleep, energy, anything worth remembering">' + esc(d.notes) + '</textarea>' +
       '<button class="btn primary block" type="button" data-act="finish-now" id="finish-btn"' + (draftCount() ? '' : ' disabled') + '>' + (d.editing ? 'Save changes' : 'Finish workout') + '</button>' +
       '<button class="btn quiet danger" type="button" data-act="discard">' + (armed === 'discard' ? 'Tap again to discard' : (d.editing ? 'Cancel editing' : 'Discard workout')) + '</button></section>';
@@ -1355,6 +1433,30 @@ var LIBRARY = (function () {
   var charts = {};
   function chartW() { return Math.max(240, Math.min(574, view.clientWidth - 66)); }
   /* pts: [{x: date, y, tip}]; trend: optional parallel array of smoothed values drawn as the line while pts stay as dots */
+  /* a curve through the points that never overshoots them */
+  function smoothPath(P) {
+    var n = P.length, i, f = function (v) { return v.toFixed(1); };
+    if (n < 3) return P.map(function (p, k) { return (k ? 'L' : 'M') + f(p[0]) + ' ' + f(p[1]); }).join(' ');
+    var dx = [], m = [], t = [];
+    for (i = 0; i < n - 1; i++) { dx.push((P[i + 1][0] - P[i][0]) || 1e-6); m.push((P[i + 1][1] - P[i][1]) / dx[i]); }
+    t.push(m[0]);
+    for (i = 1; i < n - 1; i++) t.push(m[i - 1] * m[i] <= 0 ? 0 : (m[i - 1] + m[i]) / 2);
+    t.push(m[n - 2]);
+    for (i = 0; i < n - 1; i++) {
+      if (m[i] === 0) { t[i] = 0; t[i + 1] = 0; continue; }
+      var a = t[i] / m[i], b = t[i + 1] / m[i], q = a * a + b * b;
+      if (q > 9) { var k = 3 / Math.sqrt(q); t[i] = k * a * m[i]; t[i + 1] = k * b * m[i]; }
+    }
+    var d = 'M' + f(P[0][0]) + ' ' + f(P[0][1]);
+    for (i = 0; i < n - 1; i++) { var h = dx[i] / 3; d += 'C' + f(P[i][0] + h) + ' ' + f(P[i][1] + t[i] * h) + ' ' + f(P[i + 1][0] - h) + ' ' + f(P[i + 1][1] - t[i + 1] * h) + ' ' + f(P[i + 1][0]) + ' ' + f(P[i + 1][1]); }
+    return d;
+  }
+  function gradDefs(id, W, H, m) {
+    return '<defs><linearGradient id="' + id + '-l" gradientUnits="userSpaceOnUse" x1="' + m.l + '" y1="0" x2="' + (W - m.r) + '" y2="0"><stop offset="0" style="stop-color:var(--accent)"/><stop offset="0.6" style="stop-color:var(--teal)"/><stop offset="1" style="stop-color:var(--green)"/></linearGradient>' +
+      '<linearGradient id="' + id + '-a" gradientUnits="userSpaceOnUse" x1="0" y1="' + m.t + '" x2="0" y2="' + (H - m.b) + '"><stop offset="0" style="stop-color:var(--teal);stop-opacity:0.32"/><stop offset="1" style="stop-color:var(--teal);stop-opacity:0"/></linearGradient>' +
+      '<linearGradient id="' + id + '-b" gradientUnits="userSpaceOnUse" x1="0" y1="' + m.t + '" x2="0" y2="' + (H - m.b) + '"><stop offset="0" style="stop-color:var(--teal)"/><stop offset="1" style="stop-color:var(--accent)"/></linearGradient></defs>';
+  }
+  /* pts: [{x: date, y, tip}]; trend: optional parallel array of smoothed values drawn as the line while pts stay as dots */
   function lineChart(id, pts, trend) {
     var W = chartW(), H = 190, m = { l: 36, r: 46, t: 14, b: 24 };
     if (!pts.length) return '<p class="sub">No entries yet.</p>';
@@ -1364,41 +1466,41 @@ var LIBRARY = (function () {
     function X(v) { return x1 === x0 ? m.l + (W - m.l - m.r) / 2 : m.l + (v - x0) / (x1 - x0) * (W - m.l - m.r); }
     function Y(v) { return H - m.b - (v - y0) / (y1 - y0) * (H - m.t - m.b); }
     var lineY = trend || ys, last = lineY[lineY.length - 1];
-    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Line chart with ' + pts.length + ' entries, latest ' + fmt(Math.round(last * 10) / 10) + '">';
+    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Line chart with ' + pts.length + ' entries, latest ' + fmt(Math.round(last * 10) / 10) + '">' + gradDefs(id, W, H, m);
     ticks.forEach(function (t) { s += '<line class="grid" x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + Y(t) + '" y2="' + Y(t) + '"/><text x="' + (m.l - 6) + '" y="' + (Y(t) + 4) + '" text-anchor="end">' + fmt(t) + '</text>'; });
     var P = pts.map(function (p, i) { return [X(xs[i]), Y(p.y)]; }), Lp = lineY.map(function (v, i) { return [X(xs[i]), Y(v)]; });
     if (Lp.length > 1) {
-      var dstr = Lp.map(function (p, i) { return (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1); }).join(' ');
-      s += '<path class="area" d="' + dstr + ' L' + Lp[Lp.length - 1][0].toFixed(1) + ' ' + (H - m.b) + ' L' + Lp[0][0].toFixed(1) + ' ' + (H - m.b) + ' Z"/><path class="ln" d="' + dstr + '"/>';
+      var dstr = smoothPath(Lp);
+      s += '<path class="area" style="fill:url(#' + id + '-a)" d="' + dstr + ' L' + Lp[Lp.length - 1][0].toFixed(1) + ' ' + (H - m.b) + ' L' + Lp[0][0].toFixed(1) + ' ' + (H - m.b) + ' Z"/><path class="ln draw" pathLength="1" style="stroke:url(#' + id + '-l)" d="' + dstr + '"/>';
     }
     if (trend) P.forEach(function (p) { s += '<circle class="dot2" r="2.6" cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '"/>'; });
     var e = Lp[Lp.length - 1];
     s += '<line class="cross" id="' + id + '-x" y1="' + m.t + '" y2="' + (H - m.b) + '" x1="0" x2="0" visibility="hidden"/><circle class="dot" id="' + id + '-d" r="4" cx="0" cy="0" visibility="hidden"/>';
-    s += '<circle class="dot" r="4.5" cx="' + e[0] + '" cy="' + e[1] + '"/><text class="val" x="' + (e[0] + 9) + '" y="' + (e[1] + 4) + '">' + fmt(Math.round(last * 10) / 10) + '</text>';
+    s += '<circle class="halo" r="5" cx="' + e[0] + '" cy="' + e[1] + '"/><circle class="dot end" r="5" cx="' + e[0] + '" cy="' + e[1] + '"/><text class="val" x="' + (e[0] + 10) + '" y="' + (e[1] + 4) + '">' + fmt(Math.round(last * 10) / 10) + '</text>';
     s += '<text x="' + P[0][0] + '" y="' + (H - 6) + '" text-anchor="' + (P.length > 1 ? 'start' : 'middle') + '">' + fmtDate(pts[0].x, true) + '</text>';
     if (P.length > 1) s += '<text x="' + e[0] + '" y="' + (H - 6) + '" text-anchor="end">' + fmtDate(pts[pts.length - 1].x, true) + '</text>';
     s += '</svg><div class="tip" id="' + id + '-t" hidden></div>';
     charts[id] = { type: 'line', P: P, pts: pts, W: W };
     return s;
   }
-  /* weekly columns; each week {start, a, b}: a drawn in blue, b stacked on top in orange */
+  /* weekly columns; each week {start, a, b}: a is the main series, b is stacked on top in the second colour */
   function colChart(id, weeks, opt) {
     var W = chartW(), H = 160, m = { l: 30, r: opt.target != null ? 48 : 12, t: 14, b: 22 }, N = weeks.length;
     var maxV = Math.max(opt.min || 0, Math.max.apply(null, weeks.map(function (w) { return w.a + (w.b || 0); })));
     var ticks = opt.int ? null : niceTicks(0, maxV || 1, 3); if (ticks) maxV = ticks[ticks.length - 1];
     var band = (W - m.l - m.r) / N, bw = Math.min(24, band * 0.62);
     function Y(v) { return H - m.b - v / maxV * (H - m.t - m.b); }
-    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(opt.label) + '">';
+    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(opt.label) + '">' + gradDefs(id, W, H, m);
     if (ticks) ticks.forEach(function (t) { s += '<line class="grid" x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + Y(t) + '" y2="' + Y(t) + '"/><text x="' + (m.l - 6) + '" y="' + (Y(t) + 4) + '" text-anchor="end">' + (opt.fmt ? opt.fmt(t) : t) + '</text>'; });
     else for (var t = 0; t <= maxV; t += (maxV > 6 ? 2 : 1)) s += '<line class="grid" x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + Y(t) + '" y2="' + Y(t) + '"/><text x="' + (m.l - 6) + '" y="' + (Y(t) + 4) + '" text-anchor="end">' + t + '</text>';
-    function bar(x, yTop, yBot, cls, round) {
-      var hgt = yBot - yTop; if (hgt <= 0.2) return ''; var r = round ? Math.min(4, hgt) : 0;
-      return '<path class="' + cls + '" d="M' + x + ' ' + yBot + ' V' + (yTop + r) + ' Q' + x + ' ' + yTop + ' ' + (x + r) + ' ' + yTop + ' H' + (x + bw - r) + ' Q' + (x + bw) + ' ' + yTop + ' ' + (x + bw) + ' ' + (yTop + r) + ' V' + yBot + ' Z"/>';
+    function bar(x, yTop, yBot, cls, round, i) {
+      var hgt = yBot - yTop; if (hgt <= 0.2) return ''; var r = round ? Math.min(5, hgt, bw / 2) : 0;
+      return '<path class="' + cls + ' grow" style="' + (cls === 'col-core' ? 'fill:url(#' + id + '-b);' : '') + '--i:' + i + '" d="M' + x + ' ' + yBot + ' V' + (yTop + r) + ' Q' + x + ' ' + yTop + ' ' + (x + r) + ' ' + yTop + ' H' + (x + bw - r) + ' Q' + (x + bw) + ' ' + yTop + ' ' + (x + bw) + ' ' + (yTop + r) + ' V' + yBot + ' Z"/>';
     }
     weeks.forEach(function (w, i) {
       var x = m.l + band * i + (band - bw) / 2;
-      s += bar(x, Y(w.a), Y(0), 'col-core', !w.b);
-      if (w.b) s += bar(x, Y(w.a + w.b), Y(w.a) - (w.a ? 2 : 0), 'col-extra', true);
+      s += bar(x, Y(w.a), Y(0), 'col-core', !w.b, i);
+      if (w.b) s += bar(x, Y(w.a + w.b), Y(w.a) - (w.a ? 2 : 0), 'col-extra', true, i + 2);
       if (i % 3 === (N - 1) % 3) s += '<text x="' + (x + bw / 2) + '" y="' + (H - 6) + '" text-anchor="middle">' + (i === N - 1 ? 'now' : fmtDate(w.start, true)) + '</text>';
       w.cx = x + bw / 2; w.top = Y(w.a + (w.b || 0));
     });
@@ -1416,13 +1518,17 @@ var LIBRARY = (function () {
     return '<svg viewBox="0 0 64 24" aria-hidden="true"><path class="ln" d="' + P.map(function (p, i) { return (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1); }).join('') + '"/><circle class="dot" cx="' + P[P.length - 1][0] + '" cy="' + P[P.length - 1][1].toFixed(1) + '" r="3"/></svg>';
   }
   function topSet(e, sets) { return sets.reduce(function (a, x) { return metric(e, [x]) > metric(e, [a]) ? x : a; }); }
+  /* one square per day, greener the more sets were logged, like a contribution graph */
   function calendar(list) {
-    var W = 16, ws = weekStart(today()), start = addDays(ws, -7 * (W - 1)), map = {}, h = '', months = '', lastM = -1;
-    list.forEach(function (s) { var c = isCore(s); if (!map[s.date] || c) map[s.date] = c ? 'on' : 'x'; });
+    var W = 16, ws = weekStart(today()), start = addDays(ws, -7 * (W - 1)), sets = {}, h = '', months = '', lastM = -1;
+    list.forEach(function (s) { sets[s.date] = (sets[s.date] || 0) + Math.max(1, countSets(s)); });
     for (var w = 0; w < W; w++) {
       var wk = addDays(start, w * 7), mo = toDate(addDays(wk, 6)).getMonth();
       months += '<span>' + (mo !== lastM ? MONTHS[mo] : '') + '</span>'; lastM = mo;
-      for (var d = 0; d < 7; d++) { var dt = addDays(wk, d); h += '<i class="' + (dt > today() ? 'future' : (map[dt] || '')) + (dt === today() ? ' now' : '') + '"' + (map[dt] ? ' title="' + fmtDate(dt) + '"' : '') + '></i>'; }
+      for (var d = 0; d < 7; d++) {
+        var dt = addDays(wk, d), n = sets[dt] || 0, lv = n >= 20 ? 4 : n >= 14 ? 3 : n >= 8 ? 2 : n > 0 ? 1 : 0;
+        h += '<i class="' + (dt > today() ? 'future' : (lv ? 'on l' + lv : '')) + (dt === today() ? ' now' : '') + '"' + (lv ? ' style="--w:' + w + '" title="' + fmtDate(dt) + ': ' + n + ' sets"' : '') + '></i>';
+      }
     }
     var days = list.filter(function (s) { return s.date >= start; }).length;
     return '<div class="cal" role="img" aria-label="' + days + ' workouts in the last ' + W + ' weeks"><span></span><div class="cal-months">' + months + '</div>' +
@@ -1432,28 +1538,32 @@ var LIBRARY = (function () {
     var ws = weekStart(today()), four = state.ui.musWin === 'four', from = four ? addDays(ws, -21) : ws, got = {}, h = '', plan = {};
     PLAN.muscles.forEach(function (m) { plan[m.id] = m.plan; });
     list.forEach(function (s) { if (s.date < from) return; (s.entries || []).forEach(function (en) { var e = exi(en.ex); if (e.log === 'cardio') return; Object.keys(e.muscles).forEach(function (mu) { got[mu] = (got[mu] || 0) + en.sets.length * e.muscles[mu] / (four ? 4 : 1); }); }); });
-    var rows = LIBRARY.MUSCLES.filter(function (m) { return plan[m.id] || got[m.id]; }), maxV = 1;
-    rows.forEach(function (m) { maxV = Math.max(maxV, plan[m.id] || 0, got[m.id] || 0); }); maxV *= 1.08;
+    var rows = LIBRARY.MUSCLES.filter(function (m) { return plan[m.id] || got[m.id]; }), free = 10;
+    rows.forEach(function (m) { if (!plan[m.id]) free = Math.max(free, got[m.id] || 0); });
     h += '<div class="mus">';
     rows.forEach(function (m) {
-      var g = Math.round((got[m.id] || 0) * 10) / 10, p = plan[m.id];
-      h += '<span>' + esc(m.name) + '</span><div class="mus-track" role="img" aria-label="' + esc(m.name) + ': ' + fmt(g) + (p ? ' of ' + p + ' planned sets' : ' sets') + '"><div class="mus-fill" style="width:' + (g / maxV * 100).toFixed(1) + '%"></div>' + (p ? '<div class="mus-tick" style="left:calc(' + (p / maxV * 100).toFixed(1) + '% - 1px)"></div>' : '') + '</div><span class="mus-val"><b>' + fmt(g) + '</b>' + (p ? ' / ' + p : '') + '</span>';
+      var g = Math.round((got[m.id] || 0) * 10) / 10, p = plan[m.id], pct = Math.min(1, g / (p || free)), hit = p && g >= p;
+      var fill = p ? 'background:color-mix(in oklab, var(--mus-hi) ' + Math.round(pct * 100) + '%, var(--mus-lo));' : '';
+      h += '<span>' + esc(m.name) + '</span><div class="mus-track" role="img" aria-label="' + esc(m.name) + ': ' + fmt(g) + (p ? ' of ' + p + ' planned sets' : ' sets') + '"><div class="mus-fill" style="' + fill + 'width:' + (g > 0 ? Math.max(4, pct * 100) : 0).toFixed(1) + '%"></div></div>' +
+        '<span class="mus-val">' + (hit ? IC.check : '') + '<span><b>' + fmt(g) + '</b>' + (p ? ' / ' + p : '') + '</span></span>';
     });
     return h + '</div>';
   }
   function badgesHtml(list) {
     return '<div class="badges">' + milestones(list).map(function (m) {
-      var shown = m.unit === 't' ? m.show : m.show;
-      return '<div class="badge' + (m.got ? ' got' : '') + '"><i>' + shown + '</i><span>' + esc(m.label) + '</span>' + (m.next ? '<u aria-hidden="true"><s style="width:' + Math.round(m.pct * 100) + '%"></s></u><span class="foot">' + (m.unit === 't' ? fmt(Math.round(m.value * 10) / 10) : Math.floor(m.value)) + ' of ' + m.next + '</span>' : '<span class="foot">all done</span>') + '</div>';
+      return '<div class="badge' + (m.got ? ' got' : '') + '"><i style="--p:' + Math.round((m.next ? m.pct : 1) * 100) + '"><b>' + m.show + '</b></i><span>' + esc(m.label) + '</span><span class="foot">' + (m.next ? (m.unit === 't' ? fmt(Math.round(m.value * 10) / 10) : Math.floor(m.value)) + ' of ' + m.next : 'all done') + '</span></div>';
     }).join('') + '</div>';
   }
   function overviewView(list, demo) {
     var h = '', ws = weekStart(today()), goal = state.settings.weeklyGoal || 4;
     var thisWeek = list.filter(function (s) { return weekStart(s.date) === ws && isCore(s); }).length, vol = 0;
     list.forEach(function (s) { vol += volOf(s); });
-    h += '<div class="tiles"><div class="tile"><b>' + list.length + '</b><span>workouts logged</span></div><div class="tile"><b>' + thisWeek + '<small>of ' + goal + '</small></b><span>sessions this week</span></div>' +
-      '<div class="tile"><b>' + streakWeeks(list) + '<small>wk</small></b><span>weeks in a row with a workout</span></div><div class="tile"><b>' + compact(vol) + '<small>kg</small></b><span>lifted in total</span></div></div>';
-    h += '<section class="card"><div class="spread"><h3>Consistency</h3><div class="legend"><span><i></i>Main</span><span><i class="x"></i>Extra</span></div></div>' + calendar(list) + '</section>';
+    function cnt(v, f) { return '<em class="cnt" data-count="' + v + '"' + (f ? ' data-fmt="' + f + '"' : '') + '>' + (f === 'compact' ? compact(v) : v) + '</em>'; }
+    h += '<div class="tiles"><div class="tile"><span class="ico">' + IC.cal + '</span><b>' + cnt(list.length) + '</b><span>workouts logged</span></div>' +
+      '<div class="tile t-green"><span class="ico">' + IC.target + '</span><b>' + cnt(thisWeek) + '<small>of ' + goal + '</small></b><span>sessions this week</span></div>' +
+      '<div class="tile t-hot"><span class="ico">' + IC.flame + '</span><b>' + cnt(streakWeeks(list)) + '<small>wk</small></b><span>weeks in a row with a workout</span></div>' +
+      '<div class="tile t-violet"><span class="ico">' + IC.weight + '</span><b>' + cnt(Math.round(vol), 'compact') + '<small>kg</small></b><span>lifted in total</span></div></div>';
+    h += '<section class="card"><div class="spread"><h3>Consistency</h3><div class="legend"><span class="scale">Less <i></i><i class="l1"></i><i class="l2"></i><i class="l3"></i><i class="l4"></i> More</span></div></div>' + calendar(list) + '<p class="foot">One square per day for the last 16 weeks. Greener means more sets that day.</p></section>';
     var wk = lastWeeks(10), vw = lastWeeks(10);
     list.forEach(function (s) { var k = weekStart(s.date); wk.forEach(function (w) { if (w.start === k) { if (isCore(s)) w.a++; else w.b++; } }); vw.forEach(function (w) { if (w.start === k) w.a += volOf(s); }); });
     h += '<section class="card"><div class="spread"><h3>Sessions per week</h3><div class="legend"><span><i></i>Main</span><span><i class="x"></i>Extra</span></div></div><div class="chart" data-chart="wk">' +
@@ -1464,10 +1574,10 @@ var LIBRARY = (function () {
     h += '<section class="card"><div class="spread"><h3>Workout length</h3>' + (durs.length ? '<span class="pill">average ' + fmtDur(durs.reduce(function (a, x) { return a + x.d; }, 0) / durs.length) + '</span>' : '') + '</div>';
     h += durs.length ? '<p class="sub">Minutes from start to finish.</p><div class="chart" data-chart="dur">' + lineChart('dur', durs.map(function (x) { return { x: x.s.date, y: Math.round(x.d / 60), tip: '<b>' + fmtDate(x.s.date) + '</b><br>' + esc(x.s.name || 'Workout') + ' · ' + fmtDur(x.d) }; })) + '</div>' : '<p class="sub">The clock at the top of a workout records how long it took. Your next finished workout shows up here.</p>';
     h += '</section>';
-    h += '<section class="card"><div class="spread"><h3>Hard sets per muscle</h3><div class="legend"><span><i></i>Logged</span><span><i class="tk"></i>Plan</span></div></div>' +
+    h += '<section class="card"><h3>Hard sets per muscle</h3>' +
       '<div class="seg" role="group" aria-label="Period"><button type="button" data-act="mus-win" data-v="week" aria-pressed="' + (state.ui.musWin !== 'four') + '">This week</button><button type="button" data-act="mus-win" data-v="four" aria-pressed="' + (state.ui.musWin === 'four') + '">Average of 4 weeks</button></div>' +
-      '<p class="sub">Assisting work counts as half a set.</p>' + muscleBars(list) + '</section>';
-    h += '<section class="card"><h3>Milestones</h3>' + badgesHtml(list) + '</section>';
+      '<p class="sub">Each bar fills toward that muscle’s weekly target and turns green as it gets there. Assisting work counts as half a set.</p>' + muscleBars(list) + '</section>';
+    h += '<section class="card"><div><h3>Milestones</h3><p class="sub">The ring shows how close the next one is.</p></div>' + badgesHtml(list) + '</section>';
     return h;
   }
   function liftsView(list) {
@@ -1657,18 +1767,22 @@ var LIBRARY = (function () {
   }
   function openSummary() {
     var s = summary; if (!s) return;
-    var doc = state.sessions[s.id], h = '<div class="done-hero"><span class="label">' + (s.edited ? 'Changes saved' : 'Workout complete') + '</span><div class="big">' + esc(s.name) + '</div><p class="sub">' + (doc ? fmtDate(doc.date) : '') + '</p></div>';
+    var doc = state.sessions[s.id], h = '<div class="done-hero"><span class="label">' + (s.edited ? 'Changes saved' : 'Workout complete') + '</span><div class="big gtext">' + esc(s.name) + '</div><p class="sub">' + (doc ? fmtDate(doc.date) : '') + '</p></div>';
     h += '<div class="tiles three"><div class="tile"><b>' + (s.dur ? fmtClock(s.dur) : '–') + '</b><span>time</span></div><div class="tile"><b>' + s.sets + '</b><span>sets</span></div><div class="tile"><b>' + compact(s.vol) + '</b><span>kg lifted</span></div></div>';
-    if (s.prs.length) { h += '<div><h3>' + plural(s.prs.length, 'new best') + '</h3></div><div class="pr-list">'; s.prs.forEach(function (p) { h += '<div>' + IC.star + '<span>' + esc(p.name) + ' · ' + esc(p.text) + '</span></div>'; }); h += '</div>'; }
+    if (s.prs.length || s.volRec) {
+      h += '<div><h3>' + (s.prs.length ? plural(s.prs.length, 'exercise') + ' with a record' : 'A record') + '</h3></div><div class="pr-list">';
+      s.prs.forEach(function (p) { h += '<div>' + IC.star + '<span><b>' + esc(p.name) + '</b>' + esc(p.tags.join(' · ')) + '</span></div>'; });
+      if (s.volRec) h += '<div>' + IC.star + '<span><b>Whole workout</b>the most weight you have lifted in ' + esc(/^[aeiou]/i.test(s.name) ? 'an ' : 'a ') + esc(s.name) + ' workout</span></div>';
+      h += '</div>';
+    }
     if (s.fresh && s.fresh.length) h += '<div class="pills">' + s.fresh.map(function (m) { return '<span class="pill hot">Milestone: ' + m.show + (m.unit === 't' ? ' t' : '') + ' ' + esc(m.label.toLowerCase()) + '</span>'; }).join('') + '</div>';
     var fun = !s.edited && funVolume(s.vol); if (fun) h += '<p class="done-fun">' + esc(fun) + '</p>';
     if (s.offer === 'update') h += '<button class="btn block" type="button" data-act="sum-update">Update ' + esc(s.name) + ' to match today</button><p class="foot">You did different exercises from the saved session. Updating changes it for next time.</p>';
     if (s.offer === 'save') h += '<button class="btn block" type="button" data-act="sum-save">Save these exercises as a session</button>';
     h += '<button class="btn primary block" type="button" data-act="sheet-x">Done</button>';
     openSheet(h);
-    if (!s.edited && !s.shown) { s.shown = true; if (s.prs.length || s.first || (s.fresh && s.fresh.length)) confetti(140); else confetti(40); }
+    if (!s.edited && !s.shown) { s.shown = true; if (s.prs.length || s.volRec || s.first || (s.fresh && s.fresh.length)) confetti(140); else confetti(40); }
   }
-
   /* ================= render and routing ================= */
   function render() {
     var tab = state.ui.tab; charts = {};
@@ -1677,7 +1791,7 @@ var LIBRARY = (function () {
     chrome(); observe();
   }
   function go(tab, push) {
-    state.ui.tab = tab; saveLocal(); render(); window.scrollTo(0, 0);
+    state.ui.tab = tab; saveLocal(); render(); enter(); window.scrollTo(0, 0);
     if (push) { try { if (location.hash !== '#' + tab) location.hash = tab; } catch (e) {} }
   }
   function fromHash() { var h = (location.hash || '').replace('#', ''); if (h === 'log' || h === 'progress' || h === 'exercises') { if (h !== state.ui.tab) go(h, false); return true; } return false; }
@@ -1740,7 +1854,7 @@ var LIBRARY = (function () {
     var cv = document.getElementById('fx'), ctx = cv.getContext && cv.getContext('2d'); if (!ctx) return;
     var dpr = Math.min(2, window.devicePixelRatio || 1), W = window.innerWidth, H = window.innerHeight, cs = getComputedStyle(document.documentElement);
     cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    var cols = [cs.getPropertyValue('--accent').trim(), cs.getPropertyValue('--hot').trim(), cs.getPropertyValue('--good').trim(), '#f2b632', cs.getPropertyValue('--ink').trim()], P = [], burst = ox != null;
+    var cols = [cs.getPropertyValue('--accent').trim(), cs.getPropertyValue('--hot').trim(), cs.getPropertyValue('--green').trim(), '#f2b632', cs.getPropertyValue('--ink').trim()], P = [], burst = ox != null;
     for (var i = 0; i < n; i++) {
       var a = burst ? Math.random() * Math.PI * 2 : -Math.PI / 2 + (Math.random() - 0.5) * 1.5, sp = burst ? 2 + Math.random() * 4 : 7 + Math.random() * 9;
       P.push({ x: burst ? ox : W / 2 + (Math.random() - 0.5) * W * 0.5, y: burst ? oy : H * 0.78, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - (burst ? 2 : 3), w: 5 + Math.random() * 5, h: 3 + Math.random() * 4, r: Math.random() * 6, vr: (Math.random() - 0.5) * 0.4, c: cols[i % cols.length] });
@@ -1787,6 +1901,18 @@ var LIBRARY = (function () {
   view.addEventListener('pointerdown', chartPointer);
   view.addEventListener('pointerout', chartLeave);
 
+  /* ================= arriving on a screen: charts draw in and the big numbers count up ================= */
+  var enterTimer = null;
+  function countUp() {
+    if (reduceMotion) return;
+    view.querySelectorAll('[data-count]').forEach(function (el) {
+      var to = +el.dataset.count, f = el.dataset.fmt === 'compact' ? compact : function (v) { return String(Math.round(v)); }, t0 = performance.now();
+      if (!(to > 0)) return;
+      (function step(now) { var k = Math.min(1, (now - t0) / 800); el.textContent = f(k < 1 ? to * (1 - Math.pow(1 - k, 3)) : to); if (k < 1 && el.isConnected) requestAnimationFrame(step); })(t0);
+    });
+  }
+  function enter() { view.classList.add('enter'); clearTimeout(enterTimer); enterTimer = setTimeout(function () { view.classList.remove('enter'); }, 1700); countUp(); }
+
   /* ================= backup ================= */
   function backupData() { return { app: 'workout-log', v: 2, exportedAt: new Date().toISOString(), sessions: state.sessions, body: state.body, routines: state.routines, custom: state.custom, settings: state.settings }; }
   function restore(text) {
@@ -1817,7 +1943,7 @@ var LIBRARY = (function () {
     if (p.mode === 'draft' && d) { var it = newItem(exId); d.items.push(it); touchDraft(); closeSheet(); render(); scrollToItem(it.u); }
     else if (p.mode === 'replace' && d) { var old = findItem(p.u), ix = d.items.indexOf(old); if (ix >= 0) { var ni = newItem(exId); d.items[ix] = ni; touchDraft(); closeSheet(); render(); scrollToItem(ni.u); } }
     else if (p.mode === 'editor' && editor) { editor.items.push({ ex: exId, sets: e.log === 'cardio' ? 1 : e.sets, lo: e.lo, hi: e.hi, restSec: e.restSec, rir: e.rir, link: false }); render(); toast('Added ' + e.name); }
-    else if (p.mode === 'lift') { state.ui.ex = exId; saveLocal(); closeSheet(); render(); }
+    else if (p.mode === 'lift') { state.ui.ex = exId; saveLocal(); closeSheet(); render(); enter(); }
   }
   function openEditor(key) {
     if (!key) { editor = { id: 'r' + uid(), isNew: true, name: '', focus: '', core: true, warmup: '', items: [] }; }
@@ -1873,10 +1999,17 @@ var LIBRARY = (function () {
               var cur = best; it.rows.forEach(function (x) { if (x !== s && x.d && x.pr) { var o = rowSets({ ex: it.ex, rows: [x] }); if (o.length) cur = Math.max(cur, metric(e, o)); } });
               s.pr = metric(e, one) > cur + 1e-9;
             }
-            if (s.pr) { var br = a.getBoundingClientRect(); confetti(22, br.left + br.width / 2, br.top + br.height / 2); }
+            var was = it.rec || {}, rc = itemRecords(it, d), news = [];
+            if (rc.w && !was.w) news.push('Record weight on ' + e.name + ': ' + fmt(rc.maxW) + ' kg');
+            if (rc.v && !was.v) news.push('Record volume on ' + e.name + ': ' + compact(rc.vol) + ' kg');
+            if (rc.b && !was.b && e.log !== 'wr') news.push(e.log === 'bw' ? 'Most reps yet on ' + e.name + ': ' + fmt(rc.best) : e.log === 'time' ? 'Longest hold yet on ' + e.name + ': ' + fmt(rc.best) + ' s' : 'Longest ' + e.name + ' yet: ' + fmt(rc.best) + ' min');
+            it.recNew = news.length ? { w: rc.w && !was.w, v: rc.v && !was.v, b: rc.b && !was.b } : null;
+            it.rec = { w: rc.w, v: rc.v, b: rc.b };
+            if (news.length) toast(news[0], true);
+            if (s.pr || news.length) { var br = a.getBoundingClientRect(); confetti(news.length ? 34 : 22, br.left + br.width / 2, br.top + br.height / 2); }
             if (state.settings.autoRest && it.restSec >= 30) startRest(it.restSec); else if (it.restSec < 30) stopRest();
           }
-        } else { s.d = false; s.pr = false; }
+        } else { s.d = false; s.pr = false; if (!d.editing) { var rc2 = itemRecords(it, d); it.rec = { w: rc2.w, v: rc2.v, b: rc2.b }; } }
         touchDraft(); render(); break;
       case 'add-set': it = findItem(u); if (it) { var lr = it.rows[it.rows.length - 1]; it.rows.push({ w: lr ? lr.w : '', r: '', d: false }); touchDraft(); render(); } break;
       case 'del-set': it = findItem(u); if (it && it.rows.length > 1) { it.rows.pop(); touchDraft(); render(); } break;
@@ -1904,9 +2037,9 @@ var LIBRARY = (function () {
       case 'backup-show': { var bx = document.getElementById('backup-box'); bx.hidden = false; document.getElementById('backup-text').value = JSON.stringify(backupData()); break; }
       case 'backup-copy': { var ta = document.getElementById('backup-text'); try { navigator.clipboard.writeText(ta.value).then(function () { toast('Backup copied'); }, function () { ta.select(); toast('Select all and copy the text'); }); } catch (err) { ta.select(); toast('Select all and copy the text'); } break; }
       case 'backup-restore': restore(document.getElementById('backup-text').value); break;
-      case 'prog': state.ui.prog = a.dataset.v; saveLocal(); render(); break;
-      case 'mus-win': state.ui.musWin = a.dataset.v; saveLocal(); render(); break;
-      case 'measure': state.ui.measure = a.dataset.v; saveLocal(); render(); break;
+      case 'prog': state.ui.prog = a.dataset.v; saveLocal(); render(); enter(); break;
+      case 'mus-win': state.ui.musWin = a.dataset.v; saveLocal(); render(); enter(); break;
+      case 'measure': state.ui.measure = a.dataset.v; saveLocal(); render(); enter(); break;
       case 'pick-lift': openPicker('lift'); break;
       case 'lift': state.ui.ex = a.dataset.ex; state.ui.prog = 'lifts'; closeSheet(); go('progress', true); break;
       case 'body-del': delete state.body[a.dataset.id]; mark('body/' + a.dataset.id); render(); break;
@@ -2008,6 +2141,7 @@ var LIBRARY = (function () {
   else if (state.draft) state.ui.tab = 'log';
   applyTheme();
   render();
+  enter();
   refreshSync();
   connect();
   wake();
