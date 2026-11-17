@@ -1,0 +1,7 @@
+# Files that stay in the repo but are not published at workout.omaksimov.com
+.assetsignore
+wrangler.jsonc
+README.md
+.wrangler
+node_modules
+.DS_Store

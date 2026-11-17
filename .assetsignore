@@ -12,6 +12,9 @@ tools
 games/src
 games/README.md
 
+# The Workout Log app is its own Worker at workout.omaksimov.com (see workout/wrangler.jsonc), so the website does not publish it
+workout
+
 # Local-only files (also kept out of git): never publish them, even from a local deploy
 *.mov
 *.MOV
