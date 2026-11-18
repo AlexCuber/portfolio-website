@@ -831,7 +831,7 @@ var LIBRARY = (function () {
       var k = KIND[r[6]], o = r[8] || {};
       list.push({ id: r[0], name: r[1], equip: r[2], group: r[3], muscles: parseMuscles(r[4]), illo: r[5], log: k.log, unit: unitOf(k.log), sets: o.sets || k.sets, lo: o.lo || k.lo, hi: o.hi || k.hi,
         restSec: o.restSec != null ? o.restSec : k.restSec, rir: o.rir || k.rir, cue: r[7], detail: '', why: '', swap: '',
-        weightHint: k.log === 'bw' ? 'Leave kg empty for body weight only, or enter the weight you added.' : (r[2] === 'Dumbbell' && k.log === 'wr' ? 'Weight per dumbbell.' : '') });
+        weightHint: k.log === 'bw' ? 'Leave the weight empty for body weight only, or enter the weight you added.' : (r[2] === 'Dumbbell' && k.log === 'wr' ? 'Weight per dumbbell.' : '') });
     });
     return list;
   }
@@ -868,7 +868,7 @@ var LIBRARY = (function () {
 
   /* ================= state and storage ================= */
   var LS = 'workout-log-v1';
-  var DEF_SET = { theme: 'auto', sound: true, autoRest: true, awake: true, weeklyGoal: 4, goalWeight: null, goalRate: 0.25 };
+  var DEF_SET = { theme: 'auto', sound: true, autoRest: true, awake: true, weeklyGoal: 4, goalWeight: null, goalRate: 0.25, unit: 'kg', rir: false, setupDone: false };
   var DEF_UI = { tab: 'log', ex: null, lib: 'all', prog: 'overview', measure: 'weight', musWin: 'week', lib3: 'history' };
   var state = { sessions: {}, body: {}, routines: {}, custom: {}, settings: Object.assign({}, DEF_SET), settingsAt: 0, draft: null, draftAt: 0, dirty: {}, ui: Object.assign({}, DEF_UI) };
   var draftWait = false, justWrote = {}, db = null, syncState = 'local', busy = {}, again = {}, draftTimer = null;
@@ -932,7 +932,7 @@ var LIBRARY = (function () {
     var timeout = new Promise(function (res) { timer = setTimeout(function () { res(null); }, 10000); });
     Promise.race([all, timeout]).then(function (r) {
       clearTimeout(timer);
-      if (!r) { refreshSync(); return; }
+      if (!r) { refreshSync(); settle(); return; }
       var maps = [{}, {}, {}, {}];
       [r[0], r[1], r[3], r[4]].forEach(function (snap, i) { snap.docs.forEach(function (d) { maps[i][d.id] = clone(d.data()); }); });
       mergeMap(state.sessions, maps[0], 'sessions/'); mergeMap(state.body, maps[1], 'body/');
@@ -946,19 +946,21 @@ var LIBRARY = (function () {
         var rs = r[5].data();
         if ((rs.updatedAt || 0) > (state.settingsAt || 0)) { state.settings = Object.assign({}, DEF_SET, rs.settings || {}); state.settingsAt = rs.updatedAt; applyTheme(); }
       }
-      saveLocal(); flushDirty(); refreshSync();
+      saveLocal(); flushDirty(); refreshSync(); syncSettled = true;
       if (!isTyping() && !editor && !picker) render();
-    }, function () { refreshSync(); });
+    }, function () { refreshSync(); settle(); });
   }
   function mergeMap(local, remote, prefix) {
     Object.keys(remote).forEach(function (id) { if (!state.dirty[prefix + id]) local[id] = remote[id]; });
     Object.keys(local).forEach(function (id) { if (!remote[id] && !state.dirty[prefix + id] && !(Date.now() - (justWrote[prefix + id] || 0) < 60000)) delete local[id]; });
   }
   function isTyping() { var a = document.activeElement; return !!(a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.tagName === 'SELECT')); }
+  /* the first answer from Claude's storage is in (or there will be none): only now is an empty log known to be empty */
+  function settle() { if (syncSettled) return; syncSettled = true; if (!isTyping() && !editor && !picker) render(); }
   function connect(tries) {
     if (STANDALONE) { refreshSync(); return; }
-    if (!(window.claude && typeof window.claude.use === 'function')) { refreshSync(); if ((tries || 0) < 5) setTimeout(function () { connect((tries || 0) + 1); }, 700); return; }
-    window.claude.use('db').then(function (d) { db = d || null; refreshSync(); if (db) pullRemote(); }, function () { refreshSync(); });
+    if (!(window.claude && typeof window.claude.use === 'function')) { refreshSync(); if ((tries || 0) < 5) setTimeout(function () { connect((tries || 0) + 1); }, 700); else settle(); return; }
+    window.claude.use('db').then(function (d) { db = d || null; refreshSync(); if (db) pullRemote(); else settle(); }, function () { refreshSync(); settle(); });
   }
   function saveSettings() { state.settingsAt = Date.now(); mark('state/settings'); }
 
@@ -976,7 +978,7 @@ var LIBRARY = (function () {
     var k = LIBRARY.KIND[c.kind] || LIBRARY.KIND.M, m = {}; if (LIBRARY.GROUP_MUSCLE[c.group]) m[LIBRARY.GROUP_MUSCLE[c.group]] = 1;
     return { id: c.id, name: c.name, equip: c.equip || 'Your own', group: c.group, muscles: m, illo: LIBRARY.GROUP_ILLO[c.group] || 'm-core', log: k.log, unit: LIBRARY.unitOf(k.log),
       sets: k.sets, lo: k.lo, hi: k.hi, restSec: k.restSec, rir: k.rir, cue: c.cue || '', detail: '', why: '', swap: '', custom: true,
-      weightHint: k.log === 'bw' ? 'Leave kg empty for body weight only, or enter the weight you added.' : '' };
+      weightHint: k.log === 'bw' ? 'Leave the weight empty for body weight only, or enter the weight you added.' : '' };
   }
   function cat() {
     if (CAT) return CAT;
@@ -1067,13 +1069,13 @@ var LIBRARY = (function () {
     if (e.log === 'wr' && mode !== 'e1rm') return Math.max.apply(null, sets.map(function (s) { return s.w || 0; }));
     return metric(e, sets);
   }
-  function liftLabel(e, mode) { return e.log === 'wr' && mode !== 'e1rm' ? 'Top weight (kg)' : metricLabel(e); }
+  function liftLabel(e, mode) { return e.log === 'wr' && mode !== 'e1rm' ? 'Top weight (' + UW() + ')' : metricLabel(e); }
   function bestSet(e, sets, mode) {
     if (e.log === 'wr' && mode !== 'e1rm') return sets.reduce(function (a, x) { return x.w > a.w || (x.w === a.w && x.r > a.r) ? x : a; });
     return sets.reduce(function (a, x) { return metric(e, [x]) > metric(e, [a]) ? x : a; });
   }
-  function metricLabel(e) { return e.log === 'cardio' ? 'Minutes' : e.log === 'time' ? 'Longest hold (s)' : e.log === 'bw' ? 'Most reps in a set' : 'Estimated 1-rep max (kg)'; }
-  function metricUnit(e) { return e.log === 'cardio' ? 'min' : e.log === 'time' ? 's' : e.log === 'bw' ? 'reps' : 'kg'; }
+  function metricLabel(e) { return e.log === 'cardio' ? 'Minutes' : e.log === 'time' ? 'Longest hold (s)' : e.log === 'bw' ? 'Most reps in a set' : 'Estimated 1-rep max (' + UW() + ')'; }
+  function metricUnit(e) { return e.log === 'cardio' ? 'min' : e.log === 'time' ? 's' : e.log === 'bw' ? 'reps' : UW(); }
   function setsText(e, sets) {
     if (!sets || !sets.length) return '—';
     if (e.log === 'cardio') return sets.map(function (s) { return fmt(s.r) + ' min'; }).join(', ');
@@ -1081,9 +1083,9 @@ var LIBRARY = (function () {
     var sameW = sets.every(function (s) { return s.w === sets[0].w; });
     if (e.log === 'bw') {
       if (sameW && !sets[0].w) return sets.map(function (s) { return fmt(s.r); }).join(', ') + ' reps';
-      return sets.map(function (s) { return (s.w ? '+' + fmt(s.w) + ' kg × ' : '') + fmt(s.r); }).join(', ');
+      return sets.map(function (s) { return (s.w ? '+' + fmt(s.w) + ' ' + UW() + ' × ' : '') + fmt(s.r); }).join(', ');
     }
-    if (sameW) return fmt(sets[0].w) + ' kg × ' + sets.map(function (s) { return fmt(s.r); }).join(', ');
+    if (sameW) return fmt(sets[0].w) + ' ' + UW() + ' × ' + sets.map(function (s) { return fmt(s.r); }).join(', ');
     return sets.map(function (s) { return fmt(s.w) + ' × ' + fmt(s.r); }).join(', ');
   }
   function historyOf(exId, list) {
@@ -1128,8 +1130,8 @@ var LIBRARY = (function () {
   }
   function recordTags(e, rc, sets) {
     var t = [];
-    if (rc.w) t.push('record weight ' + fmt(rc.maxW) + ' kg');
-    if (rc.v) t.push('record volume ' + compact(rc.vol) + ' kg');
+    if (rc.w) t.push('record weight ' + fmt(rc.maxW) + ' ' + UW() + '');
+    if (rc.v) t.push('record volume ' + compact(rc.vol) + ' ' + UW() + '');
     if (rc.b) t.push(e.log === 'wr' ? 'best set ' + setsText(e, [topSet(e, sets)]) : e.log === 'bw' ? 'most reps in a set, ' + fmt(rc.best) : e.log === 'time' ? 'longest hold, ' + fmt(rc.best) + ' s' : 'longest yet, ' + fmt(rc.best) + ' min');
     return t;
   }
@@ -1182,14 +1184,14 @@ var LIBRARY = (function () {
     var n = list.length, vol = 0, sets = 0, prs = 0;
     list.forEach(function (s) { vol += volOf(s); sets += countSets(s); });
     records(list).forEach(function (r) { prs += r.prs; });
-    var st = streakWeeks(list), gw = goalWeeks(list), t = vol / 1000;
+    var st = streakWeeks(list), gw = goalWeeks(list), t = vol * KGF() / 1000;
     function step(v, steps) { for (var i = 0; i < steps.length; i++) if (v < steps[i]) return { goal: steps[i], prev: i ? steps[i - 1] : 0, got: i }; return { goal: steps[steps.length - 1], prev: steps[steps.length - 1], got: steps.length }; }
     function M(label, v, steps, unit) { var s = step(v, steps), done = s.got > 0; return { label: label, steps: steps, level: s.got, value: v, show: done ? (s.got === steps.length ? steps[steps.length - 1] : s.prev) : s.goal, unit: unit, got: done, next: s.got < steps.length ? s.goal : null, pct: s.got < steps.length ? Math.max(0, Math.min(1, (v - s.prev) / (s.goal - s.prev))) : 1 }; }
     return [M('Workouts logged', n, [1, 5, 10, 25, 50, 100, 200, 400], ''), M('Weeks in a row', st, [2, 4, 8, 12, 26, 52, 78, 104], 'wk'), M('Weeks on target', gw, [1, 4, 8, 12, 26, 52, 78, 104], ''),
       M('Tonnes lifted', t, [5, 10, 25, 50, 100, 250, 500, 1000], 't'), M('Hard sets', sets, [50, 100, 250, 500, 1000, 2500, 5000, 10000], ''), M('Personal bests', prs, [1, 5, 10, 25, 50, 100, 200, 400], '')];
   }
   var FUN = [[100, 'a newborn elephant'], [400, 'a grand piano'], [700, 'a dairy cow'], [1300, 'a small car'], [3000, 'a hippo'], [6000, 'an African elephant'], [8000, 'a T. rex'], [12000, 'a double-decker bus'], [20000, 'a fire engine'], [36000, 'a humpback whale']];
-  function funVolume(kg) { if (kg < 100) return ''; var pick = FUN[0]; FUN.forEach(function (f) { if (kg >= f[0]) pick = f; }); var k = kg / pick[0]; return 'You moved ' + compact(kg) + ' kg in total. That is about ' + (k >= 1.75 ? (Math.round(k * 2) / 2) + ' times ' : '') + 'the weight of ' + pick[1] + '.'; }
+  function funVolume(v) { var kgs = v * KGF(); if (kgs < 100) return ''; var pick = FUN[0]; FUN.forEach(function (f) { if (kgs >= f[0]) pick = f; }); var k = kgs / pick[0]; return 'You moved ' + compact(v) + ' ' + UW() + ' in total. That is about ' + (k >= 1.75 ? (Math.round(k * 2) / 2) + ' times ' : '') + 'the weight of ' + pick[1] + '.'; }
 
   /* ================= the workout in progress (draft) ================= */
   function migrateDraft(d) {
@@ -1214,12 +1216,12 @@ var LIBRARY = (function () {
       var src = Object.assign({}, it, { n: it.n || String(i + 1) });
       var prev = from ? (from.entries || []).filter(function (en, j) { if (used[j]) return false; if (en.n === src.n && en.ex === it.ex) { used[j] = 1; return true; } return false; })[0] : null;
       var last = lastEntry(key, it.ex, d.id), count = prev ? Math.max(prev.sets.length, it.sets) : Math.max(it.sets, last && last.key === key ? Math.min(last.sets.length, it.sets + 2) : 0), rows = [];
-      for (var k = 0; k < count; k++) { var ps = prev && prev.sets[k]; rows.push({ w: ps ? fmt(ps.w) : '', r: ps ? fmt(ps.r) : '', d: !!ps }); }
+      for (var k = 0; k < count; k++) { var ps = prev && prev.sets[k], row = { w: ps ? fmt(ps.w) : '', r: ps ? fmt(ps.r) : '', d: !!ps }; if (ps && ps.rir != null) row.rir = ps.rir; rows.push(row); }
       d.items.push(itemFrom(src, rows, prev ? prev.note : ''));
     });
     if (from) (from.entries || []).forEach(function (en, j) {
       if (used[j]) return; var e = exi(en.ex, en.name);
-      d.items.push(itemFrom({ ex: en.ex, n: en.n || 'x', sets: en.sets.length, lo: e.lo, hi: e.hi, restSec: e.restSec }, en.sets.map(function (x) { return { w: fmt(x.w), r: fmt(x.r), d: true }; }), en.note));
+      d.items.push(itemFrom({ ex: en.ex, n: en.n || 'x', sets: en.sets.length, lo: e.lo, hi: e.hi, restSec: e.restSec }, en.sets.map(function (x) { var row = { w: fmt(x.w), r: fmt(x.r), d: true }; if (x.rir != null) row.rir = x.rir; return row; }), en.note));
     });
     state.draft = d; touchDraft(true); stopRest(); summary = null; editor = null;
     state.ui.tab = 'log'; applyTheme(); wake();
@@ -1235,7 +1237,7 @@ var LIBRARY = (function () {
   function findItem(u) { var d = state.draft; if (!d) return null; for (var i = 0; i < d.items.length; i++) if (d.items[i].u === u) return d.items[i]; return null; }
   function rowSets(it) {
     var e = exi(it.ex), out = [];
-    it.rows.forEach(function (s) { var r = num(s.r), w = num(s.w); if (r == null || r <= 0) return; out.push({ w: (e.log === 'cardio' || e.log === 'time') ? 0 : (w == null || w < 0 ? 0 : w), r: r }); });
+    it.rows.forEach(function (s) { var r = num(s.r), w = num(s.w); if (r == null || r <= 0) return; var o = { w: (e.log === 'cardio' || e.log === 'time') ? 0 : (w == null || w < 0 ? 0 : w), r: r }; if (s.rir != null && s.d) o.rir = s.rir; out.push(o); });
     return out;
   }
   function draftCount() { var n = 0; state.draft.items.forEach(function (it) { n += rowSets(it).length; }); return n; }
@@ -1293,11 +1295,11 @@ var LIBRARY = (function () {
 
   /* ================= coaching: today's targets, comparisons, things to watch ================= */
   function r2(x) { return Math.round(x * 100) / 100; }
-  function massText(kg) { return kg >= 1000 ? fmt(Math.round(kg / 100) / 10) + ' t' : Math.round(kg) + ' kg'; }
+  function massText(v) { return isLb() ? compact(v) + ' lb' : v >= 1000 ? fmt(Math.round(v / 100) / 10) + ' t' : Math.round(v) + ' ' + UW() + ''; }
   /* is a lift moving? estimated 1-rep max for weights; for bodyweight moves added weight counts first, then reps */
   function progressScore(e, sets) { return e.log === 'bw' ? Math.max.apply(null, sets.map(function (x) { return (x.w || 0) * 1000 + x.r; })) : metric(e, sets); }
   /* the next step up in weight: small for light loads, the usual dumbbell or plate jump after that */
-  function wStep(e, w) { if (w < 10) return 1; return /dumbbell/i.test(e.equip || '') ? 2 : 2.5; }
+  function wStep(e, w) { if (isLb()) return w < 20 ? 2.5 : 5; if (w < 10) return 1; return /dumbbell/i.test(e.equip || '') ? 2 : 2.5; }
   /* Today's target from last time's sets, by double progression: add a rep until every planned set is at the top
      of the range, then add weight and start again from the bottom. Returns { sets, text, up, step }; sets is null the first time. */
   function targetFor(it, e, last) {
@@ -1308,11 +1310,17 @@ var LIBRARY = (function () {
     if (e.log === 'cardio' || !it.hi) return { sets: sets, text: h.t, up: false };
     var planned = prev.slice(0, it.sets), top = planned.length >= it.sets && planned.every(function (s) { return s.r >= it.hi; });
     var loaded = e.log === 'wr' || (e.log === 'bw' && prev.some(function (s) { return s.w > 0; }));
+    var easy = !top && loaded && planned.length >= it.sets && planned.every(function (s) { return s.rir != null && s.rir >= 3; });
+    if (easy) {
+      var st2 = wStep(e, sets[0].w);
+      sets.forEach(function (s) { s.w = r2(s.w + wStep(e, s.w)); });
+      return { sets: sets, text: 'You had 3 or more reps left on every set last time, so the weight goes up by ' + fmt(st2) + ' ' + UW() + '. Same reps.', up: true, step: st2, easy: true };
+    }
     if (top && !loaded) return { sets: sets, text: h.t, up: true };
     if (top) {
       var step = wStep(e, sets[0].w);
       sets.forEach(function (s) { s.w = r2(s.w + wStep(e, s.w)); s.r = it.lo; });
-      return { sets: sets, text: 'Every set reached ' + it.hi + ' last time, so the weight goes up by ' + fmt(step) + ' kg and the reps start again at ' + it.lo + '.', up: true, step: step };
+      return { sets: sets, text: 'Every set reached ' + it.hi + ' last time, so the weight goes up by ' + fmt(step) + ' ' + UW() + ' and the reps start again at ' + it.lo + '.', up: true, step: step };
     }
     for (i = 0; i < Math.min(sets.length, it.sets || sets.length); i++) if (sets[i].r < it.hi) { k = i; break; }
     if (k < 0) return { sets: sets, text: 'Same ' + (e.log === 'time' ? 'holds' : 'weight') + '. Get all ' + it.sets + ' sets to ' + it.hi + (e.log === 'time' ? ' s.' : ' reps.'), up: false };
@@ -1326,7 +1334,7 @@ var LIBRARY = (function () {
     function sum(x) { return x.reduce(function (t, s) { return t + s.r; }, 0); }
     function topW(x) { return Math.max.apply(null, x.map(function (s) { return s.w || 0; })); }
     var timed = e.log === 'cardio' || e.log === 'time', dw = timed ? 0 : r2(topW(a) - topW(b)), dr = r2(sum(a) - sum(b));
-    if (dw) return { st: dw > 0 ? 'up' : 'down', label: (dw > 0 ? '+' : '−') + fmt(Math.abs(dw)) + ' kg' };
+    if (dw) return { st: dw > 0 ? 'up' : 'down', label: (dw > 0 ? '+' : '−') + fmt(Math.abs(dw)) + ' ' + UW() + '' };
     if (!dr) return { st: 'same', label: 'same' };
     if (timed) return { st: dr > 0 ? 'up' : 'down', label: (dr > 0 ? '+' : '−') + fmt(Math.abs(dr)) + (e.log === 'cardio' ? ' min' : ' s') };
     return { st: dr > 0 ? 'up' : 'down', label: dr > 0 ? '+' + plural(dr, 'rep') : plural(-dr, 'rep') + ' fewer' };
@@ -1349,7 +1357,7 @@ var LIBRARY = (function () {
     (items || []).forEach(function (it) {
       var e = exi(it.ex), sets = rowSets(it); if (!sets.length || (e.log !== 'wr' && e.log !== 'bw')) return;
       var t = targetFor(it, e, { sets: sets });
-      if (t.up && t.step) next.push(e.name + ' goes up to ' + fmt(t.sets[0].w) + ' kg for ' + it.lo + ' reps');
+      if (t.up && t.step) next.push(e.name + ' goes up to ' + fmt(t.sets[0].w) + ' ' + UW() + '' + (t.easy ? '' : ' for ' + it.lo + ' reps'));
     });
     return { date: prev.date, rows: rows, up: up, n: n, durDiff: da && db2 ? Math.round((da - db2) / 60) : null, volPct: vb > 0 ? Math.round((va - vb) / vb * 100) : null, next: next };
   }
@@ -1397,7 +1405,7 @@ var LIBRARY = (function () {
     });
     stalled.sort(function (a, b) { return b.n - a.n; }).slice(0, 2).forEach(function (s) {
       var e = s.e, it = s.it, top = bestSet(e, s.last.sets, 'top'), swap = it.swap || e.swap, tip;
-      if (top.w > 0) tip = 'Try ' + (e.log === 'bw' ? '+' : '') + fmt(r2(top.w + wStep(e, top.w))) + ' kg for sets of ' + it.lo + (swap ? ', or swap it for a few weeks: ' + swap.charAt(0).toLowerCase() + swap.slice(1) + '.' : ', or swap it for a similar exercise for a few weeks.');
+      if (top.w > 0) tip = 'Try ' + (e.log === 'bw' ? '+' : '') + fmt(r2(top.w + wStep(e, top.w))) + ' ' + UW() + ' for sets of ' + it.lo + (swap ? ', or swap it for a few weeks: ' + swap.charAt(0).toLowerCase() + swap.slice(1) + '.' : ', or swap it for a similar exercise for a few weeks.');
       else tip = 'Add a little weight or slow the lowering' + (swap ? ', or swap it for a few weeks: ' + swap.charAt(0).toLowerCase() + swap.slice(1) + '.' : '.');
       out.push({ k: 'stall', ex: it.ex, t: e.name + ' has stalled', d: setsText(e, s.last.sets) + ' last time, and no better set in the last ' + NUM_WORDS[Math.min(s.n, 12)].toLowerCase() + ' sessions. ' + tip });
     });
@@ -1424,15 +1432,15 @@ var LIBRARY = (function () {
 
   /* body weight against the goal: pace over the last four weeks, the target pace, and when each would get there */
   function goalInfo(pts, trend) {
-    var goal = state.settings.goalWeight, rate = state.settings.goalRate || 0.25; if (!goal || !pts.length) return null;
+    var goal = state.settings.goalWeight, rate = state.settings.goalRate || (isLb() ? 0.5 : 0.25); if (!goal || !pts.length) return null;
     var now = trend[trend.length - 1], lastX = pts[pts.length - 1].x, ref = 0, from = addDays(lastX, -28), i;
     for (i = 0; i < pts.length; i++) if (pts[i].x >= from) { ref = i; break; }
     var days = Math.round((toDate(lastX) - toDate(pts[ref].x)) / 864e5), pace = days >= 14 ? (now - trend[ref]) / days * 7 : null;
     var dir = goal >= now ? 1 : -1, left = Math.abs(goal - now), toward = pace == null ? 0 : pace * dir;
-    var st = left < 0.25 ? 'done' : pace == null ? 'none' : toward < -0.03 ? 'away' : toward <= 0.03 ? 'flat' : toward < rate * 0.7 ? 'slow' : toward > rate * 1.4 ? 'fast' : 'on';
+    var k = isLb() ? 2.2 : 1, st = left < 0.25 * k ? 'done' : pace == null ? 'none' : toward < -0.03 * k ? 'away' : toward <= 0.03 * k ? 'flat' : toward < rate * 0.7 ? 'slow' : toward > rate * 1.4 ? 'fast' : 'on';
     function eta(perWeek) { var d = Math.round(left / perWeek * 7); return d > 730 ? null : addDays(lastX, d); }
     return { goal: goal, rate: rate, now: now, first: pts[0].y, dir: dir, left: left, pace: pace, days: days, st: st, lastX: lastX,
-      etaPace: toward > 0.03 ? eta(toward) : null, far: toward > 0.03 && !eta(toward), etaRate: eta(rate) };
+      etaPace: toward > 0.03 * k ? eta(toward) : null, far: toward > 0.03 * k && !eta(toward), etaRate: eta(rate) };
   }
   /* what waist and weight say together, in one sentence; empty when there is too little to go on */
   function waistNote(body) {
@@ -1442,10 +1450,10 @@ var LIBRARY = (function () {
     var days = Math.round((toDate(b) - toDate(a)) / 864e5); if (days < 14 || !g.length) return '';
     function near(k) { var best = g[0]; g.forEach(function (x) { if (Math.abs(toDate(x) - toDate(k)) < Math.abs(toDate(best) - toDate(k))) best = x; }); return Math.abs(toDate(best) - toDate(k)) <= 5 * 864e5 ? body[best].weight : null; }
     var wa = near(a), wb = near(b); if (wa == null || wb == null) return '';
-    var dW = r2(body[b].waist - body[a].waist), dKg = wb - wa, wk = Math.round(days / 7), cm = fmt(Math.abs(Math.round(dW * 10) / 10)) + ' cm', at = fmt(body[b].waist) + ' cm';
-    if (dKg > 0.3) return dW <= -1 ? 'Waist is down ' + cm + ' in ' + wk + ' weeks while weight rises, a good sign that the gain is muscle.' : dW < 1 ? 'Waist is steady at ' + at + ' while weight rises, which points to muscle more than fat.' : 'Waist is up ' + cm + ' in ' + wk + ' weeks along with your weight, so part of the gain is likely fat. A slower pace keeps it leaner.';
-    if (dKg < -0.3) return dW <= -1 ? 'Waist is down ' + cm + ' in ' + wk + ' weeks along with your weight, so the loss is coming off the middle.' : 'Weight is down but waist is unchanged at ' + at + '. Keep protein and training up so the loss is not muscle.';
-    return dW <= -1 ? 'Weight is steady and waist is down ' + cm + ' in ' + wk + ' weeks, which points to fat going and muscle coming.' : dW >= 1 ? 'Weight is steady but waist is up ' + cm + ' in ' + wk + ' weeks.' : '';
+    var lb = isLb(), one = lb ? 0.4 : 1, kq = lb ? 0.66 : 0.3, dW = r2(body[b].waist - body[a].waist), dKg = wb - wa, wk = Math.round(days / 7), by = fmt(Math.abs(Math.round(dW * 10) / 10)) + ' ' + UL() + '', at = fmt(body[b].waist) + ' ' + UL() + '';
+    if (dKg > kq) return dW <= -one ? 'Waist is down ' + by + ' in ' + wk + ' weeks while weight rises, a good sign that the gain is muscle.' : dW < one ? 'Waist is steady at ' + at + ' while weight rises, which points to muscle more than fat.' : 'Waist is up ' + by + ' in ' + wk + ' weeks along with your weight, so part of the gain is likely fat. A slower pace keeps it leaner.';
+    if (dKg < -kq) return dW <= -one ? 'Waist is down ' + by + ' in ' + wk + ' weeks along with your weight, so the loss is coming off the middle.' : 'Weight is down but waist is unchanged at ' + at + '. Keep protein and training up so the loss is not muscle.';
+    return dW <= -one ? 'Weight is steady and waist is down ' + by + ' in ' + wk + ' weeks, which points to fat going and muscle coming.' : dW >= one ? 'Weight is steady but waist is up ' + by + ' in ' + wk + ' weeks.' : '';
   }
 
   /* start a workout with the same exercises as an earlier one */
@@ -1461,6 +1469,172 @@ var LIBRARY = (function () {
       return itemFrom(src, blankRows(e.log === 'cardio' ? 1 : Math.max(1, p ? p.sets : en.sets.length)), '');
     });
     touchDraft(true); render(); window.scrollTo(0, 0);
+  }
+
+  /* ================= units ================= */
+  /* Numbers in the log are in the person's own units; nothing is converted on the fly. */
+  function isLb() { return state.settings.unit === 'lb'; }
+  function UW() { return isLb() ? 'lb' : 'kg'; }
+  function UL() { return isLb() ? 'in' : 'cm'; }
+  function KGF() { return isLb() ? 0.45359237 : 1; }
+  function roundTo(x, s) { return r2(Math.round(x / s) * s); }
+  /* switch units and convert what is already logged */
+  function convertUnits(to) {
+    if (to === (isLb() ? 'lb' : 'kg')) return;
+    var f = to === 'lb' ? 1 / 0.45359237 : 0.45359237, fl = to === 'lb' ? 1 / 2.54 : 2.54, now = Date.now(), s = state.settings;
+    Object.keys(state.sessions).forEach(function (id) {
+      var doc = state.sessions[id], any = false;
+      (doc.entries || []).forEach(function (en) { (en.sets || []).forEach(function (x) { if (x.w) { x.w = roundTo(x.w * f, 0.25); any = true; } }); });
+      if (any) { doc.updatedAt = now; mark('sessions/' + id); }
+    });
+    Object.keys(state.body).forEach(function (k) {
+      var b = state.body[k];
+      if (b.weight != null) b.weight = Math.round(b.weight * f * 10) / 10;
+      ['waist', 'chest', 'arm', 'thigh'].forEach(function (m) { if (b[m] != null) b[m] = Math.round(b[m] * fl * 10) / 10; });
+      b.updatedAt = now; mark('body/' + k);
+    });
+    if (s.goalWeight != null) s.goalWeight = Math.round(s.goalWeight * f * 2) / 2;
+    s.goalRate = to === 'lb' ? Math.round((s.goalRate || 0.25) * f * 10) / 10 : Math.round((s.goalRate || 0.5) * f * 20) / 20;
+    delete s.bars; s.unit = to; saveSettings();
+  }
+
+  /* ================= plates and warm-up sets ================= */
+  var BAR_RX = /barbell|smith|ez bar|trap bar/i;
+  function isBar(e) { return BAR_RX.test(e.equip || ''); }
+  function barFor(e) { var b = (state.settings.bars || {})[e.id]; if (b != null) return b; if (!isBar(e)) return 0; return /ez/i.test(e.equip) ? (isLb() ? 25 : 10) : (isLb() ? 45 : 20); }
+  function barChoices() { return isLb() ? [45, 35, 25, 15, 0] : [20, 15, 10, 7.5, 0]; }
+  function plateSizes() { return isLb() ? [45, 35, 25, 10, 5, 2.5] : [25, 20, 15, 10, 5, 2.5, 1.25]; }
+  /* plates for one side, largest first; rem is what the standard plates cannot make up */
+  function platesFor(total, bar) {
+    var left = r2((total - bar) / 2), out = []; if (left < -1e-9) return null;
+    plateSizes().forEach(function (p) { while (left >= p - 1e-9) { out.push(p); left = r2(left - p); } });
+    return { side: out, rem: left, loaded: r2(total - 2 * left) };
+  }
+  /* ramp-up sets below the working weight: about 50, 70 and 85 percent for 8, 5 and 2 reps, or one feeler set at 60 percent */
+  function warmups(W, e, full) {
+    var lb = isLb(), bar = isBar(e) ? barFor(e) : 0, step = W < (lb ? 45 : 20) ? (lb ? 2.5 : 1) : /dumbbell/i.test(e.equip || '') ? (lb ? 5 : 2) : (lb ? 5 : 2.5), out = [], seen = {};
+    function add(p, reps) { var w = Math.max(bar, roundTo(W * p, step)); if (w <= 0 || w >= W - 1e-9 || seen[w]) return; seen[w] = 1; out.push({ w: w, r: reps }); }
+    if (!full) { add(0.6, 5); return out; }
+    if (bar > 0 && W * 0.5 > bar * 1.3) { seen[bar] = 1; out.push({ w: bar, r: 10, bar: true }); }
+    add(0.5, 8); add(0.7, 5); add(0.85, 2);
+    return out;
+  }
+  /* the weight the next set will use: what is typed, else today's target, else the last set done */
+  function workingWeight(it) {
+    var d = state.draft, e = exi(it.ex), tg = d.editing ? null : targetFor(it, e, lastEntry(d.key, it.ex, d.id)), i, w;
+    for (i = 0; i < it.rows.length; i++) { if (it.rows[i].d) continue; w = num(it.rows[i].w); if (w != null) return w; if (tg && tg.sets) return (tg.sets[i] || tg.sets[tg.sets.length - 1]).w || null; break; }
+    for (i = it.rows.length - 1; i >= 0; i--) { w = num(it.rows[i].w); if (w != null) return w; }
+    return null;
+  }
+  /* the first lift of a workout gets the full ramp; after that the body is warm and one feeler set is enough */
+  function warmedUp(it) {
+    var d = state.draft, ix = d.items.indexOf(it);
+    return d.items.slice(0, ix).some(function (x) { var o = exi(x.ex); return o.log === 'wr' || o.log === 'bw'; });
+  }
+
+  /* ================= swaps ================= */
+  /* other exercises for the same main muscle, the plan's own suggestion first, different equipment preferred */
+  function swapsFor(it, d) {
+    var e = exi(it.ex), mine = Object.keys(e.muscles), tot = 0, main = {}, used = {}, done = {}, hint = ((it.swap || '') + ' ' + (e.swap || '')).toLowerCase(), lifting = e.log === 'wr' || e.log === 'bw';
+    mine.forEach(function (m) { tot += e.muscles[m]; if (e.muscles[m] >= 1) main[m] = 1; });
+    d.items.forEach(function (x) { used[x.ex] = 1; });
+    finished().forEach(function (s) { (s.entries || []).forEach(function (en) { done[en.ex] = 1; }); });
+    return allEx().filter(function (c) { return c.id !== e.id && !used[c.id] && (lifting ? (c.log === 'wr' || c.log === 'bw') : c.log === e.log); }).map(function (c) {
+      var ov = 0, hit = false, named = c.name.length > 5 && hint.indexOf(c.name.toLowerCase()) >= 0;
+      mine.forEach(function (m) { var v = c.muscles[m] || 0; ov += Math.min(e.muscles[m], v); if (main[m] && v >= 1) hit = true; });
+      var s = tot ? ov / tot : (c.group === e.group ? 1 : 0);
+      return { c: c, named: named, ok: named || (tot ? hit && s >= 0.6 : s > 0), s: s + (named ? 2 : 0) + (c.equip !== e.equip ? 0.15 : 0) + (done[c.id] ? 0.1 : 0) + (c.log === e.log ? 0.05 : 0) };
+    }).filter(function (x) { return x.ok; }).sort(function (a, b) { return b.s - a.s || (a.c.name < b.c.name ? -1 : 1); }).slice(0, 6);
+  }
+  /* put another exercise in this slot, keeping the slot's sets, rep range and rest when both are logged the same way */
+  function swapItem(u, exId) {
+    var d = state.draft, old = findItem(u); if (!d || !old) return null;
+    var ix = d.items.indexOf(old), e = exi(exId), oe = exi(old.ex), keep = oe.log === e.log;
+    var ni = itemFrom({ ex: exId, n: old.n, group: old.group, link: old.link, sets: keep ? old.sets : e.sets, lo: keep ? old.lo : e.lo, hi: keep ? old.hi : e.hi, rir: keep ? old.rir : e.rir,
+      restSec: old.link || old.restSec >= 30 ? old.restSec : e.restSec }, blankRows(e.log === 'cardio' ? 1 : (keep ? Math.max(1, old.rows.length) : e.sets)), '');
+    if (old.link) ni.restSec = old.restSec;
+    d.items[ix] = ni; if (d.timer && d.timer.u === u) delete d.timer;
+    touchDraft(); return ni;
+  }
+
+  /* ================= countdown for holds and cardio ================= */
+  function timerStart(u, i) {
+    var d = state.draft, it = findItem(u); if (!d || !it || !it.rows[i]) return;
+    var e = exi(it.ex), el = document.getElementById('r-' + u + '-' + i), v = num(it.rows[i].r);
+    if (v == null && el && el.placeholder) v = num(el.placeholder);
+    if (v == null && it.lo) v = it.lo; /* nothing typed and no target yet: the bottom of the planned range */
+    var mul = e.log === 'cardio' ? 60 : 1, lead = e.log === 'time' ? 5000 : 0;
+    d.timer = { u: u, i: i, start: Date.now() + lead, total: v ? Math.round(v * mul) : 0, mul: mul, go: !lead };
+    stopRest(); unlockAudio(); touchDraft(true); render(); drawRest();
+  }
+  /* done: the countdown ran out. Otherwise it was stopped by hand and the time so far is logged. */
+  function timerStop(done) {
+    var d = state.draft, t = d && d.timer; if (!t) return;
+    var it = findItem(t.u), el = Math.floor((Date.now() - t.start) / 1000), secs = done && t.total ? t.total : el;
+    delete d.timer;
+    if (!it || !it.rows[t.i] || secs < (t.mul === 60 ? 30 : 1)) { touchDraft(true); render(); drawRest(); return; }
+    var row = it.rows[t.i]; row.r = fmt(t.mul === 60 ? Math.max(1, Math.round(secs / 60)) : secs);
+    touchDraft(true); render();
+    var btn = document.querySelector('[data-act="tick"][data-u="' + t.u + '"][data-i="' + t.i + '"]');
+    if (!row.d) { if (btn) btn.click(); else { row.d = true; touchDraft(true); } }
+    drawRest();
+  }
+
+
+  /* ================= starting plans ================= */
+  /* each exercise: id, sets, lowest reps, highest reps; rest and the rest come from the exercise library */
+  var TEMPLATES = [
+    { id: 'fb', name: 'Full body', days: [2, 3], blurb: 'Every session trains the whole body. A good fit for two or three days a week.',
+      sessions: [
+        { id: 'tpl-fb-a', name: 'Full body A', focus: 'Squat, bench press, pulldown', items: [['back-squat', 3, 6, 10], ['barbell-bench-press', 3, 6, 10], ['lat-pulldown', 3, 8, 12], ['romanian-deadlift', 2, 8, 12], ['dumbbell-lateral-raise', 2, 12, 20], ['plank', 2, 30, 60]] },
+        { id: 'tpl-fb-b', name: 'Full body B', focus: 'Leg press, shoulder press, row', items: [['leg-press', 3, 8, 12], ['seated-dumbbell-shoulder-press', 3, 8, 12], ['seated-cable-row', 3, 8, 12], ['seated-leg-curl', 2, 10, 15], ['dumbbell-curl', 2, 10, 15], ['triceps-pushdown', 2, 10, 15]] },
+        { id: 'tpl-fb-c', name: 'Full body C', focus: 'Split squat, incline press, row', items: [['bulgarian-split-squat', 3, 8, 12], ['incline-dumbbell-press', 3, 6, 10], ['chest-supported-row', 3, 8, 12], ['hip-thrust', 2, 8, 12], ['face-pull', 2, 12, 20], ['cable-crunch', 2, 10, 15]] }
+      ] },
+    { id: 'ul', name: 'Upper / Lower', days: [4, 5], blurb: 'Two upper-body and two lower-body sessions, so each muscle is trained twice a week, plus an optional lighter fifth day.', builtin: ['upperA', 'lowerA', 'upperB', 'lowerB'], extra: 'day5' },
+    { id: 'ppl', name: 'Push / Pull / Legs', days: [3, 6], blurb: 'One session for pushing muscles, one for pulling muscles, one for legs. Run it once a week on three days or twice on six.',
+      sessions: [
+        { id: 'tpl-push', name: 'Push', focus: 'Chest, shoulders, triceps', items: [['barbell-bench-press', 3, 6, 10], ['seated-dumbbell-shoulder-press', 3, 8, 12], ['incline-dumbbell-press', 3, 8, 12], ['dumbbell-lateral-raise', 3, 12, 20], ['triceps-pushdown', 3, 10, 15], ['overhead-cable-triceps-extension', 2, 10, 15]] },
+        { id: 'tpl-pull', name: 'Pull', focus: 'Back, rear shoulders, biceps', items: [['lat-pulldown', 3, 8, 12], ['barbell-row', 3, 6, 10], ['seated-cable-row', 3, 8, 12], ['face-pull', 3, 12, 20], ['ez-bar-curl', 3, 8, 12], ['hammer-curl', 2, 10, 15]] },
+        { id: 'tpl-legs', name: 'Legs', focus: 'Quads, hamstrings, calves, abs', items: [['back-squat', 3, 6, 10], ['romanian-deadlift', 3, 6, 10], ['leg-press', 3, 8, 12], ['seated-leg-curl', 3, 10, 15], ['standing-calf-raise', 3, 8, 15], ['hanging-leg-raise', 3, 8, 15]] }
+      ] },
+    { id: 'none', name: 'Start empty', days: [], blurb: 'No sessions yet. Build your own from the exercise library.' }
+  ];
+  function template(id) { return TEMPLATES.filter(function (t) { return t.id === id; })[0] || null; }
+  function templateFor(days) { return days <= 3 ? 'fb' : days <= 5 ? 'ul' : 'ppl'; }
+  /* the sessions a template gives for this many days a week, as { id, name, n } */
+  function templateSessions(t, days) {
+    if (t.builtin) return t.builtin.concat(t.extra ? [t.extra] : []).map(function (k) { var b = builtin(k); return { id: k, name: shortName(b.name), n: b.items.length, extra: b.core === false }; });
+    if (!t.sessions) return [];
+    return t.sessions.slice(0, t.id === 'fb' && days <= 2 ? 2 : t.sessions.length).map(function (s) { return { id: s.id, name: s.name, n: s.items.length }; });
+  }
+  /* Make a template the plan. Whatever was in the plan moves to "Not in the plan"; nothing is deleted. */
+  function applyTemplate(id, days) {
+    var t = template(id); if (!t) return;
+    var want = templateSessions(t, days).map(function (s) { return s.id; });
+    planIds().forEach(function (k) { if (want.indexOf(k) < 0) planRemove(k); });
+    if (t.builtin) want.forEach(function (k) { var o = state.routines[k]; if (o && o.hidden) planRestore(k); });
+    else (t.sessions || []).forEach(function (s) {
+      if (want.indexOf(s.id) < 0) return;
+      var old = state.routines[s.id];
+      saveRoutine({ id: s.id, name: s.name, focus: s.focus, core: true, warmup: '', createdAt: (old && old.createdAt) || Date.now(),
+        items: s.items.map(function (x) { var e = exi(x[0]); return { ex: x[0], sets: x[1], lo: x[2], hi: x[3], restSec: e.restSec, link: false }; }) });
+    });
+    state.settings.weeklyGoal = Math.max(1, Math.min(7, id === 'ul' ? Math.min(days, 4) : days));
+    setPlanOrder(want);
+  }
+  /* a log with nothing in it and no choices made yet gets the setup screen */
+  var syncSettled = STANDALONE, setup = null;
+  function emptyLog() { return !Object.keys(state.sessions).length && !Object.keys(state.routines).length && !Object.keys(state.body).length && !state.draft; }
+  function needSetup() { return !state.settings.setupDone && !state.settings.planOrder && emptyLog() && !editor; }
+  function setupState() {
+    if (!setup) { var lb = /^en-(US|LR|MM)$/i.test((navigator.language || '')); setup = { unit: lb ? 'lb' : 'kg', days: 4, tpl: 'ul', picked: false }; }
+    return setup;
+  }
+  function finishSetup() {
+    var su = setupState(), s = state.settings;
+    s.unit = su.unit; s.goalRate = su.unit === 'lb' ? 0.5 : 0.25; s.setupDone = true;
+    applyTemplate(su.tpl, su.days); s.weeklyGoal = su.tpl === 'ul' ? Math.min(su.days, 4) : su.days;
+    saveSettings(); setup = null;
   }
 
 
@@ -1482,7 +1656,9 @@ var LIBRARY = (function () {
     cal: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>',
     target: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.5"/></svg>',
     weight: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 20h11l1.5-9h-14z"/><path d="M9 11V8a3 3 0 0 1 6 0v3"/></svg>',
-    play: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>'
+    play: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>',
+    swap: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h13l-3.2-3.2M19 16H6l3.2 3.2"/></svg>',
+    bar: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9.5v5M6.5 7v10M17.5 7v10M21 9.5v5M6.5 12h11"/></svg>'
   };
   function illoSvg(key, t, live) { return '<svg viewBox="0 0 120 120" aria-hidden="true"' + (live ? ' data-illo="' + esc(key) + '"' : '') + '>' + ILLO.render(key, t == null ? ILLO.restT(key) : t) + '</svg>'; }
   function muscleNames(e, mainOnly) {
@@ -1505,6 +1681,7 @@ var LIBRARY = (function () {
   function chrome() {
     var d = state.draft, live = d && !d.editing, bar = document.getElementById('bar'), wbar = document.getElementById('wbar'), tab = state.ui.tab, now = new Date();
     bar.hidden = !!live; wbar.hidden = !live;
+    if (document.body.classList.contains('setup')) { document.getElementById('bar-title').textContent = 'Hilo'; document.getElementById('bar-date').textContent = 'Welcome'; return; }
     document.getElementById('bar-title').textContent = tab === 'progress' ? 'Progress' : tab === 'exercises' ? (state.ui.lib3 === 'exercises' ? 'Exercises' : 'History') : DAYS_FULL[now.getDay()];
     document.getElementById('bar-date').textContent = tab === 'progress' ? plural(Object.keys(state.sessions).length, 'workout') + ' logged' : tab === 'exercises' ? (state.ui.lib3 === 'exercises' ? allEx().length + ' exercises' : plural(Object.keys(state.sessions).length, 'workout')) : now.getDate() + ' ' + MONTHS_FULL[now.getMonth()];
     if (!live) return;
@@ -1520,6 +1697,18 @@ var LIBRARY = (function () {
 
   /* ================= log tab: home ================= */
   function initials(name) { var w = shortName(name).trim().split(/\s+/); return (w.length > 1 ? w[0].charAt(0) + w[1].charAt(0) : w[0].slice(0, 2)).toUpperCase(); }
+  /* two letters per session in the plan, told apart when names start alike (Full body A, B, C; Push, Pull) */
+  function sessInitials() {
+    var m = {}, seen = {};
+    routineList().forEach(function (r) {
+      var nm = shortName(r.name).trim(), w = nm.split(/\s+/), base = initials(nm), c = [];
+      if (w.length > 2 && w[w.length - 1].length === 1) c.push((w[0].charAt(0) + w[w.length - 1]).toUpperCase());
+      c.push(base);
+      if (w[0].length > 2) c.push((w[0].charAt(0) + w[0].charAt(2)).toUpperCase(), (w[0].charAt(0) + w[0].charAt(w[0].length - 1)).toUpperCase());
+      var pick = c.filter(function (x) { return !seen[x]; })[0] || base; seen[pick] = 1; m[r.id] = pick;
+    });
+    return m;
+  }
   function weekCard(f) {
     var ws = weekStart(today()), goal = state.settings.weeklyGoal || 4, h = '', n = 0, letters = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
     for (var i = 0; i < 7; i++) {
@@ -1536,14 +1725,14 @@ var LIBRARY = (function () {
   }
   var planEdit = false;
   function planCard() {
-    var list = routineList(), h = '';
+    var list = routineList(), h = '', ini = sessInitials();
     if (!planEdit) {
       h += '<section class="card"><div class="plan-head"><div><h3>Your plan</h3><p class="sub">Tap a session to start it.</p></div><button class="btn quiet" type="button" data-act="plan-edit">Edit</button></div>';
       if (!list.length) return h + '<p class="empty">Your plan is empty. Tap Edit to bring a session back, or build a new one below.</p></section>';
       h += '<ul class="list">';
       list.forEach(function (x, i) {
         var l = lastDone(x.id), s = rStats(x);
-        h += '<li><button class="item" type="button" data-act="start" data-key="' + esc(x.id) + '"><span class="avatar av' + (i % 5) + '" aria-hidden="true">' + esc(initials(x.name)) + '</span><span class="txt"><b>' + esc(x.name) + '</b><small>' + plural(s.n, 'exercise') + ' · ' + (l ? 'last done ' + fmtDate(l.date) : 'not logged yet') + '</small></span></button>' +
+        h += '<li><button class="item" type="button" data-act="start" data-key="' + esc(x.id) + '"><span class="avatar av' + (i % 5) + '" aria-hidden="true">' + esc(ini[x.id] || initials(x.name)) + '</span><span class="txt"><b>' + esc(x.name) + '</b><small>' + plural(s.n, 'exercise') + ' · ' + (l ? 'last done ' + fmtDate(l.date) : 'not logged yet') + '</small></span></button>' +
           '<button class="icon-btn" type="button" data-act="ed-open" data-key="' + esc(x.id) + '" aria-label="Edit ' + esc(x.name) + '">' + IC.edit + '</button></li>';
       });
       return h + '</ul></section>';
@@ -1561,7 +1750,7 @@ var LIBRARY = (function () {
       });
       h += '</ul>';
     } else h += '<p class="empty">Nothing in the plan yet.</p>';
-    h += '<button class="add-ex" type="button" data-act="ed-new">+ Add a session</button>';
+    h += '<button class="add-ex" type="button" data-act="ed-new">+ Add a session</button><button class="btn quiet" type="button" data-act="tpl-open">Start from a template</button>';
     if (off.length) {
       h += '<p class="sec-title">Not in the plan</p><ul class="list">';
       off.forEach(function (x) {
@@ -1628,11 +1817,15 @@ var LIBRARY = (function () {
 
   /* ================= log tab: the workout ================= */
   function setRow(it, e, i, s, lastSets) {
-    var ls = lastSets ? (lastSets[i] || lastSets[lastSets.length - 1]) : null, one = e.log === 'cardio' || e.log === 'time';
-    var h = '<div class="set' + (one ? ' one' : '') + (s.d ? ' done' : '') + (s.d && s.pr ? ' pr' : '') + '"><span class="set-n">' + (i + 1) + '</span>';
-    if (!one) h += '<div class="field"><input id="w-' + it.u + '-' + i + '" type="text" inputmode="decimal" autocomplete="off" data-f="w" data-u="' + it.u + '" data-i="' + i + '" value="' + esc(s.w) + '" placeholder="' + (ls ? fmt(ls.w) : (e.log === 'bw' ? '0' : '')) + '" aria-label="Set ' + (i + 1) + ' weight in kg"><span>kg</span></div><span class="set-x">×</span>';
+    var d = state.draft, ls = lastSets ? (lastSets[i] || lastSets[lastSets.length - 1]) : null, one = e.log === 'cardio' || e.log === 'time';
+    var tm = one && !d.editing && !s.d, run = !!(d.timer && d.timer.u === it.u && d.timer.i === i), left = s.d && s.rir != null ? (s.rir >= 3 ? '3+' : String(s.rir)) : '';
+    var h = '<div class="set' + (one ? ' one' : '') + (tm ? ' tm' : '') + (s.d ? ' done' : '') + (s.d && s.pr ? ' pr' : '') + '"><span class="set-n">' + (i + 1) + '</span>';
+    if (!one) h += '<div class="field"><input id="w-' + it.u + '-' + i + '" type="text" inputmode="decimal" autocomplete="off" data-f="w" data-u="' + it.u + '" data-i="' + i + '" value="' + esc(s.w) + '" placeholder="' + (ls ? fmt(ls.w) : (e.log === 'bw' ? '0' : '')) + '" aria-label="Set ' + (i + 1) + ' weight in ' + UW() + '"><span>' + UW() + '</span></div><span class="set-x">×</span>';
     h += '<div class="field"><input id="r-' + it.u + '-' + i + '" type="text" inputmode="' + (one ? 'decimal' : 'numeric') + '" autocomplete="off" data-f="r" data-u="' + it.u + '" data-i="' + i + '" value="' + esc(s.r) + '" placeholder="' + (ls ? fmt(ls.r) : '') + '" aria-label="Set ' + (i + 1) + ' ' + e.unit + '"><span>' + e.unit + '</span></div>';
-    h += '<button class="tick' + (s.pop ? ' pop' : '') + '" type="button" data-act="tick" data-u="' + it.u + '" data-i="' + i + '" aria-pressed="' + (s.d ? 'true' : 'false') + '" aria-label="Set ' + (i + 1) + (s.d && s.pr ? ' done, new best' : ' done') + '">' + (s.d && s.pr ? IC.star : IC.check) + '</button></div>';
+    if (tm) h += '<button class="tbtn' + (run ? ' on' : '') + '" type="button" data-act="timer" data-u="' + it.u + '" data-i="' + i + '" aria-label="' + (run ? 'Stop the countdown' : 'Start a countdown for set ' + (i + 1)) + '">' + (run ? IC.stop : IC.timer) + '</button>';
+    h += '<button class="tick' + (s.pop ? ' pop' : '') + '" type="button" data-act="tick" data-u="' + it.u + '" data-i="' + i + '" aria-pressed="' + (s.d ? 'true' : 'false') + '" aria-label="Set ' + (i + 1) + (s.d && s.pr ? ' done, new best' : ' done') + (left ? ', ' + (left === '3+' ? '3 or more' : left) + ' left in the tank' : '') + '">' + (s.d && s.pr ? IC.star : IC.check) + (left ? '<span class="rir-b" aria-hidden="true">' + left + '</span>' : '') + '</button></div>';
+    if (state.settings.rir && !d.editing && (e.log === 'wr' || e.log === 'bw') && s.d && s.rir == null && !it.rows.slice(i + 1).some(function (x) { return x.d; }))
+      h += '<div class="rir" role="group" aria-label="Reps left in the tank after set ' + (i + 1) + '"><span>Reps left in the tank</span>' + [0, 1, 2, 3].map(function (v) { return '<button type="button" data-act="rir" data-u="' + it.u + '" data-i="' + i + '" data-v="' + v + '">' + (v === 3 ? '3+' : v) + '</button>'; }).join('') + '</div>';
     return h;
   }
   function draftView() {
@@ -1662,12 +1855,15 @@ var LIBRARY = (function () {
         '<span class="' + (showT ? 'last-prev' : 'last-sets') + '">' + (last ? esc(setsText(e, last.sets)) : 'No entry yet') + '</span></div>' +
         (showT ? '<div class="last-row"><span class="label tgt">Target today</span><span class="last-sets">' + esc(setsText(e, tg.sets.slice(0, Math.max(1, Math.min(it.rows.length, tg.sets.length))))) + '</span></div>' : '') +
         (last && last.note ? '<span class="last-hint">Note: ' + esc(last.note) + '</span>' : '') +
-        '<span class="last-hint' + (hi.up ? ' up' : '') + '">' + esc(hi.t) + '</span></div><div class="sets">';
+        '<span class="last-hint' + (hi.up ? ' up' : '') + '">' + esc(hi.t) + '</span></div>';
+      var anyDone = it.rows.some(function (x) { return x.d; });
+      if (!d.editing && !allDone) h += '<div class="tools">' + (e.log === 'wr' ? '<button class="tool" type="button" data-act="help-open" data-u="' + it.u + '">' + IC.bar + (isBar(e) ? 'Warm-up and plates' : 'Warm-up') + '</button>' : '') + (anyDone ? '' : '<button class="tool" type="button" data-act="swap-open" data-u="' + it.u + '">' + IC.swap + 'Swap</button>') + '</div>';
+      h += '<div class="sets">';
       it.rows.forEach(function (s, i) { h += setRow(it, e, i, s, tg && tg.sets ? tg.sets : (last ? last.sets : null)); if (s.d && s.pr) anyPr = true; s.pop = false; });
       h += '</div>';
       var rc = itemRecords(it, d), chips = '', nw = it.recNew || {};
-      if (rc.w) chips += '<span class="rec-chip' + (nw.w ? ' new' : '') + '">' + IC.star + 'Record weight · ' + fmt(rc.maxW) + ' kg</span>';
-      if (rc.v) chips += '<span class="rec-chip' + (nw.v ? ' new' : '') + '">' + IC.star + 'Record volume · ' + compact(rc.vol) + ' kg</span>';
+      if (rc.w) chips += '<span class="rec-chip' + (nw.w ? ' new' : '') + '">' + IC.star + 'Record weight · ' + fmt(rc.maxW) + ' ' + UW() + '</span>';
+      if (rc.v) chips += '<span class="rec-chip' + (nw.v ? ' new' : '') + '">' + IC.star + 'Record volume · ' + compact(rc.vol) + ' ' + UW() + '</span>';
       if (rc.b && e.log !== 'wr') chips += '<span class="rec-chip' + (nw.b ? ' new' : '') + '">' + IC.star + (e.log === 'bw' ? 'Most reps yet · ' + fmt(rc.best) : e.log === 'time' ? 'Longest hold yet · ' + fmt(rc.best) + ' s' : 'Longest yet · ' + fmt(rc.best) + ' min') + '</span>';
       if (chips) h += '<div class="recs">' + chips + '</div>';
       it.recNew = null;
@@ -1701,7 +1897,7 @@ var LIBRARY = (function () {
     });
     return out;
   }
-  function demoBody() { var o = {}, start = addDays(weekStart(today()), -56); for (var w = 0; w < 24; w++) { var dt = addDays(start, Math.round(w * 2.4)); if (dt > today()) break; o[dt] = { date: dt, weight: Math.round((75 + w * 0.06 + ((w * 7) % 5 - 2) * 0.14) * 10) / 10, waist: Math.round((82 - w * 0.03) * 10) / 10 }; } return o; }
+  function demoBody() { var o = {}, start = addDays(weekStart(today()), -56); for (var w = 0; w < 24; w++) { var dt = addDays(start, Math.round(w * 2.4)); if (dt > today()) break; o[dt] = { date: dt, weight: Math.round((75 + w * 0.06 + ((w * 7) % 5 - 2) * 0.14) * (isLb() ? 2.2 : 1) * 10) / 10, waist: Math.round((82 - w * 0.03) * (isLb() ? 0.394 : 1) * 10) / 10 }; } return o; }
   function niceTicks(lo, hi, n) {
     if (hi - lo < 1e-9) { lo -= 1; hi += 1; }
     var rawStep = (hi - lo) / n, mag = Math.pow(10, Math.floor(Math.log10(rawStep))), nr = rawStep / mag;
@@ -1898,7 +2094,7 @@ var LIBRARY = (function () {
     h += '<div class="tiles"><div class="tile"><span class="ico">' + IC.cal + '</span><b>' + cnt(list.length) + '</b><span>workouts logged</span></div>' +
       '<div class="tile t-green"><span class="ico">' + IC.target + '</span><b>' + cnt(thisWeek) + '<small>of ' + goal + '</small></b><span>sessions this week</span></div>' +
       '<div class="tile t-hot"><span class="ico">' + IC.flame + '</span><b>' + cnt(streakWeeks(list)) + '<small>wk</small></b><span>weeks in a row with a workout</span></div>' +
-      '<div class="tile t-violet"><span class="ico">' + IC.weight + '</span><b>' + cnt(Math.round(vol), 'compact') + '<small>kg</small></b><span>lifted in total</span></div></div>';
+      '<div class="tile t-violet"><span class="ico">' + IC.weight + '</span><b>' + cnt(Math.round(vol), 'compact') + '<small>' + UW() + '</small></b><span>lifted in total</span></div></div>';
     h += attentionCard(list);
     h += '<section class="card"><h3>Hard sets per muscle</h3>' +
       '<div class="seg" role="group" aria-label="Period"><button type="button" data-act="mus-win" data-v="week" aria-pressed="' + (state.ui.musWin !== 'four') + '">This week</button><button type="button" data-act="mus-win" data-v="four" aria-pressed="' + (state.ui.musWin === 'four') + '">Average of 4 weeks</button></div>' +
@@ -1909,7 +2105,7 @@ var LIBRARY = (function () {
     h += '<section class="card"><div class="spread"><h3>Sessions per week</h3><div class="legend"><span><i></i>Main</span><span><i class="x"></i>Extra</span></div></div><div class="chart" data-chart="wk">' +
       colChart('wk', wk, { int: true, min: Math.max(5, goal + 1), target: goal, label: 'Sessions per week for the last 10 weeks', tip: function (w) { return '<b>Week of ' + fmtDate(w.start, true) + '</b><br>' + plural(w.a, 'main session') + (w.b ? ' + ' + w.b + ' extra' : ''); } }) + '</div></section>';
     h += '<section class="card"><h3>Weight lifted per week</h3><p class="sub">Kilograms times reps, added up over every set.</p><div class="chart" data-chart="vol">' +
-      colChart('vol', vw, { label: 'Kilograms lifted per week for the last 10 weeks', fmt: function (t) { return t >= 1000 ? (t / 1000) + 'K' : t; }, tip: function (w) { return '<b>Week of ' + fmtDate(w.start, true) + '</b><br>' + compact(w.a) + ' kg lifted'; } }) + '</div></section>';
+      colChart('vol', vw, { label: 'Kilograms lifted per week for the last 10 weeks', fmt: function (t) { return t >= 1000 ? (t / 1000) + 'K' : t; }, tip: function (w) { return '<b>Week of ' + fmtDate(w.start, true) + '</b><br>' + compact(w.a) + ' ' + UW() + ' lifted'; } }) + '</div></section>';
     var durs = list.map(function (s) { return { s: s, d: durOf(s) }; }).filter(function (x) { return x.d; }).slice(-24);
     h += '<section class="card"><div class="spread"><h3>Workout length</h3>' + (durs.length ? '<span class="pill">average ' + fmtDur(durs.reduce(function (a, x) { return a + x.d; }, 0) / durs.length) + '</span>' : '') + '</div>';
     h += durs.length ? '<p class="sub">Minutes from start to finish. The line is orange for short workouts and turns green at 60 minutes.</p><div class="chart" data-chart="dur">' + lineChart('dur', durs.map(function (x) { return { x: x.s.date, y: Math.round(x.d / 60), tip: '<b>' + fmtDate(x.s.date) + '</b><br>' + esc(x.s.name || 'Workout') + ' · ' + fmtDur(x.d) }; }), null, { scale: [30, 60] }) + '</div>' : '<p class="sub">The clock at the top of a workout records how long it took. Your next finished workout shows up here.</p>';
@@ -1936,7 +2132,7 @@ var LIBRARY = (function () {
     h += '<section class="card"><div class="spread" style="align-items:center"><h3>Exercise progress</h3><button class="info-btn" type="button" data-act="lift-info" aria-expanded="' + liftInfo + '" aria-label="What this chart shows">i</button></div>' +
       '<button class="btn block" type="button" data-act="pick-lift" style="justify-content:space-between"><span>' + esc(e.name) + '</span><span class="chev" aria-hidden="true">›</span></button>' +
       (wr ? modeSeg() : '') +
-      (liftInfo ? '<p class="note">' + (wr ? (mode === 'max' ? 'Top weight is the heaviest weight you used in each workout, in kg.' : 'Estimated 1-rep max (kg), from the best set of each workout: weight × (1 + reps ÷ 30). It lets sets with different weights and reps be compared.') : esc(metricLabel(e)) + ' in each workout.') + ' Tap a point to see the sets.' + (onGraph ? ' Grey dots are the sets below the top one.' : '') + '</p>' : '') +
+      (liftInfo ? '<p class="note">' + (wr ? (mode === 'max' ? 'Top weight is the heaviest weight you used in each workout, in ' + UW() + '.' : 'Estimated 1-rep max (' + UW() + '), from the best set of each workout: weight × (1 + reps ÷ 30). It lets sets with different weights and reps be compared.') : esc(metricLabel(e)) + ' in each workout.') + ' Tap a point to see the sets.' + (onGraph ? ' Grey dots are the sets below the top one.' : '') + '</p>' : '') +
       '<div class="chart" data-chart="exc">' + lineChart('exc', hist.map(function (x) { return { x: x.date, y: liftVal(e, x.sets, mode), tip: '<b>' + fmtDate(x.date) + '</b><br>' + esc(setsText(e, onGraph ? [bestSet(e, x.sets, mode)] : x.sets)) }; }), null, { up: true, extra: extra }) + '</div>';
     if (rec) h += '<div class="pills"><span class="pill hot">Best set: ' + esc(setsText(e, [bestSet(e, rec.sets, mode)])) + ' · ' + fmtDate(rec.date, true) + '</span>' + (rec.n > 1 && rec.first > 0 && rec.last !== rec.first ? '<span class="pill' + (rec.last >= rec.first ? ' good' : '') + '">' + (rec.last >= rec.first ? '+' : '') + Math.round((rec.last - rec.first) / rec.first * 100) + '% since you started</span>' : '') + '</div>';
     h += '<button class="toggle" type="button" data-act="lift-sets" data-v="' + (onGraph ? 'off' : 'graph') + '" aria-pressed="' + onGraph + '"><i>' + IC.check + '</i>All sets</button>';
@@ -1954,9 +2150,9 @@ var LIBRARY = (function () {
     h += '</div></section>';
     return h;
   }
-  var MEASURES = [['weight', 'Weight', 'kg'], ['waist', 'Waist', 'cm'], ['chest', 'Chest', 'cm'], ['arm', 'Arm', 'cm'], ['thigh', 'Thigh', 'cm']];
+  function measures() { var w = UW(), l = UL(); return [['weight', 'Weight', w], ['waist', 'Waist', l], ['chest', 'Chest', l], ['arm', 'Arm', l], ['thigh', 'Thigh', l]]; }
   function bodyView(demo) {
-    var body = demo ? demoBody() : state.body, ms = MEASURES.filter(function (m) { return m[0] === state.ui.measure; })[0] || MEASURES[0], key = ms[0], unit = ms[2], h = '';
+    var MEASURES = measures(), body = demo ? demoBody() : state.body, ms = MEASURES.filter(function (m) { return m[0] === state.ui.measure; })[0] || MEASURES[0], key = ms[0], unit = ms[2], h = '';
     h += '<div class="chips" role="group" aria-label="Measurement">' + MEASURES.map(function (m) { return '<button class="chip" type="button" data-act="measure" data-v="' + m[0] + '" aria-pressed="' + (m[0] === key) + '">' + m[1] + '</button>'; }).join('') + '</div>';
     var keys = Object.keys(body).sort().filter(function (k) { return body[k][key] != null; }), pts = keys.map(function (k) { return { x: k, y: body[k][key], tip: '<b>' + fmtDate(k) + '</b><br>' + fmt(body[k][key]) + ' ' + unit }; });
     var trend = pts.map(function (p, i) { var from = addDays(p.x, -6), s = 0, n = 0; for (var j = i; j >= 0 && pts[j].x >= from; j--) { s += pts[j].y; n++; } return Math.round(s / n * 100) / 100; });
@@ -1971,9 +2167,9 @@ var LIBRARY = (function () {
     if (key === 'weight' && state.settings.goalWeight && pts.length && !demo) h += goalCard(pts, trend);
     h += '<section class="card"><div class="spread"><h3>' + ms[1] + '</h3>' + (pts.length > 1 ? '<div class="legend"><span><i class="dot-k"></i>Each entry</span><span><i style="height:2px;border-radius:0;width:14px"></i>7-day average</span></div>' : '') + '</div><div class="chart" data-chart="bw">' + lineChart('bw', pts, pts.length > 1 ? trend : null) + '</div></section>';
     h += '<section class="card"><h3>Add a measurement</h3><form class="body-form" id="body-form"><label class="wide">Date<input id="bw-d" type="date" value="' + today() + '" max="' + today() + '"></label>' +
-      '<label>Weight, kg<input id="bw-weight" type="text" inputmode="decimal" autocomplete="off"></label><label>Waist, cm<input id="bw-waist" type="text" inputmode="decimal" autocomplete="off" placeholder="optional"></label>' +
-      '<label>Chest, cm<input id="bw-chest" type="text" inputmode="decimal" autocomplete="off" placeholder="optional"></label><label>Arm, cm<input id="bw-arm" type="text" inputmode="decimal" autocomplete="off" placeholder="optional"></label>' +
-      '<label>Thigh, cm<input id="bw-thigh" type="text" inputmode="decimal" autocomplete="off" placeholder="optional"></label><button class="btn" type="submit" style="align-self:end">Save</button></form>' +
+      '<label>Weight, ' + UW() + '<input id="bw-weight" type="text" inputmode="decimal" autocomplete="off"></label><label>Waist, ' + UL() + '<input id="bw-waist" type="text" inputmode="decimal" autocomplete="off" placeholder="optional"></label>' +
+      '<label>Chest, ' + UL() + '<input id="bw-chest" type="text" inputmode="decimal" autocomplete="off" placeholder="optional"></label><label>Arm, ' + UL() + '<input id="bw-arm" type="text" inputmode="decimal" autocomplete="off" placeholder="optional"></label>' +
+      '<label>Thigh, ' + UL() + '<input id="bw-thigh" type="text" inputmode="decimal" autocomplete="off" placeholder="optional"></label><button class="btn" type="submit" style="align-self:end">Save</button></form>' +
       '<p class="foot">Weigh in on 3–4 mornings a week and watch the average, not single days. Measure in the same spot each time.</p></section>';
     var all = Object.keys(state.body).sort().reverse();
     if (all.length && !demo) {
@@ -2032,7 +2228,7 @@ var LIBRARY = (function () {
   /* ================= sheets ================= */
   var scrim = document.getElementById('scrim'), sheet = document.getElementById('sheet');
   function openSheet(html, tall) { sheet.className = 'sheet' + (tall ? ' tall' : ''); sheet.innerHTML = html; scrim.hidden = false; sheet.scrollTop = 0; document.documentElement.style.overflow = 'hidden'; observe(); }
-  function closeSheet() { scrim.hidden = true; sheet.innerHTML = ''; armed = null; picker = null; document.documentElement.style.overflow = ''; observe(); }
+  function closeSheet() { scrim.hidden = true; sheet.innerHTML = ''; armed = null; picker = null; help = null; document.documentElement.style.overflow = ''; observe(); }
   function head(title, sub) { return '<div class="sheet-head"><div><h2>' + esc(title) + '</h2>' + (sub ? '<p class="sub">' + esc(sub) + '</p>' : '') + '</div><button class="btn quiet" type="button" data-act="sheet-x">Close</button></div>'; }
   function exSheet(exId, ctx) {
     var e = exi(exId), it = null, d = state.draft;
@@ -2048,7 +2244,7 @@ var LIBRARY = (function () {
     var why = (it && it.why) || e.why, swap = (it && it.swap) || e.swap;
     if (why) h += '<div><dt>Why it is in the plan</dt><dd>' + esc(why) + '</dd></div>';
     if (swap) h += '<div><dt>Swap if needed</dt><dd>' + esc(swap) + '</dd></div>';
-    if (rec) h += '<div><dt>Your best set</dt><dd>' + esc(setsText(e, [topSet(e, rec.sets)])) + ' on ' + fmtDate(rec.date) + (e.log === 'wr' ? ' (estimated 1-rep max ' + fmt(Math.round(rec.best * 10) / 10) + ' kg)' : '') + '</dd></div>';
+    if (rec) h += '<div><dt>Your best set</dt><dd>' + esc(setsText(e, [topSet(e, rec.sets)])) + ' on ' + fmtDate(rec.date) + (e.log === 'wr' ? ' (estimated 1-rep max ' + fmt(Math.round(rec.best * 10) / 10) + ' ' + UW() + ')' : '') + '</dd></div>';
     h += '</dl>';
     if (hist.length) { h += '<table class="hist"><tbody>'; hist.slice(-3).reverse().forEach(function (x) { h += '<tr><td>' + fmtDate(x.date) + '</td><td>' + esc(setsText(e, x.sets)) + '</td></tr>'; }); h += '</tbody></table>'; }
     h += '<div class="row">';
@@ -2061,18 +2257,20 @@ var LIBRARY = (function () {
   function sessionSheet(id) {
     var s = state.sessions[id]; if (!s) return;
     var du = durOf(s), vol = volOf(s);
-    var h = head(s.name || 'Workout', fmtDate(s.date) + ' · ' + countSets(s) + ' sets' + (du ? ' · ' + fmtDur(du) : '') + (vol ? ' · ' + compact(vol) + ' kg lifted' : ''));
-    (s.entries || []).forEach(function (en) { var e = exi(en.ex, en.name); h += '<div class="sess-entry"><b>' + esc(e.gone ? en.name : e.name) + '</b><span>' + esc(setsText(e, en.sets)) + '</span>' + (en.note ? '<span>Note: ' + esc(en.note) + '</span>' : '') + '</div>'; });
+    var h = head(s.name || 'Workout', fmtDate(s.date) + ' · ' + countSets(s) + ' sets' + (du ? ' · ' + fmtDur(du) : '') + (vol ? ' · ' + compact(vol) + ' ' + UW() + ' lifted' : ''));
+    (s.entries || []).forEach(function (en) { var e = exi(en.ex, en.name); h += '<div class="sess-entry"><b>' + esc(e.gone ? en.name : e.name) + '</b><span>' + esc(setsText(e, en.sets)) + '</span>' + rirLine(en.sets) + (en.note ? '<span>Note: ' + esc(en.note) + '</span>' : '') + '</div>'; });
     if (s.notes) h += '<p class="sub">Notes: ' + esc(s.notes) + '</p>';
     h += '<div class="row"><button class="btn primary-sm" type="button" data-act="again" data-id="' + esc(id) + '"' + (state.draft ? ' disabled' : '') + '>Do this again</button><button class="btn" type="button" data-act="edit-session" data-id="' + esc(id) + '"' + (state.draft ? ' disabled' : '') + '>Edit</button><button class="btn danger" type="button" data-act="delete-session" data-id="' + esc(id) + '">' + (armed === 'del' + id ? 'Tap again to delete' : 'Delete') + '</button></div>';
     if (state.draft) h += '<p class="foot">Finish or discard the workout in progress before editing or repeating an older one.</p>';
     openSheet(h);
   }
+  function rirLine(sets) { return sets.some(function (x) { return x.rir != null; }) ? '<span>Reps left in the tank: ' + sets.map(function (x) { return x.rir == null ? '–' : x.rir >= 3 ? '3+' : x.rir; }).join(', ') + '</span>' : ''; }
   function menuSheet(u) {
     var d = state.draft, it = findItem(u); if (!it) return;
     var i = d.items.indexOf(it), e = exi(it.ex);
     openSheet(head(e.name) + '<div class="menu"><button type="button" data-act="open-ex" data-ex="' + esc(it.ex) + '" data-u="' + u + '">How to do it</button>' +
-      '<button type="button" data-act="ex-replace" data-u="' + u + '">Replace with another exercise</button>' +
+      (e.log === 'wr' && !d.editing ? '<button type="button" data-act="help-open" data-u="' + u + '">' + (isBar(e) ? 'Warm-up and plates' : 'Warm-up sets') + '</button>' : '') +
+      '<button type="button" data-act="' + (d.editing ? 'ex-replace' : 'swap-open') + '" data-u="' + u + '">Swap for another exercise</button>' +
       '<button type="button" data-act="ex-up" data-u="' + u + '"' + (i ? '' : ' disabled') + '>Move up</button><button type="button" data-act="ex-down" data-u="' + u + '"' + (i < d.items.length - 1 ? '' : ' disabled') + '>Move down</button>' +
       '<button type="button" class="danger" data-act="ex-remove" data-u="' + u + '">Remove from this workout</button></div>');
   }
@@ -2102,11 +2300,12 @@ var LIBRARY = (function () {
   function settingsSheet() {
     var s = state.settings, h = head('Settings');
     h += '<div class="setting stack"><div><b>Appearance</b><small>Automatic follows your phone.</small></div><div class="seg" role="group" aria-label="Appearance">' + [['auto', 'Automatic'], ['light', 'Light'], ['dark', 'Dark']].map(function (t) { return '<button type="button" data-act="theme" data-v="' + t[0] + '" aria-pressed="' + (s.theme === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div></div>';
+    h += unitRow();
     h += '<div class="setting"><div><b>Sessions per week</b><small>Your weekly goal.</small></div><div class="stepper"><button type="button" data-act="goal" data-d="-1" aria-label="One fewer">−</button><b>' + s.weeklyGoal + '</b><button type="button" data-act="goal" data-d="1" aria-label="One more">+</button></div></div>';
     function sw(key, title, sub) { return '<div class="setting"><div><b>' + title + '</b><small>' + sub + '</small></div><button class="switch" type="button" role="switch" data-act="toggle" data-k="' + key + '" aria-checked="' + (s[key] ? 'true' : 'false') + '" aria-label="' + title + '"></button></div>'; }
-    h += sw('autoRest', 'Start the rest timer', 'When you tick a set.') + sw('sound', 'Sound when rest ends', 'A short beep. Your phone must not be on silent.') + sw('awake', 'Keep the screen on', 'During a workout, where the phone allows it.');
-    h += '<div class="setting"><div><b>Goal body weight</b><small>Shown on the Body page. Leave empty for none.</small></div><div class="fld" style="width:96px"><input id="set-goalw" type="text" inputmode="decimal" autocomplete="off" value="' + (s.goalWeight != null ? fmt(s.goalWeight) : '') + '" placeholder="kg" aria-label="Goal body weight in kg"></div></div>';
-    h += '<div class="setting"><div><b>Target pace</b><small>Kilograms a week toward your goal weight.</small></div><div class="fld" style="width:96px"><input id="set-goalr" type="text" inputmode="decimal" autocomplete="off" value="' + fmt(s.goalRate || 0.25) + '" placeholder="0.25" aria-label="Target pace in kg per week"></div></div>';
+    h += sw('autoRest', 'Start the rest timer', 'When you tick a set.') + sw('sound', 'Sound when rest ends', 'A short beep. Your phone must not be on silent.') + sw('awake', 'Keep the screen on', 'During a workout, where the phone allows it.') + sw('rir', 'Ask for reps left in the tank', 'After each set, tap how many more reps you had in you. Three or more on every set raises the next target.');
+    h += '<div class="setting"><div><b>Goal body weight</b><small>Shown on the Body page. Leave empty for none.</small></div><div class="fld" style="width:96px"><input id="set-goalw" type="text" inputmode="decimal" autocomplete="off" value="' + (s.goalWeight != null ? fmt(s.goalWeight) : '') + '" placeholder="' + UW() + '" aria-label="Goal body weight in ' + UW() + '"></div></div>';
+    h += '<div class="setting"><div><b>Target pace</b><small>Kilograms a week toward your goal weight.</small></div><div class="fld" style="width:96px"><input id="set-goalr" type="text" inputmode="decimal" autocomplete="off" value="' + fmt(s.goalRate || (isLb() ? 0.5 : 0.25)) + '" placeholder="' + (isLb() ? '0.5' : '0.25') + '" aria-label="Target pace in ' + UW() + ' per week"></div></div>';
     h += '<div class="setting stack"><div><b>Backup</b><small>' + (STANDALONE ? 'Everything is stored on this phone only. ' + (function () { var b = backupState(); return b.at ? 'Last backup ' + fmtDate(iso(new Date(b.at))) + (b.fresh ? ', ' + plural(b.fresh, 'workout') + ' since then.' : ', nothing new since then.') : 'No backup made yet.'; })() + ' To bring a backup back, use Restore from file.' : 'Your log syncs through Claude. A backup lets you move it elsewhere.') + '</small></div>' +
       '<div class="row">' + (STANDALONE ? '<button class="btn sm" type="button" data-act="backup-save">Save backup file</button>' : '') + '<button class="btn sm" type="button" data-act="backup-show">Show backup text</button><label class="btn sm">Restore from file<input id="backup-file" type="file" accept=".json,application/json,text/plain" hidden></label></div>' +
       '<div id="backup-box" hidden><textarea class="backup" id="backup-text" spellcheck="false" aria-label="Backup text"></textarea><div class="row"><button class="btn sm" type="button" data-act="backup-copy">Copy</button><button class="btn sm" type="button" data-act="backup-restore">Restore from this text</button></div></div></div>';
@@ -2117,7 +2316,7 @@ var LIBRARY = (function () {
     var s = summary; if (!s) return;
     var doc = state.sessions[s.id], h = '<div class="done-hero"><span class="label">' + (s.edited ? 'Changes saved' : 'Workout complete') + '</span><div class="big gtext">' + esc(s.name) + '</div><p class="sub">' + (doc ? fmtDate(doc.date) : '') + '</p></div>';
     var c = s.cmp, dT = c && c.durDiff != null && s.dur ? (c.durDiff === 0 ? 'same as last time' : Math.abs(c.durDiff) + ' min ' + (c.durDiff < 0 ? 'shorter' : 'longer')) : '', dV = c && c.volPct != null ? (c.volPct === 0 ? 'same as last time' : (c.volPct > 0 ? 'up ' : 'down ') + Math.abs(c.volPct) + '%') : '';
-    h += '<div class="tiles three"><div class="tile"><b>' + (s.dur ? fmtClock(s.dur) : '–') + '</b><span>time' + (dT ? '<em>' + dT + '</em>' : '') + '</span></div><div class="tile"><b>' + s.sets + '</b><span>sets</span></div><div class="tile"><b>' + compact(s.vol) + '</b><span>kg lifted' + (dV ? '<em>' + dV + '</em>' : '') + '</span></div></div>';
+    h += '<div class="tiles three"><div class="tile"><b>' + (s.dur ? fmtClock(s.dur) : '–') + '</b><span>time' + (dT ? '<em>' + dT + '</em>' : '') + '</span></div><div class="tile"><b>' + s.sets + '</b><span>sets</span></div><div class="tile"><b>' + compact(s.vol) + '</b><span>' + UW() + ' lifted' + (dV ? '<em>' + dV + '</em>' : '') + '</span></div></div>';
     if (c) h += cmpHtml(s);
     else if (s.prs.length || s.volRec) {
       h += '<div><h3>' + (s.prs.length ? plural(s.prs.length, 'exercise') + ' with a record' : 'A record') + '</h3></div><div class="pr-list">';
@@ -2137,7 +2336,9 @@ var LIBRARY = (function () {
   function render() {
     var tab = state.ui.tab; charts = {};
     document.querySelectorAll('.tab').forEach(function (b) { if (b.dataset.tab === tab) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
-    view.innerHTML = tab === 'progress' ? progressView() : tab === 'exercises' ? thirdView() : (editor ? editorView() : state.draft ? draftView() : homeView());
+    var su = syncSettled && needSetup(), wait = !syncSettled && needSetup();
+    document.body.classList.toggle('setup', !!(su || wait));
+    view.innerHTML = su ? setupView() : wait ? loadingView() : tab === 'progress' ? progressView() : tab === 'exercises' ? thirdView() : (editor ? editorView() : state.draft ? draftView() : homeView());
     chrome(); observe();
   }
   function go(tab, push) {
@@ -2249,26 +2450,26 @@ var LIBRARY = (function () {
       return h;
     }
     var mk = histMonth || t.slice(0, 7), y = +mk.slice(0, 4), mo = +mk.slice(5, 7) - 1, nDays = new Date(y, mo + 1, 0).getDate(), lead = (new Date(y, mo, 1).getDay() + 6) % 7;
-    var by = {}, tint = sessTint(), seen = {}, legend = [], count = 0, cells = '', d;
+    var by = {}, tint = sessTint(), ini = sessInitials(), seen = {}, legend = [], count = 0, cells = '', d;
     f.forEach(function (s) { if (s.date.slice(0, 7) !== mk) return; (by[s.date] = by[s.date] || []).push(s); count++; var k = s.key + '|' + (s.name || 'Workout'); if (!seen[k]) { seen[k] = 1; legend.push(s); } });
     var days = Object.keys(by).sort(), sel = histDay && by[histDay] ? histDay : (days.length ? days[days.length - 1] : null);
     for (i = 0; i < lead; i++) cells += '<span></span>';
     for (d = 1; d <= nDays; d++) {
       var dt = mk + '-' + pad(d), ss = by[dt];
-      if (ss) cells += '<button type="button" class="hd on' + (tint[ss[0].key] != null ? ' av' + tint[ss[0].key] : '') + (dt === sel ? ' sel' : '') + (dt === t ? ' now' : '') + '" data-act="hist-day" data-d="' + dt + '" aria-pressed="' + (dt === sel) + '" aria-label="' + fmtDate(dt) + ': ' + esc(ss.map(function (s) { return s.name || 'Workout'; }).join(' and ')) + '"><b>' + d + '</b><small>' + esc(initials(ss[0].name || 'Workout')) + (ss.length > 1 ? '+' : '') + '</small></button>';
+      if (ss) cells += '<button type="button" class="hd on' + (tint[ss[0].key] != null ? ' av' + tint[ss[0].key] : '') + (dt === sel ? ' sel' : '') + (dt === t ? ' now' : '') + '" data-act="hist-day" data-d="' + dt + '" aria-pressed="' + (dt === sel) + '" aria-label="' + fmtDate(dt) + ': ' + esc(ss.map(function (s) { return s.name || 'Workout'; }).join(' and ')) + '"><b>' + d + '</b><small>' + esc(ini[ss[0].key] || initials(ss[0].name || 'Workout')) + (ss.length > 1 ? '+' : '') + '</small></button>';
       else cells += '<span class="hd' + (dt === t ? ' now' : '') + (dt > t ? ' future' : '') + '"><b>' + d + '</b></span>';
     }
     h += '<section class="card"><div class="hist-nav"><button class="icon-btn" type="button" data-act="hist-prev" aria-label="Previous month"' + (mk <= f[0].date.slice(0, 7) ? ' disabled' : '') + '>' + IC.left + '</button><h3>' + MONTHS_FULL[mo] + ' ' + y + '</h3>' +
       '<button class="icon-btn" type="button" data-act="hist-next" aria-label="Next month"' + (mk >= t.slice(0, 7) ? ' disabled' : '') + '>' + IC.right + '</button></div>' +
       '<div class="hist-grid"><span class="hw">M</span><span class="hw">T</span><span class="hw">W</span><span class="hw">T</span><span class="hw">F</span><span class="hw">S</span><span class="hw">S</span>' + cells + '</div>';
-    if (legend.length) h += '<div class="hist-key">' + legend.map(function (s) { return '<span><i class="hk' + (tint[s.key] != null ? ' av' + tint[s.key] : '') + '">' + esc(initials(s.name || 'Workout')) + '</i>' + esc(s.name || 'Workout') + '</span>'; }).join('') + '</div>';
+    if (legend.length) h += '<div class="hist-key">' + legend.map(function (s) { return '<span><i class="hk' + (tint[s.key] != null ? ' av' + tint[s.key] : '') + '">' + esc(ini[s.key] || initials(s.name || 'Workout')) + '</i>' + esc(s.name || 'Workout') + '</span>'; }).join('') + '</div>';
     h += '<p class="foot">' + (count ? plural(count, 'workout') + ' this month. Tap a day to see it.' : 'No workouts this month.') + '</p></section>';
     if (sel) {
       var rec = recordsBy(f);
       by[sel].forEach(function (s) {
         var du = durOf(s), vol = volOf(s), bits = [du ? fmtDur(du) : '', plural(countSets(s), 'set'), vol ? massText(vol) + ' lifted' : '', rec[s.id] ? plural(rec[s.id], 'new best') : ''].filter(Boolean);
         h += '<section class="card" id="hist-day"><div><span class="label">' + fmtDate(s.date) + (toDate(s.date).getFullYear() !== new Date().getFullYear() ? ' ' + toDate(s.date).getFullYear() : '') + '</span><h2>' + esc(s.name || 'Workout') + '</h2><p class="sub">' + esc(bits.join(' · ')) + '</p></div><div>';
-        (s.entries || []).forEach(function (en) { var e = exi(en.ex, en.name); h += '<div class="sess-entry"><b>' + esc(e.gone ? en.name : e.name) + '</b><span>' + esc(setsText(e, en.sets)) + '</span></div>'; });
+        (s.entries || []).forEach(function (en) { var e = exi(en.ex, en.name); h += '<div class="sess-entry"><b>' + esc(e.gone ? en.name : e.name) + '</b><span>' + esc(setsText(e, en.sets)) + '</span>' + rirLine(en.sets) + '</div>'; });
         h += '</div>' + (s.notes ? '<p class="sub">Notes: ' + esc(s.notes) + '</p>' : '') +
           '<div class="row"><button class="btn sm primary-sm" type="button" data-act="again" data-id="' + esc(s.id) + '">Do this again</button><button class="btn sm" type="button" data-act="open-session" data-id="' + esc(s.id) + '">Edit or delete</button></div></section>';
       });
@@ -2362,26 +2563,130 @@ var LIBRARY = (function () {
     s += '<text x="' + tx.toFixed(1) + '" y="' + (H - 6) + '" text-anchor="middle">today</text>';
     if (W - m.r - e[0] > 96) s += '<text x="' + (W - m.r) + '" y="' + (H - 6) + '" text-anchor="end">' + fmtDate(iso(new Date(x1)), true) + '</text>';
     s += '</svg><div class="tip" id="' + id + '-t" hidden></div>';
-    charts[id] = { type: 'line', P: P, pts: P0.map(function (p, i) { return { tip: '<b>' + fmtDate(p.x) + '</b><br>7-day average ' + fmt(Math.round(T0[i] * 10) / 10) + ' kg' }; }), W: W, XP: [], extra: [] };
+    charts[id] = { type: 'line', P: P, pts: P0.map(function (p, i) { return { tip: '<b>' + fmtDate(p.x) + '</b><br>7-day average ' + fmt(Math.round(T0[i] * 10) / 10) + ' ' + UW() + '' }; }), W: W, XP: [], extra: [] };
     return s;
   }
   function goalCard(pts, trend) {
     var g = goalInfo(pts, trend); if (!g) return '';
     var ST = { done: ['good', 'goal reached'], on: ['good', 'on pace'], slow: ['hot', 'slower than target'], fast: ['hot', 'faster than target'], flat: ['hot', 'holding steady'], away: ['hot', 'moving away'], none: ['', 'pace needs two weeks'] }[g.st];
-    var kg = fmt(g.goal) + ' kg', target = 'At the target pace of ' + fmt(g.rate) + ' kg a week you would get there around ' + (g.etaRate ? aboutWhen(g.etaRate) : 'two years from now or later') + '.', txt;
-    if (g.st === 'done') txt = 'You are within a quarter of a kilo of ' + kg + '.';
+    var goalT = fmt(g.goal) + ' ' + UW() + '', target = 'At the target pace of ' + fmt(g.rate) + ' ' + UW() + ' a week you would get there around ' + (g.etaRate ? aboutWhen(g.etaRate) : 'two years from now or later') + '.', txt;
+    if (g.st === 'done') txt = 'You are within a quarter of a kilo of ' + goalT + '.';
     else if (g.st === 'none') txt = 'Two weeks of weigh-ins are needed to work out your pace. ' + target;
     else if (g.st === 'flat') txt = 'Your weight has held steady over the last ' + Math.round(g.days / 7) + ' weeks. ' + target;
-    else if (g.st === 'away') txt = 'Your weight is moving away from ' + kg + '. ' + target;
-    else txt = (g.far ? 'At your pace ' + kg + ' is more than two years away. ' : 'At your pace you reach ' + kg + ' around ' + aboutWhen(g.etaPace) + '. ') + (g.st === 'on' ? '' : target) +
+    else if (g.st === 'away') txt = 'Your weight is moving away from ' + goalT + '. ' + target;
+    else txt = (g.far ? 'At your pace ' + goalT + ' is more than two years away. ' : 'At your pace you reach ' + goalT + ' around ' + aboutWhen(g.etaPace) + '. ') + (g.st === 'on' ? '' : target) +
       (g.st === 'fast' ? (g.dir > 0 ? ' Gaining faster than the target tends to add more fat than muscle.' : ' Losing faster than the target makes it harder to keep muscle.') : '');
     var pace = g.pace == null ? '–' : (g.pace >= 0 ? '+' : '−') + fmt(Math.abs(Math.round(g.pace * 100) / 100));
     var h = '<section class="card"><div class="spread"><h3>Body weight goal</h3>' + (ST[1] ? '<span class="pill ' + ST[0] + '">' + ST[1] + '</span>' : '') + '</div>' +
-      '<div class="goal-head"><b>' + (g.st === 'done' ? fmt(Math.round(g.now * 10) / 10) + ' kg' : fmt(Math.round(g.left * 10) / 10) + ' kg to ' + (g.dir > 0 ? 'gain' : 'lose')) + '</b><span>' + fmt(Math.round(g.now * 10) / 10) + ' kg now, goal ' + kg + (g.pace == null ? '' : ', ' + pace + ' kg a week over the last ' + Math.round(g.days / 7) + ' weeks') + '</span></div>';
+      '<div class="goal-head"><b>' + (g.st === 'done' ? fmt(Math.round(g.now * 10) / 10) + ' ' + UW() + '' : fmt(Math.round(g.left * 10) / 10) + ' ' + UW() + ' to ' + (g.dir > 0 ? 'gain' : 'lose')) + '</b><span>' + fmt(Math.round(g.now * 10) / 10) + ' ' + UW() + ' now, goal ' + goalT + (g.pace == null ? '' : ', ' + pace + ' ' + UW() + ' a week over the last ' + Math.round(g.days / 7) + ' weeks') + '</span></div>';
     if (g.st !== 'done') h += '<div class="chart" data-chart="goal">' + goalChart('goal', pts, trend, g) + '</div><div class="legend"><span><i class="ln-k"></i>7-day average</span>' + (g.etaPace ? '<span><i class="ln-k dash"></i>At your pace</span>' : '') + (g.etaRate ? '<span><i class="ln-k dash grey"></i>At the target pace</span>' : '') + '</div>';
     h += '<p class="sub">' + esc(txt) + '</p>';
     var wn = waistNote(state.body); if (wn) h += '<p class="note">' + esc(wn) + '</p>';
     return h + '<p class="foot">“Now” is the average of your last seven days. The goal and the target pace are in settings.</p></section>';
+  }
+
+
+  /* ================= workout helpers: warm-up and plates ================= */
+  IC.timer = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13.5" r="7"/><path d="M12 10v3.5l2.3 1.6M9.5 3.5h5M12 3.5v3"/></svg>';
+  IC.stop = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="2"/></svg>';
+  var help = null;
+  function plateSvg(pl, bar) {
+    var W = 230, H = 92, cy = 44, x = 64, s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="One end of the bar with ' + (pl.side.length ? pl.side.map(fmt).join(', ') : 'no plates') + '">';
+    s += '<rect class="pb" x="0" y="' + (cy - 4) + '" width="' + W + '" height="8" rx="4"/><rect class="pc" x="' + (x - 10) + '" y="' + (cy - 11) + '" width="10" height="22" rx="3"/>';
+    var max = plateSizes()[0];
+    pl.side.forEach(function (p) {
+      var h = 30 + 46 * Math.sqrt(p / max), w = p >= max * 0.55 ? 20 : p >= max * 0.3 ? 17 : p >= max * 0.15 ? 14 : 11;
+      s += '<rect class="pp" x="' + x + '" y="' + (cy - h / 2).toFixed(1) + '" width="' + w + '" height="' + h.toFixed(1) + '" rx="4"/><text x="' + (x + w / 2) + '" y="' + (H - 2) + '">' + fmt(p) + '</text>';
+      x += w + 3;
+    });
+    if (!pl.side.length) s += '<text x="' + (x + 50) + '" y="' + (cy - 14) + '">no plates</text>';
+    return s + '</svg>';
+  }
+  function helpBody() {
+    var it = findItem(help.u); if (!it) return '';
+    var e = exi(it.ex), W = help.w, uw = ' ' + UW() + '', h = '', bar = barFor(e), plates = isBar(e) || (state.settings.bars || {})[e.id] != null;
+    if (W == null || !(W > 0)) return '<p class="sub">Type the weight you will work with to see the warm-up' + (plates ? ' and the plates.' : '.') + '</p>';
+    if (plates) {
+      var pl = platesFor(W, bar);
+      h += '<div class="plates"><h3>Plates</h3>';
+      if (!pl) h += '<p class="sub">' + fmt(W) + uw + ' is lighter than the ' + fmt(bar) + uw + ' bar.</p>';
+      else {
+        h += plateSvg(pl, bar) + '<p class="plate-t"><b>' + (pl.side.length ? 'Each side: ' + pl.side.map(fmt).join(' + ') + uw : 'Just the bar') + '</b>' + (bar ? ' on a ' + fmt(bar) + uw + ' bar' : '') + '</p>';
+        if (pl.rem > 0.01) h += '<p class="sub">Standard plates cannot make ' + fmt(W) + uw + ' exactly. This loads ' + fmt(pl.loaded) + uw + '.</p>';
+      }
+      h += '<div class="bar-pick"><span class="label">Bar</span><div class="chips">' + barChoices().map(function (b) { return '<button class="chip" type="button" data-act="help-bar" data-v="' + b + '" aria-pressed="' + (b === bar) + '">' + (b ? fmt(b) + uw : 'None') + '</button>'; }).join('') + '</div></div></div>';
+    }
+    var full = help.full, ws = warmups(W, e, full);
+    h += '<div><div class="spread"><h3>' + (full ? 'Warm-up sets' : 'Feeler set') + '</h3><button class="btn quiet sm" type="button" data-act="help-ramp">' + (full ? 'One feeler set instead' : 'Show the full ramp') + '</button></div>';
+    if (!ws.length) h += '<p class="sub">This is light enough to go straight in. Do a few easy reps first if it is your first exercise.</p>';
+    else {
+      h += '<ol class="warm-list">';
+      ws.forEach(function (x) {
+        var pl2 = plates && !x.bar ? platesFor(x.w, bar) : null;
+        h += '<li><b>' + (x.bar ? 'Empty bar' : fmt(x.w) + uw) + ' × ' + x.r + '</b><span>' + (x.bar ? fmt(x.w) + uw : pl2 && pl2.side.length ? 'each side ' + pl2.side.map(fmt).join(' + ') : pl2 ? 'just the bar' : '') + '</span></li>';
+      });
+      h += '</ol>';
+    }
+    h += '<p class="foot">' + (full ? 'About 50, 70 and 85 percent of the working weight. Keep them easy and rest about a minute between them.' : 'About 60 percent. After the first exercise you are warm, and this is only to feel the movement.') + ' Warm-up sets are not logged.</p></div>';
+    return h;
+  }
+  function helpSheet(u) {
+    var it = findItem(u); if (!it) return;
+    var e = exi(it.ex), keep = help && help.u === u;
+    if (!keep) help = { u: u, w: workingWeight(it), full: !warmedUp(it) };
+    openSheet(head(isBar(e) ? 'Warm-up and plates' : 'Warm-up', e.name) +
+      '<div class="help-w"><button class="step" type="button" data-act="help-step" data-d="-1" aria-label="Less weight">−</button><label class="fld"><span class="sr">Working weight</span><input id="help-w" type="text" inputmode="decimal" autocomplete="off" value="' + (help.w != null ? fmt(help.w) : '') + '" placeholder="Working weight"></label><span class="help-u">' + UW() + '</span><button class="step" type="button" data-act="help-step" data-d="1" aria-label="More weight">+</button></div>' +
+      '<div class="contents" id="help-body">' + helpBody() + '</div><button class="btn primary block" type="button" data-act="sheet-x">Done</button>');
+  }
+
+  /* ================= workout helpers: swaps ================= */
+  function swapSheet(u) {
+    var d = state.draft, it = findItem(u); if (!d || !it) return;
+    var e = exi(it.ex), list = swapsFor(it, d), plan = it.swap || e.swap, h = head('Swap for today', 'Instead of ' + e.name);
+    if (plan) h += '<p class="note"><b>The plan suggests.</b> ' + esc(plan) + '</p>';
+    if (list.length) {
+      h += '<ul class="list">';
+      list.forEach(function (x) {
+        var c = x.c, last = historyOf(c.id).slice(-1)[0];
+        h += '<li><button class="item" type="button" data-act="swap-pick" data-u="' + u + '" data-ex="' + esc(c.id) + '"><span class="thumb sm" aria-hidden="true">' + illoSvg(c.illo) + '</span><span class="txt"><b>' + esc(c.name) + '</b><small>' + esc(c.equip) + (last ? ' · last ' + esc(setsText(c, last.sets)) : '') + '</small></span></button><span class="chev" aria-hidden="true">›</span></li>';
+      });
+      h += '</ul>';
+    } else h += '<p class="sub">Nothing close enough in the library for the same muscles.</p>';
+    h += '<button class="btn block" type="button" data-act="ex-replace" data-u="' + u + '">Browse all exercises</button><p class="foot">Only today’s workout changes. The sets and rep range of this slot are kept. After the workout you can choose to update the saved session.</p>';
+    openSheet(h);
+  }
+
+  /* ================= first-run setup and templates ================= */
+  function tplCards(cur, days, act, plansOnly) {
+    var rec = templateFor(days);
+    return TEMPLATES.filter(function (t) { return !plansOnly || t.id !== 'none'; }).map(function (t) {
+      var ss = templateSessions(t, days), on = t.id === cur;
+      return '<button type="button" class="tpl' + (on ? ' on' : '') + '" role="radio" aria-checked="' + on + '" data-act="' + act + '" data-v="' + t.id + '"><span class="tpl-dot" aria-hidden="true">' + (on ? IC.check : '') + '</span><span class="txt"><b>' + esc(t.name) + (t.id === rec ? '<span class="pill good">fits ' + days + ' days</span>' : '') + '</b><small>' + esc(t.blurb) + '</small>' +
+        (ss.length ? '<span class="tpl-s">' + ss.map(function (s) { return esc(s.name) + (s.extra ? ' (optional)' : ''); }).join(' · ') + '</span>' : '') + '</span></button>';
+    }).join('');
+  }
+  function setupView() {
+    var su = setupState(), h = '';
+    h += '<section class="setup-top"><h2>Three choices and you are ready</h2><p class="sub">All of them can be changed later.</p></section>';
+    h += '<section class="card"><div><h3>Units</h3><p class="sub">' + (su.unit === 'lb' ? 'Weights in pounds, body measurements in inches.' : 'Weights in kilograms, body measurements in centimetres.') + '</p></div><div class="seg" role="group" aria-label="Units"><button type="button" data-act="setup-unit" data-v="kg" aria-pressed="' + (su.unit === 'kg') + '">Kilograms</button><button type="button" data-act="setup-unit" data-v="lb" aria-pressed="' + (su.unit === 'lb') + '">Pounds</button></div></section>';
+    h += '<section class="card"><div><h3>Days a week</h3><p class="sub">How often you plan to train. This becomes your weekly goal.</p></div><div class="seg" role="group" aria-label="Days a week">' + [2, 3, 4, 5, 6].map(function (n) { return '<button type="button" data-act="setup-days" data-v="' + n + '" aria-pressed="' + (su.days === n) + '">' + n + '</button>'; }).join('') + '</div></section>';
+    h += '<section class="card"><div><h3>Starting plan</h3><p class="sub">Every session can be edited, reordered or replaced once you are in.</p></div><div class="tpls" role="radiogroup" aria-label="Starting plan">' + tplCards(su.tpl, su.days, 'setup-tpl') + '</div></section>';
+    h += '<button class="btn primary block" type="button" data-act="setup-go">Start</button>';
+    h += '<p class="foot setup-foot">Used Hilo before? <label class="link">Restore from a backup file<input id="backup-file" type="file" accept=".json,application/json,text/plain" hidden></label></p>';
+    return h;
+  }
+  function loadingView() { return '<section class="card"><h3>Opening your log</h3><p class="sub">Checking for workouts saved from another device.</p></section>'; }
+  function templateSheet() {
+    var days = state.settings.weeklyGoal || 4;
+    openSheet(head('Start from a template', 'For ' + days + ' days a week, your weekly goal.') + '<div class="tpls">' + tplCards(null, days, 'tpl-apply', true).replace(/role="radio" aria-checked="false" /g, '') + '</div>' +
+      '<p class="foot">The sessions in your plan now move to “Not in the plan”. Nothing is deleted, and your history stays.</p>');
+  }
+  /* settings: switching units converts what is logged, so it asks once */
+  function unitRow() {
+    var s = state.settings, cur = s.unit === 'lb' ? 'lb' : 'kg', other = cur === 'kg' ? 'lb' : 'kg', n = Object.keys(state.sessions).length + Object.keys(state.body).length;
+    var h = '<div class="setting stack"><div><b>Units</b><small>' + (cur === 'lb' ? 'Pounds and inches.' : 'Kilograms and centimetres.') + '</small></div><div class="seg" role="group" aria-label="Units"><button type="button" data-act="unit" data-v="kg" aria-pressed="' + (cur === 'kg') + '">Kilograms</button><button type="button" data-act="unit" data-v="lb" aria-pressed="' + (cur === 'lb') + '">Pounds</button></div>';
+    if (armed === 'unit') h += '<p class="note">' + (state.draft ? 'Finish or discard the workout in progress first.' : 'This converts your ' + n + ' saved ' + (n === 1 ? 'entry' : 'entries') + ' to ' + (other === 'lb' ? 'pounds and inches' : 'kilograms and centimetres') + ', rounded to the nearest quarter. Tap ' + (other === 'lb' ? 'Pounds' : 'Kilograms') + ' again to go ahead.') + '</p>';
+    return h + '</div>';
   }
 
 
@@ -2401,7 +2706,7 @@ var LIBRARY = (function () {
   if (!reduceMotion) requestAnimationFrame(frame);
 
   /* ================= rest timer, sound, screen lock ================= */
-  var restEl = document.getElementById('rest'), restT = document.getElementById('rest-t'), restArc = document.getElementById('rest-arc'), restL = document.getElementById('rest-l'), RC = 2 * Math.PI * 18, actx = null, wakeLock = null;
+  var restEl = document.getElementById('rest'), restT = document.getElementById('rest-t'), restArc = document.getElementById('rest-arc'), restL = document.getElementById('rest-l'), restAdd = restEl.querySelector('[data-act="rest-add"]'), restSkip = restEl.querySelector('[data-act="rest-skip"]'), RC = 2 * Math.PI * 18, actx = null, wakeLock = null;
   function unlockAudio() { if (!state.settings.sound) return; try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume(); } catch (e) {} }
   function beep() {
     if (!state.settings.sound || !actx) return;
@@ -2416,7 +2721,24 @@ var LIBRARY = (function () {
   }
   function startRest(sec) { rest.until = Date.now() + sec * 1000; rest.total = sec; rest.beeped = false; drawRest(); }
   function stopRest() { rest.until = 0; rest.beeped = true; if (restEl) restEl.hidden = true; }
+  function drawTimer(t) {
+    var it = findItem(t.u), now = Date.now(); if (!it) { delete state.draft.timer; return; }
+    var e = exi(it.ex), full = RC.toFixed(1);
+    restEl.hidden = false; restEl.classList.remove('over'); restEl.classList.add('timing');
+    restAdd.hidden = !t.total; restAdd.textContent = t.mul === 60 ? '+1 min' : '+10 s'; restSkip.textContent = 'Stop';
+    restArc.setAttribute('stroke-dasharray', full);
+    if (now < t.start) { restL.textContent = 'Get ready'; restT.textContent = String(Math.ceil((t.start - now) / 1000)); restArc.setAttribute('stroke-dashoffset', '0'); return; }
+    if (!t.go) { t.go = true; beep(); }
+    var el = (now - t.start) / 1000, left = t.total - el;
+    restL.textContent = e.name + (e.log === 'time' ? ', set ' + (t.i + 1) : '');
+    restT.textContent = t.total ? fmtClock(Math.ceil(Math.max(0, left))) : fmtClock(el);
+    restArc.setAttribute('stroke-dashoffset', (t.total ? RC * (1 - Math.max(0, Math.min(1, left / t.total))) : 0).toFixed(1));
+    if (t.total && left <= 0) { beep(); timerStop(true); }
+  }
   function drawRest() {
+    var tm = state.draft && state.draft.timer;
+    if (tm) { drawTimer(tm); return; }
+    if (restEl.classList.contains('timing')) { restEl.classList.remove('timing'); restAdd.hidden = false; restAdd.textContent = '+30 s'; restSkip.textContent = 'Skip'; }
     if (!rest.until) { if (!restEl.hidden) restEl.hidden = true; return; }
     var left = (rest.until - Date.now()) / 1000;
     if (left <= -8) { stopRest(); return; }
@@ -2522,12 +2844,13 @@ var LIBRARY = (function () {
   function restore(text) {
     var data; try { data = JSON.parse(text); } catch (e) { toast('That is not a Hilo backup. Nothing was changed.'); return; }
     if (!data || !data.sessions || typeof data.sessions !== 'object') { toast('That is not a Hilo backup. Nothing was changed.'); return; }
-    var n = 0;
+    var n = 0, wasEmpty = emptyLog(), bu = data.settings && data.settings.unit === 'lb' ? 'lb' : 'kg';
+    if (!wasEmpty && bu !== (isLb() ? 'lb' : 'kg')) { toast('That backup is in ' + (bu === 'lb' ? 'pounds' : 'kilograms') + ' and this log is not. Switch units in settings, then restore.'); return; }
     [['sessions', 'sessions', 'sessions/'], ['body', 'body', 'body/'], ['routines', 'routines', 'routines/'], ['custom', 'custom', 'exercises/']].forEach(function (c) {
       var src = data[c[0]] || {}, dst = state[c[1]];
       Object.keys(src).forEach(function (id) { var a = src[id], b = dst[id]; if (!a || typeof a !== 'object') return; if (!b || (a.updatedAt || 0) >= (b.updatedAt || 0)) { dst[id] = a; mark(c[2] + id); if (c[0] === 'sessions' && !b) n++; } });
     });
-    if (data.settings && !Object.keys(state.sessions).length) { state.settings = Object.assign({}, DEF_SET, data.settings); saveSettings(); }
+    if (wasEmpty) { state.settings = Object.assign({}, DEF_SET, state.settings, data.settings || {}, { unit: bu, setupDone: true }); setup = null; saveSettings(); }
     CAT = null; saveLocal(); applyTheme(); closeSheet(); render();
     toast('Backup restored. ' + plural(n, 'workout') + ' added.');
   }
@@ -2546,7 +2869,7 @@ var LIBRARY = (function () {
   function pickExercise(exId) {
     var p = picker, d = state.draft, e = exi(exId); if (!p) return;
     if (p.mode === 'draft' && d) { var it = newItem(exId); d.items.push(it); touchDraft(); closeSheet(); render(); scrollToItem(it.u); }
-    else if (p.mode === 'replace' && d) { var old = findItem(p.u), ix = d.items.indexOf(old); if (ix >= 0) { var ni = newItem(exId); d.items[ix] = ni; touchDraft(); closeSheet(); render(); scrollToItem(ni.u); } }
+    else if (p.mode === 'replace' && d) { var ni = swapItem(p.u, exId); if (ni) { closeSheet(); render(); scrollToItem(ni.u); } }
     else if (p.mode === 'editor' && editor) { editor.items.push({ ex: exId, sets: e.log === 'cardio' ? 1 : e.sets, lo: e.lo, hi: e.hi, restSec: e.restSec, rir: e.rir, link: false }); render(); toast('Added ' + e.name); }
     else if (p.mode === 'lift') { state.ui.ex = exId; saveLocal(); closeSheet(); render(); enter(); }
   }
@@ -2582,7 +2905,7 @@ var LIBRARY = (function () {
     if (ev.target === scrim) { closeSheet(); return; }
     var a = ev.target.closest('[data-act]'); if (!a) return;
     var act = a.dataset.act, d = state.draft, u = a.dataset.u, i = +a.dataset.i, it, e;
-    if (['discard', 'delete-session', 'finish', 'ed-reset', 'plan-del', 'custom-del'].indexOf(act) < 0) armed = null;
+    if (['discard', 'delete-session', 'finish', 'ed-reset', 'plan-del', 'custom-del', 'unit'].indexOf(act) < 0) armed = null;
     switch (act) {
       case 'start': if (!state.draft) startDraft(a.dataset.key); break;
       case 'go-workout': if (state.ui.tab !== 'log') go('log', true); else window.scrollTo(0, 0); break;
@@ -2606,8 +2929,8 @@ var LIBRARY = (function () {
               s.pr = metric(e, one) > cur + 1e-9;
             }
             var was = it.rec || {}, rc = itemRecords(it, d), news = [];
-            if (rc.w && !was.w) news.push('Record weight on ' + e.name + ': ' + fmt(rc.maxW) + ' kg');
-            if (rc.v && !was.v) news.push('Record volume on ' + e.name + ': ' + compact(rc.vol) + ' kg');
+            if (rc.w && !was.w) news.push('Record weight on ' + e.name + ': ' + fmt(rc.maxW) + ' ' + UW() + '');
+            if (rc.v && !was.v) news.push('Record volume on ' + e.name + ': ' + compact(rc.vol) + ' ' + UW() + '');
             if (rc.b && !was.b && e.log !== 'wr') news.push(e.log === 'bw' ? 'Most reps yet on ' + e.name + ': ' + fmt(rc.best) : e.log === 'time' ? 'Longest hold yet on ' + e.name + ': ' + fmt(rc.best) + ' s' : 'Longest ' + e.name + ' yet: ' + fmt(rc.best) + ' min');
             it.recNew = news.length ? { w: rc.w && !was.w, v: rc.v && !was.v, b: rc.b && !was.b } : null;
             it.rec = { w: rc.w, v: rc.v, b: rc.b };
@@ -2615,7 +2938,7 @@ var LIBRARY = (function () {
             if (s.pr || news.length) { var br = a.getBoundingClientRect(); confetti(news.length ? 34 : 22, br.left + br.width / 2, br.top + br.height / 2); }
             if (state.settings.autoRest && it.restSec >= 30) startRest(it.restSec); else if (it.restSec < 30) stopRest();
           }
-        } else { s.d = false; s.pr = false; if (!d.editing) { var rc2 = itemRecords(it, d); it.rec = { w: rc2.w, v: rc2.v, b: rc2.b }; } }
+        } else { s.d = false; s.pr = false; delete s.rir; if (!d.editing) { var rc2 = itemRecords(it, d); it.rec = { w: rc2.w, v: rc2.v, b: rc2.b }; } }
         touchDraft(); render(); break;
       case 'add-set': it = findItem(u); if (it) { var lr = it.rows[it.rows.length - 1]; it.rows.push({ w: lr ? lr.w : '', r: '', d: false }); touchDraft(); render(); } break;
       case 'del-set': it = findItem(u); if (it && it.rows.length > 1) { it.rows.pop(); touchDraft(); render(); } break;
@@ -2628,8 +2951,8 @@ var LIBRARY = (function () {
       case 'finish': if (d && draftCount()) { var p = draftProgress(); if (p.done >= p.all || arm('finish', chrome)) finishDraft(); } break;
       case 'finish-now': if (d && draftCount()) finishDraft(); break;
       case 'discard': if (d && arm('discard', render)) { state.draft = null; stopRest(); touchDraft(true); applyTheme(); wake(); render(); window.scrollTo(0, 0); } break;
-      case 'rest-skip': stopRest(); break;
-      case 'rest-add': if (rest.until) { var base = Math.max(rest.until, Date.now()); rest.until = base + 30000; rest.total = Math.max(rest.total + 30, 30); rest.beeped = false; drawRest(); } break;
+      case 'rest-skip': if (d && d.timer) timerStop(false); else stopRest(); break;
+      case 'rest-add': if (d && d.timer) { d.timer.total += d.timer.mul === 60 ? 60 : 10; touchDraft(true); drawRest(); } else if (rest.until) { var base = Math.max(rest.until, Date.now()); rest.until = base + 30000; rest.total = Math.max(rest.total + 30, 30); rest.beeped = false; drawRest(); } break;
       case 'open-ex': exSheet(a.dataset.ex, { u: u, rk: a.dataset.rk }); break;
       case 'open-session': sessionSheet(a.dataset.id); break;
       case 'sheet-x': { var wasSummary = !!summary && !picker; closeSheet(); if (wasSummary) summary = null; break; }
@@ -2638,7 +2961,7 @@ var LIBRARY = (function () {
       case 'settings': settingsSheet(); break;
       case 'theme': state.settings.theme = a.dataset.v; saveSettings(); applyTheme(); render(); settingsSheet(); break;
       case 'goal': state.settings.weeklyGoal = Math.max(1, Math.min(7, (state.settings.weeklyGoal || 4) + (+a.dataset.d))); saveSettings(); settingsSheet(); render(); break;
-      case 'toggle': state.settings[a.dataset.k] = !state.settings[a.dataset.k]; saveSettings(); if (a.dataset.k === 'sound' && state.settings.sound) { unlockAudio(); beep(); } wake(); settingsSheet(); break;
+      case 'toggle': state.settings[a.dataset.k] = !state.settings[a.dataset.k]; saveSettings(); if (a.dataset.k === 'sound' && state.settings.sound) { unlockAudio(); beep(); } wake(); if (a.dataset.k === 'rir') render(); settingsSheet(); break;
       case 'backup-save': saveBackupFile(); break;
       case 'backup-later': setBackupInfo({ later: Object.keys(state.sessions).length }); render(); break;
       case 'backup-show': { var bx = document.getElementById('backup-box'); bx.hidden = false; document.getElementById('backup-text').value = JSON.stringify(backupData()); break; }
@@ -2681,6 +3004,29 @@ var LIBRARY = (function () {
       case 'lift-sets': state.ui.liftSets = a.dataset.v; saveLocal(); render(); enter(); break;
       case 'lift-info': liftInfo = !liftInfo; render(); break;
       case 'ms-open': msSheet(+a.dataset.i); break;
+      case 'rir': it = findItem(u); if (it && it.rows[i]) { it.rows[i].rir = +a.dataset.v; touchDraft(); render(); } break;
+      case 'timer': if (d && d.timer && d.timer.u === u && d.timer.i === i) timerStop(false); else timerStart(u, i); break;
+      case 'help-open': helpSheet(u); break;
+      case 'help-step': if (help) { it = findItem(help.u); if (it) { e = exi(it.ex); var hs = wStep(e, help.w || 0); help.w = Math.max(0, roundTo((help.w || 0) + (+a.dataset.d) * hs, hs)); document.getElementById('help-w').value = fmt(help.w); document.getElementById('help-body').innerHTML = helpBody(); } } break;
+      case 'help-bar': if (help) { it = findItem(help.u); if (it) { state.settings.bars = state.settings.bars || {}; state.settings.bars[it.ex] = +a.dataset.v; saveSettings(); document.getElementById('help-body').innerHTML = helpBody(); } } break;
+      case 'help-ramp': if (help) { help.full = !help.full; document.getElementById('help-body').innerHTML = helpBody(); } break;
+      case 'swap-open': swapSheet(u); break;
+      case 'swap-pick': { var sn = swapItem(u, a.dataset.ex); if (sn) { closeSheet(); render(); scrollToItem(sn.u); toast('Swapped in ' + exi(sn.ex).name); } break; }
+      case 'setup-unit': setupState().unit = a.dataset.v === 'lb' ? 'lb' : 'kg'; render(); break;
+      case 'setup-days': { var sd = setupState(); sd.days = Math.max(2, Math.min(6, +a.dataset.v)); if (!sd.picked) sd.tpl = templateFor(sd.days); render(); break; }
+      case 'setup-tpl': { var st3 = setupState(); st3.tpl = a.dataset.v; st3.picked = true; render(); break; }
+      case 'setup-go': finishSetup(); render(); enter(); window.scrollTo(0, 0); toast('You are set. Start your first workout when you are ready.'); break;
+      case 'tpl-open': templateSheet(); break;
+      case 'tpl-apply': { var tp = template(a.dataset.v); if (tp) { applyTemplate(tp.id, state.settings.weeklyGoal || 4); saveSettings(); closeSheet(); planEdit = false; render(); window.scrollTo(0, 0); toast('Your plan is now ' + tp.name); } break; }
+      case 'unit': {
+        var to = a.dataset.v === 'lb' ? 'lb' : 'kg'; if (to === (isLb() ? 'lb' : 'kg')) { armed = null; settingsSheet(); break; }
+        var nothing = !Object.keys(state.sessions).length && !Object.keys(state.body).length && !state.draft;
+        if (nothing || arm('unit', function () { if (!scrim.hidden && document.querySelector('[data-act="unit"]')) settingsSheet(); })) {
+          if (state.draft) { toast('Finish or discard the workout in progress first.'); settingsSheet(); break; }
+          convertUnits(to); CAT = null; render(); settingsSheet(); toast(to === 'lb' ? 'Now in pounds and inches' : 'Now in kilograms and centimetres');
+        }
+        break;
+      }
       case 'lib3': state.ui.lib3 = a.dataset.v; saveLocal(); render(); break;
       case 'hist-prev': histShift(-1); render(); break;
       case 'hist-next': histShift(1); render(); break;
@@ -2714,6 +3060,7 @@ var LIBRARY = (function () {
       else { render(); var again = document.getElementById('lib-q'); if (again) { again.focus(); try { again.setSelectionRange(libQ.length, libQ.length); } catch (e) {} } }
       return;
     }
+    if (el.id === 'help-w' && help) { help.w = num(el.value); document.getElementById('help-body').innerHTML = helpBody(); return; }
     if (el.id === 'hist-q') { histQ = el.value; var hb = document.getElementById('hist-body'); if (hb) hb.innerHTML = histBody(); return; }
     if (el.id === 'pick-q' && picker) { picker.q = el.value; document.getElementById('pick-list').innerHTML = libRows(picker.group, picker.q, picker.mode); return; }
     if (editor && el.id === 'ed-name') { editor.name = el.value; return; }
@@ -2734,15 +3081,16 @@ var LIBRARY = (function () {
     if (editor && el.id === 'ed-core') editor.core = el.checked;
     if (editor && el.dataset && el.dataset.ed === 'restSec') editor.items[+el.dataset.i].restSec = +el.value;
     if (editor && el.dataset && el.dataset.ed === 'link') { editor.items[+el.dataset.i].link = el.checked; render(); }
-    if (el.id === 'set-goalw') { var g = num(el.value); state.settings.goalWeight = g != null && g >= 30 && g <= 250 ? g : null; saveSettings(); render(); }
-    if (el.id === 'set-goalr') { var gr = num(el.value); state.settings.goalRate = gr != null && gr >= 0.05 && gr <= 1.5 ? gr : 0.25; saveSettings(); render(); }
+    if (el.id === 'set-goalw') { var g = num(el.value); state.settings.goalWeight = g != null && g >= (isLb() ? 66 : 30) && g <= (isLb() ? 550 : 250) ? g : null; saveSettings(); render(); }
+    if (el.id === 'set-goalr') { var gr = num(el.value); state.settings.goalRate = gr != null && gr >= 0.05 && gr <= (isLb() ? 3.5 : 1.5) ? gr : (isLb() ? 0.5 : 0.25); saveSettings(); render(); }
     if (el.id === 'backup-file' && el.files && el.files[0]) { var fr = new FileReader(); fr.onload = function () { restore(String(fr.result || '')); }; fr.readAsText(el.files[0]); }
   });
   document.addEventListener('submit', function (ev) {
     ev.preventDefault();
     if (ev.target.id !== 'body-form') return;
     var dt = document.getElementById('bw-d').value || today(), rec = Object.assign({}, state.body[dt] || {}, { date: dt, updatedAt: Date.now() }), any = false;
-    MEASURES.forEach(function (m) { var v = num(document.getElementById('bw-' + m[0]).value); if (v == null) return; if (m[0] === 'weight' ? (v >= 30 && v <= 250) : (v >= 10 && v <= 250)) { rec[m[0]] = v; any = true; } });
+    var lb = isLb();
+    measures().forEach(function (m) { var v = num(document.getElementById('bw-' + m[0]).value); if (v == null) return; if (m[0] === 'weight' ? (v >= (lb ? 66 : 30) && v <= (lb ? 550 : 250)) : (v >= (lb ? 4 : 10) && v <= (lb ? 100 : 250))) { rec[m[0]] = v; any = true; } });
     if (!any) { document.getElementById('bw-weight').focus(); toast('Enter at least one measurement.'); return; }
     state.body[dt] = rec; mark('body/' + dt); render(); toast('Saved');
   });
