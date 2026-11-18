@@ -1061,6 +1061,17 @@ var LIBRARY = (function () {
     if (e.log === 'cardio' || e.log === 'time' || e.log === 'bw') return Math.max.apply(null, sets.map(function (s) { return s.r; }));
     return Math.max.apply(null, sets.map(function (s) { return s.w * (1 + s.r / 30); }));
   }
+  /* what the progress screens plot for one workout: the heaviest weight used, or (mode 'e1rm') the estimated 1-rep max */
+  function liftVal(e, sets, mode) {
+    if (!sets || !sets.length) return null;
+    if (e.log === 'wr' && mode !== 'e1rm') return Math.max.apply(null, sets.map(function (s) { return s.w || 0; }));
+    return metric(e, sets);
+  }
+  function liftLabel(e, mode) { return e.log === 'wr' && mode !== 'e1rm' ? 'Top weight (kg)' : metricLabel(e); }
+  function bestSet(e, sets, mode) {
+    if (e.log === 'wr' && mode !== 'e1rm') return sets.reduce(function (a, x) { return x.w > a.w || (x.w === a.w && x.r > a.r) ? x : a; });
+    return sets.reduce(function (a, x) { return metric(e, [x]) > metric(e, [a]) ? x : a; });
+  }
   function metricLabel(e) { return e.log === 'cardio' ? 'Minutes' : e.log === 'time' ? 'Longest hold (s)' : e.log === 'bw' ? 'Most reps in a set' : 'Estimated 1-rep max (kg)'; }
   function metricUnit(e) { return e.log === 'cardio' ? 'min' : e.log === 'time' ? 's' : e.log === 'bw' ? 'reps' : 'kg'; }
   function setsText(e, sets) {
@@ -1157,12 +1168,12 @@ var LIBRARY = (function () {
     return n;
   }
   function goalWeeks(list) { var w = weeksWith(list), g = state.settings.weeklyGoal || 4, n = 0; Object.keys(w).forEach(function (k) { if (w[k].filter(isCore).length >= g) n++; }); return n; }
-  function records(list) {
+  function records(list, mode) {
     var seen = {}, out = [];
     list.forEach(function (s) { (s.entries || []).forEach(function (en) { seen[en.ex] = en.name; }); });
     Object.keys(seen).forEach(function (id) {
       var e = exi(id, seen[id]), h = historyOf(id, list), best = -Infinity, bi = 0, prs = 0, vals = [];
-      h.forEach(function (x, i) { var v = metric(e, x.sets); vals.push(v); if (v > best + 1e-9) { if (i) prs++; best = v; bi = i; } });
+      h.forEach(function (x, i) { var v = mode ? liftVal(e, x.sets, mode) : metric(e, x.sets); vals.push(v); if (v > best + 1e-9) { if (i) prs++; best = v; bi = i; } });
       if (h.length) out.push({ id: id, e: e, name: e.gone ? seen[id] : e.name, best: best, date: h[bi].date, sets: h[bi].sets, vals: vals, n: h.length, prs: prs, first: vals[0], last: vals[vals.length - 1], lastDate: h[h.length - 1].date });
     });
     return out;
@@ -1173,7 +1184,7 @@ var LIBRARY = (function () {
     records(list).forEach(function (r) { prs += r.prs; });
     var st = streakWeeks(list), gw = goalWeeks(list), t = vol / 1000;
     function step(v, steps) { for (var i = 0; i < steps.length; i++) if (v < steps[i]) return { goal: steps[i], prev: i ? steps[i - 1] : 0, got: i }; return { goal: steps[steps.length - 1], prev: steps[steps.length - 1], got: steps.length }; }
-    function M(label, v, steps, unit) { var s = step(v, steps), done = s.got > 0; return { label: label, value: v, show: done ? (s.got === steps.length ? steps[steps.length - 1] : s.prev) : s.goal, unit: unit, got: done, next: s.got < steps.length ? s.goal : null, pct: s.got < steps.length ? Math.max(0, Math.min(1, (v - s.prev) / (s.goal - s.prev))) : 1 }; }
+    function M(label, v, steps, unit) { var s = step(v, steps), done = s.got > 0; return { label: label, steps: steps, level: s.got, value: v, show: done ? (s.got === steps.length ? steps[steps.length - 1] : s.prev) : s.goal, unit: unit, got: done, next: s.got < steps.length ? s.goal : null, pct: s.got < steps.length ? Math.max(0, Math.min(1, (v - s.prev) / (s.goal - s.prev))) : 1 }; }
     return [M('Workouts logged', n, [1, 5, 10, 25, 50, 100, 200], ''), M('Weeks in a row', st, [2, 4, 8, 12, 26, 52], 'wk'), M('Weeks on target', gw, [1, 4, 8, 12, 26], ''),
       M('Tonnes lifted', t, [1, 5, 10, 25, 50, 100, 250, 500], 't'), M('Hard sets', sets, [50, 100, 250, 500, 1000, 2500], ''), M('Personal bests', prs, [1, 5, 10, 25, 50, 100], '')];
   }
@@ -1450,7 +1461,8 @@ var LIBRARY = (function () {
     h += '<section class="draft-head">';
     if (d.editing) h += '<div class="spread"><h2>' + esc(d.name) + '</h2><span class="pill">editing a saved workout</span></div>';
     if (d.key === 'free' && !d.editing) h += '<label class="fld">Workout name<input id="draft-name" type="text" maxlength="40" autocomplete="off" value="' + esc(d.name) + '"></label>';
-    h += '<div class="spread"><p class="sub">' + esc(r && r.focus ? r.focus : (d.items.length ? '' : 'Add your first exercise to get going.')) + '</p><input class="date-in" id="draft-date" type="date" value="' + esc(d.date) + '" max="' + today() + '" aria-label="Workout date"></div></section>';
+    h += '<div class="spread"><p class="sub">' + esc(r && r.focus ? r.focus : (d.items.length ? '' : 'Add your first exercise to get going.')) + '</p><input class="date-in" id="draft-date" type="date" value="' + esc(d.date) + '" max="' + today() + '" aria-label="Workout date"></div>' +
+      (d.editing ? '<label class="dur-row">How long it took<span><input class="text-in" id="draft-dur" type="number" inputmode="numeric" min="0" max="600" step="1" placeholder="–" value="' + (d.dur ? Math.round(d.dur / 60) : '') + '">minutes</span></label>' : '') + '</section>';
     if (r && r.warmup && !d.editing) h += '<p class="warm"><b>Warm-up:</b> ' + esc(r.warmup) + '</p>';
     var anyPr = false;
     d.items.forEach(function (it, idx) {
@@ -1569,7 +1581,7 @@ var LIBRARY = (function () {
   function lineChart(id, pts, trend, opt) {
     var W = chartW(), H = 190, m = { l: 36, r: 46, t: 14, b: 24 };
     if (!pts.length) return '<p class="sub">No entries yet.</p>';
-    var xs = pts.map(function (p) { return toDate(p.x).getTime(); }), ys = pts.map(function (p) { return p.y; }), all = trend ? ys.concat(trend) : ys;
+    var extra = (opt && opt.extra) || [], xs = pts.map(function (p) { return toDate(p.x).getTime(); }), ys = pts.map(function (p) { return p.y; }), all = (trend ? ys.concat(trend) : ys).concat(extra.map(function (p) { return p.y; }));
     var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs), ticks = niceTicks(Math.min.apply(null, all), Math.max.apply(null, all), 3);
     var y0 = ticks[0], y1 = ticks[ticks.length - 1];
     function X(v) { return x1 === x0 ? m.l + (W - m.l - m.r) / 2 : m.l + (v - x0) / (x1 - x0) * (W - m.l - m.r); }
@@ -1589,6 +1601,9 @@ var LIBRARY = (function () {
       var dstr = smoothPath(Lp);
       s += '<path class="area" style="fill:url(#' + id + '-l)" mask="url(#' + id + '-m)" d="' + dstr + ' L' + Lp[Lp.length - 1][0].toFixed(1) + ' ' + (H - m.b) + ' L' + Lp[0][0].toFixed(1) + ' ' + (H - m.b) + ' Z"/><path class="ln draw" pathLength="1" style="stroke:url(#' + id + '-l)" d="' + dstr + '"/>';
     }
+    var XP = extra.map(function (p) { return [X(toDate(p.x).getTime()), Y(p.y)]; });
+    XP.forEach(function (p) { s += '<circle class="dot3" r="3.4" cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '"/>'; });
+    if (extra.length && P.length > 1) P.forEach(function (p) { s += '<circle class="dot2" r="2.8" cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '"/>'; });
     if (trend) P.forEach(function (p) { s += '<circle class="dot2" r="2.6" cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '"/>'; });
     var e = Lp[Lp.length - 1];
     s += '<line class="cross" id="' + id + '-x" y1="' + m.t + '" y2="' + (H - m.b) + '" x1="0" x2="0" visibility="hidden"/><circle class="dot" id="' + id + '-d" r="4" cx="0" cy="0" visibility="hidden"/>';
@@ -1596,7 +1611,7 @@ var LIBRARY = (function () {
     s += '<text x="' + P[0][0] + '" y="' + (H - 6) + '" text-anchor="' + (P.length > 1 ? 'start' : 'middle') + '">' + fmtDate(pts[0].x, true) + '</text>';
     if (P.length > 1) s += '<text x="' + e[0] + '" y="' + (H - 6) + '" text-anchor="end">' + fmtDate(pts[pts.length - 1].x, true) + '</text>';
     s += '</svg><div class="tip" id="' + id + '-t" hidden></div>';
-    charts[id] = { type: 'line', P: P, pts: pts, W: W };
+    charts[id] = { type: 'line', P: P, pts: pts, W: W, XP: XP, extra: extra };
     return s;
   }
   /* weekly columns; each week {start, a, b}: a is the main series, b is stacked on top in the second colour */
@@ -1633,7 +1648,7 @@ var LIBRARY = (function () {
     var P = vals.map(function (v, i) { return [3 + i / (vals.length - 1) * 55, 20 - (v - lo) / span * 16]; });
     return '<svg viewBox="0 0 64 24" aria-hidden="true"><path class="ln" d="' + P.map(function (p, i) { return (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1); }).join('') + '"/><circle class="dot" cx="' + P[P.length - 1][0] + '" cy="' + P[P.length - 1][1].toFixed(1) + '" r="3"/></svg>';
   }
-  function topSet(e, sets) { return sets.reduce(function (a, x) { return metric(e, [x]) > metric(e, [a]) ? x : a; }); }
+  function topSet(e, sets, mode) { return bestSet(e, sets, mode || 'e1rm'); }
   /* one square per day, greener the more sets were logged, like a contribution graph */
   function calendar(list) {
     var W = 16, ws = weekStart(today()), start = addDays(ws, -7 * (W - 1)), sets = {}, h = '', months = '', lastM = -1;
@@ -1664,10 +1679,28 @@ var LIBRARY = (function () {
     });
     return h + '</div>';
   }
+  /* milestone levels climb through these, like ranks in a game */
+  var TIERS = [['Tin', '#9ba6a9', '#16262a'], ['Copper', '#c57a4c', '#ffffff'], ['Silver', '#c5ced2', '#16262a'], ['Gold', '#e4b93e', '#3b2a00'], ['Emerald', '#1faa72', '#ffffff'], ['Platinum', '#e8eef0', '#16262a'], ['Diamond', '#7fe2f5', '#06323a'], ['Onyx', '#161c1e', '#b6ff1a']];
+  function tierOf(level) { return level > 0 ? TIERS[Math.min(level, TIERS.length) - 1] : null; }
+  function msNum(m, v) { return m.unit === 't' ? fmt(Math.round(v * 10) / 10) : String(Math.floor(v)); }
   function badgesHtml(list) {
-    return '<div class="badges">' + milestones(list).map(function (m) {
-      return '<div class="badge' + (m.got ? ' got' : '') + (m.next ? '' : ' full') + '"><i style="--p:' + Math.round((m.next ? m.pct : 1) * 100) + '"><b>' + m.show + '</b>' + (m.got ? '<em class="tick">' + IC.check + '</em>' : '') + '</i><span>' + esc(m.label) + '</span><span class="foot">' + (m.next ? (m.unit === 't' ? fmt(Math.round(m.value * 10) / 10) : Math.floor(m.value)) + ' of ' + m.next : 'all done') + '</span></div>';
+    return '<div class="badges">' + milestones(list).map(function (m, i) {
+      var t = tierOf(m.level);
+      return '<button type="button" data-act="ms-open" data-i="' + i + '" class="badge' + (m.got ? ' got' : '') + (m.next ? '' : ' full') + '"' + (t ? ' style="--tier:' + t[1] + ';--tier-ink:' + t[2] + '"' : '') + '><i style="--p:' + Math.round((m.next ? m.pct : 1) * 100) + '"><b>' + m.show + '</b></i><span>' + esc(m.label) + '</span><span class="foot">' + (t ? '<b>' + t[0] + '</b> · ' : '') + (m.next ? msNum(m, m.value) + ' of ' + m.next : 'all done') + '</span></button>';
     }).join('') + '</div>';
+  }
+  function msSheet(i) {
+    var list = finished(), m = milestones(list.length ? list : [])[i]; if (!m) return;
+    var t = tierOf(m.level), unit = m.unit === 't' ? ' t' : m.unit === 'wk' ? ' weeks' : '';
+    var h = head(m.label, 'You are at ' + msNum(m, m.value) + unit + (t ? ', level ' + m.level + ' of ' + m.steps.length + ' (' + t[0] + ').' : ', no level reached yet.'));
+    if (m.next) h += '<div><div class="ms-bar"><i style="width:' + Math.round(m.pct * 100) + '%"></i></div><p class="foot">' + msNum(m, Math.max(0, m.next - m.value)) + unit + ' more to reach ' + TIERS[Math.min(m.level, TIERS.length - 1)][0] + ' at ' + m.next + unit + '.</p></div>';
+    h += '<ul class="ms-list">';
+    m.steps.forEach(function (g, k) {
+      var tt = TIERS[Math.min(k, TIERS.length - 1)], done = k < m.level, cur = k === m.level;
+      h += '<li class="' + (cur ? 'cur' : '') + '"><span class="tier-dot' + (done ? '' : ' off') + '"' + (done ? ' style="--tier:' + tt[1] + '"' : '') + '></span><span class="txt"><b>' + tt[0] + '</b><small>' + g + unit + '</small></span><span class="st' + (done ? ' ok' : '') + '">' + (done ? 'Reached' : cur ? msNum(m, Math.max(0, g - m.value)) + unit + ' to go' : 'Locked') + '</span></li>';
+    });
+    h += '</ul><button class="btn primary block" type="button" data-act="sheet-x">Done</button>';
+    openSheet(h);
   }
   function overviewView(list, demo) {
     var h = '', ws = weekStart(today()), goal = state.settings.weeklyGoal || 4;
@@ -1691,32 +1724,46 @@ var LIBRARY = (function () {
     h += '</section>';
     h += '<section class="card"><h3>Hard sets per muscle</h3>' +
       '<div class="seg" role="group" aria-label="Period"><button type="button" data-act="mus-win" data-v="week" aria-pressed="' + (state.ui.musWin !== 'four') + '">This week</button><button type="button" data-act="mus-win" data-v="four" aria-pressed="' + (state.ui.musWin === 'four') + '">Average of 4 weeks</button></div>' +
-      '<p class="sub">Each bar fills toward the sets your plan gives that muscle in a week, staying orange most of the way and turning green as it gets close. Assisting work counts as half a set.</p>' + muscleBars(list) + '</section>';
-    h += '<section class="card"><div><h3>Milestones</h3><p class="sub">A tick marks a level you have reached. The ring shows how close the next one is.</p></div>' + badgesHtml(list) + '</section>';
+      '<p class="sub">Each bar fills toward the sets your plan gives that muscle in a week, going from orange through yellow to green as it fills. Assisting work counts as half a set.</p>' + muscleBars(list) + '</section>';
+    h += '<section class="card"><div><h3>Milestones</h3><p class="sub">The colour is the level you have reached, the ring is how close the next one is. Tap one to see every level.</p></div>' + badgesHtml(list) + '</section>';
     return h;
   }
+  var liftInfo = false;
+  function modeSeg() {
+    var mode = state.ui.liftMode === 'e1rm' ? 'e1rm' : 'max';
+    return '<div class="seg" role="group" aria-label="What to show for weighted lifts"><button type="button" data-act="lift-mode" data-v="max" aria-pressed="' + (mode === 'max') + '">Top weight</button><button type="button" data-act="lift-mode" data-v="e1rm" aria-pressed="' + (mode === 'e1rm') + '">Est. 1-rep max</button></div>';
+  }
   function liftsView(list) {
-    var h = '', recs = records(list);
+    var h = '', mode = state.ui.liftMode === 'e1rm' ? 'e1rm' : 'max', recs = records(list, mode);
     var exId = state.ui.ex && historyOf(state.ui.ex, list).length ? state.ui.ex : null;
     if (!exId && recs.length) { var byDate = recs.slice().sort(function (a, b) { return a.lastDate < b.lastDate ? 1 : -1; }); exId = byDate[0].id; routineList().some(function (r) { return r.items.some(function (it) { if (historyOf(it.ex, list).length) { exId = it.ex; return true; } return false; }); }); }
     if (!exId) return '<p class="empty">Log a workout and your lifts appear here.</p>';
-    var e = exi(exId), hist = historyOf(exId, list), rec = recs.filter(function (r) { return r.id === exId; })[0];
-    h += '<section class="card"><h3>Exercise progress</h3><button class="btn block" type="button" data-act="pick-lift" style="justify-content:space-between"><span>' + esc(e.name) + '</span><span class="chev" aria-hidden="true">›</span></button>' +
-      '<p class="sub">' + esc(metricLabel(e)) + (e.log === 'wr' ? ', from the best set of each workout (weight × (1 + reps ÷ 30)).' : ' in each workout.') + '</p>' +
-      '<div class="chart" data-chart="exc">' + lineChart('exc', hist.map(function (x) { return { x: x.date, y: metric(e, x.sets), tip: '<b>' + fmtDate(x.date) + '</b><br>' + esc(setsText(e, x.sets)) }; }), null, { up: true }) + '</div>';
-    if (rec) h += '<div class="pills"><span class="pill hot">Best set: ' + esc(setsText(e, [topSet(e, rec.sets)])) + ' · ' + fmtDate(rec.date, true) + '</span>' + (rec.n > 1 && rec.first > 0 ? '<span class="pill' + (rec.last >= rec.first ? ' good' : '') + '">' + (rec.last >= rec.first ? '+' : '') + Math.round((rec.last - rec.first) / rec.first * 100) + '% since you started</span>' : '') + '</div>';
-    h += '<table class="hist"><tbody>'; hist.slice(-5).reverse().forEach(function (x) { h += '<tr><td>' + fmtDate(x.date) + '</td><td>' + esc(setsText(e, x.sets)) + '</td></tr>'; }); h += '</tbody></table></section>';
+    var e = exi(exId), hist = historyOf(exId, list), rec = recs.filter(function (r) { return r.id === exId; })[0], wr = e.log === 'wr', onGraph = state.ui.liftSets === 'graph', extra = [];
+    if (onGraph) hist.forEach(function (x) {
+      var by = {};
+      x.sets.forEach(function (st) { var v = liftVal(e, [st], mode), k = String(Math.round(v * 100) / 100); (by[k] = by[k] || { v: v, sets: [] }).sets.push(st); });
+      Object.keys(by).forEach(function (k) { extra.push({ x: x.date, y: by[k].v, tip: '<b>' + fmtDate(x.date) + '</b><br>' + esc(setsText(e, by[k].sets)) }); });
+    });
+    h += '<section class="card"><div class="spread" style="align-items:center"><h3>Exercise progress</h3><button class="info-btn" type="button" data-act="lift-info" aria-expanded="' + liftInfo + '" aria-label="What this chart shows">i</button></div>' +
+      '<button class="btn block" type="button" data-act="pick-lift" style="justify-content:space-between"><span>' + esc(e.name) + '</span><span class="chev" aria-hidden="true">›</span></button>' +
+      (wr ? modeSeg() : '') +
+      (liftInfo ? '<p class="note">' + (wr ? (mode === 'max' ? 'Top weight is the heaviest weight you used in each workout, in kg.' : 'Estimated 1-rep max (kg), from the best set of each workout: weight × (1 + reps ÷ 30). It lets sets with different weights and reps be compared.') : esc(metricLabel(e)) + ' in each workout.') + (onGraph ? ' Grey dots are the other sets; tap one to see its reps.' : '') + '</p>' : '') +
+      '<div class="chart" data-chart="exc">' + lineChart('exc', hist.map(function (x) { return { x: x.date, y: liftVal(e, x.sets, mode), tip: '<b>' + fmtDate(x.date) + '</b><br>' + esc(setsText(e, onGraph ? [bestSet(e, x.sets, mode)] : x.sets)) }; }), null, { up: true, extra: extra }) + '</div>';
+    if (rec) h += '<div class="pills"><span class="pill hot">Best set: ' + esc(setsText(e, [bestSet(e, rec.sets, mode)])) + ' · ' + fmtDate(rec.date, true) + '</span>' + (rec.n > 1 && rec.first > 0 && rec.last !== rec.first ? '<span class="pill' + (rec.last >= rec.first ? ' good' : '') + '">' + (rec.last >= rec.first ? '+' : '') + Math.round((rec.last - rec.first) / rec.first * 100) + '% since you started</span>' : '') + '</div>';
+    h += '<div class="seg" role="group" aria-label="Where to show every set"><button type="button" data-act="lift-sets" data-v="list" aria-pressed="' + !onGraph + '">Sets as a list</button><button type="button" data-act="lift-sets" data-v="graph" aria-pressed="' + onGraph + '">Sets on the graph</button></div>';
+    if (!onGraph) { h += '<table class="hist"><tbody>'; hist.slice(-5).reverse().forEach(function (x) { h += '<tr><td>' + fmtDate(x.date) + '</td><td>' + esc(setsText(e, x.sets)) + '</td></tr>'; }); h += '</tbody></table>'; }
+    h += '</section>';
     var gains = recs.filter(function (r) { return r.n >= 2 && r.first > 0 && r.last > r.first; }).map(function (r) { return { r: r, pct: (r.last - r.first) / r.first }; }).sort(function (a, b) { return b.pct - a.pct; }).slice(0, 5);
     if (gains.length) {
       h += '<section class="card"><h3>Biggest gains</h3><p class="sub">First logged workout compared with the latest.</p><div>';
       gains.forEach(function (g) { h += '<button class="rec" type="button" data-act="lift" data-ex="' + esc(g.r.id) + '"><span><b>' + esc(g.r.name) + '</b><small>' + fmt(Math.round(g.r.first * 10) / 10) + ' → ' + fmt(Math.round(g.r.last * 10) / 10) + ' ' + metricUnit(g.r.e) + '</small></span>' + spark(g.r.vals) + '<span class="gain">+' + Math.round(g.pct * 100) + '%</span></button>'; });
       h += '</div></section>';
     }
-    h += '<section class="card"><h3>Personal bests</h3><div>';
+    h += '<section class="card"><h3>Personal bests</h3>' + modeSeg() + '<div>';
     recs.sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : (a.name < b.name ? -1 : 1); }).forEach(function (r) {
-      h += '<button class="rec" type="button" data-act="lift" data-ex="' + esc(r.id) + '"><span><b>' + esc(r.name) + '</b><small>' + esc(setsText(r.e, [topSet(r.e, r.sets)])) + ' · ' + fmtDate(r.date, true) + '</small></span>' + spark(r.vals) + '<span class="num">' + fmt(Math.round(r.best * 10) / 10) + '<small>' + metricUnit(r.e) + '</small></span></button>';
+      h += '<button class="rec" type="button" data-act="lift" data-ex="' + esc(r.id) + '"><span><b>' + esc(r.name) + '</b><small>' + esc(setsText(r.e, [bestSet(r.e, r.sets, mode)])) + ' · ' + fmtDate(r.date, true) + '</small></span>' + spark(r.vals) + '<span class="num">' + fmt(Math.round(r.best * 10) / 10) + '<small>' + metricUnit(r.e) + '</small></span></button>';
     });
-    h += '</div><p class="foot">For weighted lifts the number is an estimated 1-rep max, so sets with different weights and reps can be compared.</p></section>';
+    h += '</div></section>';
     return h;
   }
   var MEASURES = [['weight', 'Weight', 'kg'], ['waist', 'Waist', 'cm'], ['chest', 'Chest', 'cm'], ['arm', 'Arm', 'cm'], ['thigh', 'Thigh', 'cm']];
@@ -1993,8 +2040,15 @@ var LIBRARY = (function () {
     var id = box.dataset.chart, c = charts[id], svg = box.querySelector('svg'), tip = document.getElementById(id + '-t'); if (!c || !svg || !tip) return;
     var r = svg.getBoundingClientRect(), x = (ev.clientX - r.left) / r.width * c.W, html = '', px = 0, py = 0;
     if (c.type === 'line') {
-      var best = 0; c.P.forEach(function (p, i) { if (Math.abs(p[0] - x) < Math.abs(c.P[best][0] - x)) best = i; });
-      var p = c.P[best]; html = c.pts[best].tip; px = p[0]; py = p[1];
+      var best = 0, p; c.P.forEach(function (q, i) { if (Math.abs(q[0] - x) < Math.abs(c.P[best][0] - x)) best = i; });
+      p = c.P[best]; html = c.pts[best].tip;
+      if (c.XP && c.XP.length) {
+        /* with every set drawn, pick the nearest point in both directions; the line's own points win a tie */
+        var y = (ev.clientY - r.top) / r.width * c.W, bd = Infinity;
+        c.P.forEach(function (q, i) { var dd = (q[0] - x) * (q[0] - x) + (q[1] - y) * (q[1] - y); if (dd < bd) { bd = dd; p = q; html = c.pts[i].tip; } });
+        c.XP.forEach(function (q, i) { var dd = (q[0] - x) * (q[0] - x) + (q[1] - y) * (q[1] - y); if (dd < bd - 1) { bd = dd; p = q; html = c.extra[i].tip; } });
+      }
+      px = p[0]; py = p[1];
       var cx = document.getElementById(id + '-x'), cd = document.getElementById(id + '-d');
       cx.setAttribute('x1', p[0]); cx.setAttribute('x2', p[0]); cx.setAttribute('visibility', 'visible');
       cd.setAttribute('cx', p[0]); cd.setAttribute('cy', p[1]); cd.setAttribute('visibility', 'visible');
@@ -2186,6 +2240,10 @@ var LIBRARY = (function () {
       case 'ed-save': saveEditor(); break;
       case 'ed-reset': if (arm('ed-reset', render)) { delete state.routines[editor.id]; mark('routines/' + editor.id); editor = null; render(); toast('Back to the original plan'); } break;
       case 'ed-remove': planRemove(editor.id); editor = null; planEdit = true; render(); window.scrollTo(0, 0); toast('Removed from your plan'); break;
+      case 'lift-mode': state.ui.liftMode = a.dataset.v; saveLocal(); render(); enter(); break;
+      case 'lift-sets': state.ui.liftSets = a.dataset.v; saveLocal(); render(); enter(); break;
+      case 'lift-info': liftInfo = !liftInfo; render(); break;
+      case 'ms-open': msSheet(+a.dataset.i); break;
       case 'plan-edit': planEdit = true; render(); break;
       case 'plan-done': planEdit = false; render(); break;
       case 'plan-up': planMove(a.dataset.key, -1); render(); break;
@@ -2228,6 +2286,7 @@ var LIBRARY = (function () {
   document.addEventListener('change', function (ev) {
     var el = ev.target;
     if (el.id === 'draft-date' && state.draft && el.value) { state.draft.date = el.value; state.draft.dateSet = true; touchDraft(); }
+    if (el.id === 'draft-dur' && state.draft && state.draft.editing) { var mins = num(el.value); state.draft.dur = mins > 0 ? Math.round(Math.min(600, mins) * 60) : null; touchDraft(); }
     if (editor && el.id === 'ed-core') editor.core = el.checked;
     if (editor && el.dataset && el.dataset.ed === 'restSec') editor.items[+el.dataset.i].restSec = +el.value;
     if (editor && el.dataset && el.dataset.ed === 'link') { editor.items[+el.dataset.i].link = el.checked; render(); }
