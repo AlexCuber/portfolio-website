@@ -29,7 +29,7 @@
   --font-display: "Big Shoulders Display", "Big Shoulders", "Avenir Next Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
   --font-body: "Figtree", "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
   --radius: 20px;
-  --safe-t: env(safe-area-inset-top, 0px); --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-t: env(safe-area-inset-top, 0px); --safe-b: env(safe-area-inset-bottom, 0px); --tab-b: max(10px, calc(var(--safe-b) - 14px));
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]):not([data-app-theme="light"]) {
@@ -148,7 +148,7 @@ p { margin: 0; }
 .wbar-prog i.pr { background: #ff9a57; }
 
 main { flex: 1; padding: 8px 16px 28px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-.tabs { position: sticky; bottom: 0; z-index: 20; padding: 10px 14px calc(10px + var(--safe-b)); background: linear-gradient(to top, var(--bg) 40%, transparent); pointer-events: none; }
+.tabs { position: sticky; bottom: 0; z-index: 20; padding: 10px 14px var(--tab-b); background: linear-gradient(to top, var(--bg) 40%, transparent); pointer-events: none; }
 .tabs-in { pointer-events: auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; background: var(--tabbar); -webkit-backdrop-filter: blur(18px) saturate(1.5); backdrop-filter: blur(18px) saturate(1.5); border: 1px solid var(--line); border-radius: 24px; padding: 6px; box-shadow: 0 10px 30px rgba(15, 26, 48, 0.16); }
 .tab { appearance: none; border: 0; background: none; border-radius: 18px; padding: 7px 4px 6px; display: flex; flex-direction: column; align-items: center; gap: 2px; color: var(--muted); font-size: 0.74rem; font-weight: 600; letter-spacing: 0.01em; transition: background 0.2s, color 0.2s; }
 .tab svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
@@ -305,7 +305,7 @@ main { flex: 1; padding: 8px 16px 28px; display: flex; flex-direction: column; g
 .add-ex:active { background: var(--surface-2); }
 
 /* rest timer */
-.rest { position: sticky; bottom: calc(88px + var(--safe-b)); z-index: 19; margin: 0 16px 8px; background: linear-gradient(120deg, var(--board), var(--board-2)); color: var(--board-ink); border-radius: 20px; padding: 8px 8px 8px 10px; display: flex; align-items: center; gap: 10px; box-shadow: var(--shadow); }
+.rest { position: sticky; bottom: calc(78px + var(--tab-b)); z-index: 19; margin: 0 16px 8px; background: linear-gradient(120deg, var(--board), var(--board-2)); color: var(--board-ink); border-radius: 20px; padding: 8px 8px 8px 10px; display: flex; align-items: center; gap: 10px; box-shadow: var(--shadow); }
 .rest svg { width: 44px; height: 44px; flex: none; transform: rotate(-90deg); }
 .rest circle { fill: none; stroke-width: 4; }
 .rest .trk { stroke: var(--board-line); }
@@ -518,7 +518,7 @@ main { flex: 1; padding: 8px 16px 28px; display: flex; flex-direction: column; g
 .pr-list b { font-weight: 700; display: block; }
 .pr-list svg { width: 18px; height: 18px; fill: var(--hot); flex: none; margin-top: 1px; }
 #fx { position: fixed; inset: 0; z-index: 60; pointer-events: none; width: 100%; height: 100%; }
-.toast { position: fixed; left: 50%; bottom: calc(150px + var(--safe-b)); transform: translateX(-50%); z-index: 55; background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 14px; font-size: 0.9rem; font-weight: 600; box-shadow: var(--shadow); max-width: 88%; text-align: center; }
+.toast { position: fixed; left: 50%; bottom: calc(140px + var(--tab-b)); transform: translateX(-50%); z-index: 55; background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 14px; font-size: 0.9rem; font-weight: 600; box-shadow: var(--shadow); max-width: 88%; text-align: center; }
 .toast.rec { background: #d4551c; color: #fff; }
 @media (min-width: 560px) { .g-item { grid-template-columns: 132px minmax(0, 1fr); } .badges { grid-template-columns: repeat(6, 1fr); } }
 @media (max-width: 360px) { #sync-t { display: none; } .bar { gap: 8px; } .ring { width: 72px; height: 72px; } }
