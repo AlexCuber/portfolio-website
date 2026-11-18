@@ -1,4 +1,4 @@
-// Cloudflare Worker for the Workout Log app: serves every file in this folder as static assets at workout.omaksimov.com.
+// Cloudflare Worker for the Hilo workout app: serves every file in this folder as static assets at workout.omaksimov.com.
 // There is no script, only files. Cloudflare's Git build for this Worker uses this folder as its root directory and runs
 // `npx wrangler deploy`, which reads this file. The website's own Worker (../wrangler.jsonc) does not publish this folder.
 {

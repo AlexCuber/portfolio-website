@@ -1,13 +1,13 @@
 {
-  "name": "Workout Log",
-  "short_name": "Workout Log",
+  "name": "Hilo",
+  "short_name": "Hilo",
   "description": "A gym logbook that works offline.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#111318",
-  "theme_color": "#111318",
+  "background_color": "#08090a",
+  "theme_color": "#08090a",
   "icons": [
     {
       "src": "icons/icon-192.png",

@@ -1,4 +1,4 @@
-# Workout Log
+# Hilo
 
 A gym logbook that installs on a phone's home screen and works offline. It is served at
 `https://workout.omaksimov.com/` by its own small Cloudflare Worker, separate from the website.

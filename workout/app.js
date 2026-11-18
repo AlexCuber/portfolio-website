@@ -940,7 +940,7 @@ var LIBRARY = (function () {
       CAT = null;
       if (r[2].exists && !state.dirty['state/draft']) {
         var rd = r[2].data();
-        if ((rd.updatedAt || 0) > (state.draftAt || 0) && !isTyping()) { state.draft = rd.draft ? migrateDraft(clone(rd.draft)) : null; state.draftAt = rd.updatedAt; }
+        if ((rd.updatedAt || 0) > (state.draftAt || 0) && !isTyping()) { state.draft = rd.draft ? migrateDraft(clone(rd.draft)) : null; state.draftAt = rd.updatedAt; freshenDraft(); }
       }
       if (r[5].exists && !state.dirty['state/settings']) {
         var rs = r[5].data();
@@ -1229,6 +1229,19 @@ var LIBRARY = (function () {
   }
   function draftCount() { var n = 0; state.draft.items.forEach(function (it) { n += rowSets(it).length; }); return n; }
   function draftProgress() { var done = 0, all = 0; state.draft.items.forEach(function (it) { it.rows.forEach(function (r) { all++; if (r.d) done++; }); }); return { done: done, all: all }; }
+  /* A workout belongs to the day its first set is logged, not the day the session was opened.
+     While no set is ticked, a session opened on an earlier day moves to today and its clock starts over.
+     At the first set the clock also starts over if the session has been open for more than two hours.
+     A date picked by hand (dateSet) is left alone. Returns true when the clock was restarted. */
+  function freshenDraft(atSet) {
+    var d = state.draft; if (!d || d.editing) return false;
+    if (draftProgress().done > (atSet ? 1 : 0)) return false;
+    var t = today(), changed = false, restarted = false;
+    if (!d.dateSet && d.date !== t) { d.date = t; changed = true; }
+    if (iso(new Date(d.startedAt)) !== t || (atSet && Date.now() - d.startedAt > 2 * 3600000)) { d.startedAt = Date.now(); changed = true; restarted = true; }
+    if (changed) touchDraft(true);
+    return restarted;
+  }
   function finishDraft() {
     var d = state.draft, entries = [], prs = [], r = d.key === 'free' ? null : getRoutine(d.key);
     var before = finished().filter(function (s) { return s.id !== d.id; });
@@ -1864,7 +1877,7 @@ var LIBRARY = (function () {
     h += '<div class="setting stack"><div><b>Backup</b><small>' + (STANDALONE ? 'Everything is stored on this phone only. Save a backup file now and then.' : 'Your log syncs through Claude. A backup lets you move it elsewhere.') + '</small></div>' +
       '<div class="row">' + (STANDALONE ? '<button class="btn sm" type="button" data-act="backup-save">Save backup file</button>' : '') + '<button class="btn sm" type="button" data-act="backup-show">Show backup text</button><label class="btn sm">Restore from file<input id="backup-file" type="file" accept=".json,application/json,text/plain" hidden></label></div>' +
       '<div id="backup-box" hidden><textarea class="backup" id="backup-text" spellcheck="false" aria-label="Backup text"></textarea><div class="row"><button class="btn sm" type="button" data-act="backup-copy">Copy</button><button class="btn sm" type="button" data-act="backup-restore">Restore from this text</button></div></div></div>';
-    h += '<p class="foot">Workout Log · ' + allEx().length + ' exercises · ' + Object.keys(state.sessions).length + ' workouts saved</p>';
+    h += '<p class="foot">Hilo · ' + allEx().length + ' exercises · ' + Object.keys(state.sessions).length + ' workouts saved</p>';
     openSheet(h);
   }
   function openSummary() {
@@ -2018,8 +2031,8 @@ var LIBRARY = (function () {
   /* ================= backup ================= */
   function backupData() { return { app: 'workout-log', v: 2, exportedAt: new Date().toISOString(), sessions: state.sessions, body: state.body, routines: state.routines, custom: state.custom, settings: state.settings }; }
   function restore(text) {
-    var data; try { data = JSON.parse(text); } catch (e) { toast('That is not a Workout Log backup. Nothing was changed.'); return; }
-    if (!data || !data.sessions || typeof data.sessions !== 'object') { toast('That is not a Workout Log backup. Nothing was changed.'); return; }
+    var data; try { data = JSON.parse(text); } catch (e) { toast('That is not a Hilo backup. Nothing was changed.'); return; }
+    if (!data || !data.sessions || typeof data.sessions !== 'object') { toast('That is not a Hilo backup. Nothing was changed.'); return; }
     var n = 0;
     [['sessions', 'sessions', 'sessions/'], ['body', 'body', 'body/'], ['routines', 'routines', 'routines/'], ['custom', 'custom', 'exercises/']].forEach(function (c) {
       var src = data[c[0]] || {}, dst = state[c[1]];
@@ -2033,7 +2046,7 @@ var LIBRARY = (function () {
     var text = JSON.stringify(backupData()), name = 'workout-log-' + today() + '.json';
     try {
       var file = new File([text], name, { type: 'application/json' });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) { navigator.share({ files: [file], title: 'Workout Log backup' }).catch(function () {}); return; }
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { navigator.share({ files: [file], title: 'Hilo backup' }).catch(function () {}); return; }
     } catch (e) {}
     try { var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); } catch (e) { toast('Could not save a file here. Use the backup text instead.'); }
   }
@@ -2096,6 +2109,7 @@ var LIBRARY = (function () {
           s.d = true; s.pop = true; s.pr = false;
           if (!d.editing) {
             unlockAudio();
+            if (freshenDraft(true)) toast('Clock restarted at your first set');
             var one = rowSets({ ex: it.ex, rows: [s] }), best = bestBefore(it.ex, d.id);
             if (one.length && best != null) {
               var cur = best; it.rows.forEach(function (x) { if (x !== s && x.d && x.pr) { var o = rowSets({ ex: it.ex, rows: [x] }); if (o.length) cur = Math.max(cur, metric(e, o)); } });
@@ -2213,7 +2227,7 @@ var LIBRARY = (function () {
   });
   document.addEventListener('change', function (ev) {
     var el = ev.target;
-    if (el.id === 'draft-date' && state.draft && el.value) { state.draft.date = el.value; touchDraft(); }
+    if (el.id === 'draft-date' && state.draft && el.value) { state.draft.date = el.value; state.draft.dateSet = true; touchDraft(); }
     if (editor && el.id === 'ed-core') editor.core = el.checked;
     if (editor && el.dataset && el.dataset.ed === 'restSec') editor.items[+el.dataset.i].restSec = +el.value;
     if (editor && el.dataset && el.dataset.ed === 'link') { editor.items[+el.dataset.i].link = el.checked; render(); }
@@ -2235,7 +2249,7 @@ var LIBRARY = (function () {
   var lastPull = Date.now();
   document.addEventListener('visibilitychange', function () {
     if (!document.hidden && db && Date.now() - lastPull > 5 * 60000) { lastPull = Date.now(); pullRemote(); }
-    if (!document.hidden) { flushDirty(); tickClock(); drawRest(); }
+    if (!document.hidden) { if (freshenDraft() && !isTyping()) render(); flushDirty(); tickClock(); drawRest(); }
     wake();
   });
   if (window.matchMedia) { try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () { applyTheme(); if (!isTyping()) render(); }); } catch (e) {} }
@@ -2246,6 +2260,7 @@ var LIBRARY = (function () {
   if (h0 === 'log' || h0 === 'progress' || h0 === 'exercises') state.ui.tab = h0;
   else if (state.draft) state.ui.tab = 'log';
   applyTheme();
+  freshenDraft();
   render();
   enter();
   refreshSync();
