@@ -2706,7 +2706,7 @@ var LIBRARY = (function () {
   if (!reduceMotion) requestAnimationFrame(frame);
 
   /* ================= rest timer, sound, screen lock ================= */
-  var restEl = document.getElementById('rest'), restT = document.getElementById('rest-t'), restArc = document.getElementById('rest-arc'), restL = document.getElementById('rest-l'), restAdd = restEl.querySelector('[data-act="rest-add"]'), restSkip = restEl.querySelector('[data-act="rest-skip"]'), RC = 2 * Math.PI * 18, actx = null, wakeLock = null;
+  var restEl = document.getElementById('rest'), restT = document.getElementById('rest-t'), restArc = document.getElementById('rest-arc'), restL = document.getElementById('rest-l'), restAdd = restEl.querySelector('[data-act="rest-add"]'), restSub = restEl.querySelector('[data-act="rest-sub"]'), restStep = document.getElementById('rest-step'), restBy = document.getElementById('rest-by'), restSkip = restEl.querySelector('[data-act="rest-skip"]'), RC = 2 * Math.PI * 18, actx = null, wakeLock = null;
   function unlockAudio() { if (!state.settings.sound) return; try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume(); } catch (e) {} }
   function beep() {
     if (!state.settings.sound || !actx) return;
@@ -2725,7 +2725,8 @@ var LIBRARY = (function () {
     var it = findItem(t.u), now = Date.now(); if (!it) { delete state.draft.timer; return; }
     var e = exi(it.ex), full = RC.toFixed(1);
     restEl.hidden = false; restEl.classList.remove('over'); restEl.classList.add('timing');
-    restAdd.hidden = !t.total; restAdd.textContent = t.mul === 60 ? '+1 min' : '+10 s'; restSkip.textContent = 'Stop';
+    var by = t.mul === 60 ? '1 min' : '10 s', words = t.mul === 60 ? '1 minute' : '10 seconds';
+    restStep.hidden = !t.total; restBy.textContent = by; restAdd.setAttribute('aria-label', words + ' more'); restSub.setAttribute('aria-label', words + ' less'); restSkip.textContent = 'Stop';
     restArc.setAttribute('stroke-dasharray', full);
     if (now < t.start) { restL.textContent = 'Get ready'; restT.textContent = String(Math.ceil((t.start - now) / 1000)); restArc.setAttribute('stroke-dashoffset', '0'); return; }
     if (!t.go) { t.go = true; beep(); }
@@ -2738,7 +2739,7 @@ var LIBRARY = (function () {
   function drawRest() {
     var tm = state.draft && state.draft.timer;
     if (tm) { drawTimer(tm); return; }
-    if (restEl.classList.contains('timing')) { restEl.classList.remove('timing'); restAdd.hidden = false; restAdd.textContent = '+30 s'; restSkip.textContent = 'Skip'; }
+    if (restEl.classList.contains('timing')) { restEl.classList.remove('timing'); restStep.hidden = false; restBy.textContent = '30 s'; restAdd.setAttribute('aria-label', '30 seconds more'); restSub.setAttribute('aria-label', '30 seconds less'); restSkip.textContent = 'Skip'; }
     if (!rest.until) { if (!restEl.hidden) restEl.hidden = true; return; }
     var left = (rest.until - Date.now()) / 1000;
     if (left <= -8) { stopRest(); return; }
@@ -2952,6 +2953,11 @@ var LIBRARY = (function () {
       case 'finish-now': if (d && draftCount()) finishDraft(); break;
       case 'discard': if (d && arm('discard', render)) { state.draft = null; stopRest(); touchDraft(true); applyTheme(); wake(); render(); window.scrollTo(0, 0); } break;
       case 'rest-skip': if (d && d.timer) timerStop(false); else stopRest(); break;
+      case 'rest-sub':
+        /* taking time off: when less than the step is left, the rest simply ends, and a hold or cardio count is logged as it stands */
+        if (d && d.timer) { var tm = d.timer, stp = tm.mul === 60 ? 60 : 10, gone = Math.max(0, (Date.now() - tm.start) / 1000); if (tm.total - stp <= gone) { if (gone >= 1) timerStop(false); else tm.total = Math.max(stp, tm.total - stp); } else tm.total -= stp; if (d.timer) touchDraft(true); drawRest(); }
+        else if (rest.until) { if (rest.until - Date.now() <= 30000) stopRest(); else { rest.until -= 30000; drawRest(); } }
+        break;
       case 'rest-add': if (d && d.timer) { d.timer.total += d.timer.mul === 60 ? 60 : 10; touchDraft(true); drawRest(); } else if (rest.until) { var base = Math.max(rest.until, Date.now()); rest.until = base + 30000; rest.total = Math.max(rest.total + 30, 30); rest.beeped = false; drawRest(); } break;
       case 'open-ex': exSheet(a.dataset.ex, { u: u, rk: a.dataset.rk }); break;
       case 'open-session': sessionSheet(a.dataset.id); break;

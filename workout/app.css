@@ -724,3 +724,12 @@ body.setup .tabs { display: none; }
 .sheet .tpl { grid-template-columns: minmax(0, 1fr); }
 .setup-foot { text-align: center; }
 .link { color: var(--accent-ink); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+
+/* the countdown bar: minus and plus around the size of the step, then Skip or Stop */
+.rest button { white-space: nowrap; flex: none; }
+.rest-main small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rest-step { display: flex; align-items: center; background: var(--board-line); border-radius: 12px; flex: none; }
+.rest-step button { background: none; width: 40px; padding: 0; font-size: 1.45rem; font-weight: 500; line-height: 1; }
+.rest-step button:active { background: rgba(255, 255, 255, 0.12); }
+.rest-step span { font-size: 0.82rem; font-weight: 600; color: var(--board-dim); min-width: 30px; text-align: center; font-variant-numeric: tabular-nums; white-space: nowrap; }
+@media (max-width: 350px) { .rest svg { display: none; } .rest { padding-left: 14px; gap: 8px; } .rest-step button { width: 36px; } }
