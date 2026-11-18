@@ -995,17 +995,51 @@ var LIBRARY = (function () {
     return { id: key, name: s.name, focus: s.focus, core: s.core, warmup: s.warmupMin ? s.warmup : '', builtin: true, stats: s.stats,
       items: s.exercises.map(function (e) { return { ex: e.id, n: e.n, group: e.group || '', sets: e.sets, lo: e.lo, hi: e.hi, reps: e.reps, rir: e.rir, rest: e.rest, restSec: e.restSec, cue: e.cue, why: e.why, swap: e.swap, detail: e.detail }; }) };
   }
-  function getRoutine(id) {
+  /* a session by id, whether or not it is in the plan right now */
+  function anyRoutine(id) {
     var o = state.routines[id];
-    if (o) return o.hidden ? null : o;
-    return PLAN.sessions[id] ? builtin(id) : null;
+    if (o && o.items) return o;
+    if (!PLAN.sessions[id]) return null;
+    var b = builtin(id); if (o && o.hidden) b.hidden = true; return b;
   }
-  function routineList() {
-    var out = [];
-    BUILTIN.forEach(function (k) { var r = getRoutine(k); if (r) out.push(r); });
-    Object.keys(state.routines).map(function (k) { return state.routines[k]; }).filter(function (r) { return !r.hidden && BUILTIN.indexOf(r.id) < 0; })
+  function getRoutine(id) { var r = anyRoutine(id); return r && !r.hidden ? r : null; }
+  /* every session in the order of the plan; anything the saved order does not mention goes last */
+  function allRoutines() {
+    var out = [], ord = state.settings.planOrder || [];
+    BUILTIN.forEach(function (k) { var r = anyRoutine(k); if (r) out.push(r); });
+    Object.keys(state.routines).map(function (k) { return state.routines[k]; }).filter(function (r) { return r.items && BUILTIN.indexOf(r.id) < 0; })
       .sort(function (a, b) { return (a.createdAt || 0) - (b.createdAt || 0); }).forEach(function (r) { out.push(r); });
-    return out;
+    return out.map(function (r, i) { var q = ord.indexOf(r.id); return [q < 0 ? 1e6 + i : q, r]; }).sort(function (a, b) { return a[0] - b[0]; }).map(function (x) { return x[1]; });
+  }
+  function routineList() { return allRoutines().filter(function (r) { return !r.hidden; }); }
+  function offList() { return allRoutines().filter(function (r) { return r.hidden; }); }
+  function planIds() { return routineList().map(function (r) { return r.id; }); }
+  function setPlanOrder(ids) { state.settings.planOrder = ids; saveSettings(); }
+  function planMove(id, d) {
+    var ids = planIds(), i = ids.indexOf(id), j = i + d;
+    if (i < 0 || j < 0 || j >= ids.length) return;
+    ids[i] = ids[j]; ids[j] = id; setPlanOrder(ids);
+  }
+  /* out of the plan, but kept so it can come back */
+  function planRemove(id) {
+    var o = state.routines[id];
+    if (o && o.items) { o.hidden = true; o.updatedAt = Date.now(); } else state.routines[id] = { id: id, hidden: true, updatedAt: Date.now() };
+    mark('routines/' + id); setPlanOrder(planIds());
+  }
+  function planRestore(id) {
+    var o = state.routines[id]; if (!o) return;
+    if (o.items) { delete o.hidden; o.updatedAt = Date.now(); } else delete state.routines[id];
+    mark('routines/' + id);
+    setPlanOrder(planIds().filter(function (k) { return k !== id; }).concat([id]));
+  }
+  /* hard sets per muscle that one week of the plan adds up to */
+  function planTargets() {
+    var t = {};
+    routineList().forEach(function (r) {
+      if (r.core === false) return;
+      r.items.forEach(function (it) { var e = exi(it.ex); if (e.log === 'cardio') return; Object.keys(e.muscles).forEach(function (mu) { t[mu] = (t[mu] || 0) + (it.sets || 0) * e.muscles[mu]; }); });
+    });
+    return t;
   }
   function shortName(n) { return String(n || '').replace(' (optional)', ''); }
   function restText(sec) { return !sec ? '' : sec < 120 ? sec + ' s' : (sec % 60 ? (Math.round(sec / 6) / 10) : sec / 60) + ' min'; }
@@ -1105,11 +1139,11 @@ var LIBRARY = (function () {
     return { t: e.log === 'time' ? 'Hold a little longer than last time on at least one set.' : 'Keep the weight. Beat last time by one rep on at least one set.' };
   }
   function nextKey() {
-    var f = finished(), list = routineList().filter(function (r) { return r.core !== false; }), ids = list.map(function (r) { return r.id; });
+    var f = finished(), ids = routineList().filter(function (r) { return r.core !== false; }).map(function (r) { return r.id; });
     if (!ids.length) { var any = routineList(); return any.length ? any[0].id : null; }
     for (var i = f.length - 1; i >= 0; i--) { var ix = ids.indexOf(f[i].key); if (ix >= 0) return ids[(ix + 1) % ids.length]; }
-    var wd = WEEKDAY[new Date().getDay()];
-    return ids.indexOf(wd) >= 0 ? wd : ids[0];
+    var wd = state.settings.planOrder ? null : WEEKDAY[new Date().getDay()];
+    return wd && ids.indexOf(wd) >= 0 ? wd : ids[0];
   }
   function lastDone(key) { var f = finished(); for (var i = f.length - 1; i >= 0; i--) if (f[i].key === key) return f[i]; return null; }
   function countSets(s) { return (s.entries || []).reduce(function (a, en) { return a + (exi(en.ex).log === 'cardio' ? 0 : en.sets.length); }, 0); }
@@ -1292,25 +1326,59 @@ var LIBRARY = (function () {
       '<circle class="trk" cx="44" cy="44" r="35"/>' + (pct > 0 ? '<circle class="ring-arc" cx="44" cy="44" r="35" style="stroke:url(#rg);--c:' + C.toFixed(1) + '" stroke-dasharray="' + C.toFixed(1) + '" stroke-dashoffset="' + (C * (1 - pct)).toFixed(1) + '"/>' : '') + '</svg>' +
       '<div class="ring-n"><b>' + n + '/' + goal + '</b><span>this week</span></div></div></div></section>';
   }
+  var planEdit = false;
+  function planCard() {
+    var list = routineList(), h = '';
+    if (!planEdit) {
+      h += '<section class="card"><div class="plan-head"><div><h3>Your plan</h3><p class="sub">Tap a session to start it.</p></div><button class="btn quiet" type="button" data-act="plan-edit">Edit</button></div>';
+      if (!list.length) return h + '<p class="empty">Your plan is empty. Tap Edit to bring a session back, or build a new one below.</p></section>';
+      h += '<ul class="list">';
+      list.forEach(function (x, i) {
+        var l = lastDone(x.id), s = rStats(x);
+        h += '<li><button class="item" type="button" data-act="start" data-key="' + esc(x.id) + '"><span class="avatar av' + (i % 5) + '" aria-hidden="true">' + esc(initials(x.name)) + '</span><span class="txt"><b>' + esc(x.name) + '</b><small>' + plural(s.n, 'exercise') + ' · ' + (l ? 'last done ' + fmtDate(l.date) : 'not logged yet') + '</small></span></button>' +
+          '<button class="icon-btn" type="button" data-act="ed-open" data-key="' + esc(x.id) + '" aria-label="Edit ' + esc(x.name) + '">' + IC.edit + '</button></li>';
+      });
+      return h + '</ul></section>';
+    }
+    var off = offList();
+    h += '<section class="card"><div class="plan-head"><div><h3>Your plan</h3><p class="sub">Put the sessions in the order you train them. Next up follows this order.</p></div><button class="btn quiet" type="button" data-act="plan-done">Done</button></div>';
+    if (list.length) {
+      h += '<ul class="list">';
+      list.forEach(function (x, i) {
+        var k = esc(x.id), nm = esc(x.name);
+        h += '<li class="plan-row"><span class="plan-n" aria-hidden="true">' + (i + 1) + '</span><span class="txt"><b>' + nm + '</b><small>' + plural(rStats(x).n, 'exercise') + (x.core === false ? ' · extra' : '') + '</small></span><span class="mini">' +
+          '<button class="icon-btn" type="button" data-act="plan-up" data-key="' + k + '" aria-label="Move ' + nm + ' up"' + (i ? '' : ' disabled') + '>' + IC.up + '</button>' +
+          '<button class="icon-btn" type="button" data-act="plan-down" data-key="' + k + '" aria-label="Move ' + nm + ' down"' + (i < list.length - 1 ? '' : ' disabled') + '>' + IC.down + '</button>' +
+          '<button class="icon-btn" type="button" data-act="plan-off" data-key="' + k + '" aria-label="Remove ' + nm + ' from the plan">' + IC.x + '</button></span></li>';
+      });
+      h += '</ul>';
+    } else h += '<p class="empty">Nothing in the plan yet.</p>';
+    h += '<button class="add-ex" type="button" data-act="ed-new">+ Add a session</button>';
+    if (off.length) {
+      h += '<p class="sec-title">Not in the plan</p><ul class="list">';
+      off.forEach(function (x) {
+        var k = esc(x.id), own = BUILTIN.indexOf(x.id) < 0;
+        h += '<li class="plan-row"><span class="txt"><b>' + esc(x.name) + '</b><small>' + plural(rStats(x).n, 'exercise') + '</small></span><span class="mini">' +
+          (own ? '<button class="btn sm quiet danger" type="button" data-act="plan-del" data-key="' + k + '">' + (armed === 'pdel' + x.id ? 'Tap again' : 'Delete') + '</button>' : '') +
+          '<button class="btn sm" type="button" data-act="plan-on" data-key="' + k + '">Add back</button></span></li>';
+      });
+      h += '</ul><p class="foot">Workouts you logged with a session stay in your history either way.</p>';
+    }
+    return h + '</section>';
+  }
   function homeView() {
     var key = nextKey(), r = key ? getRoutine(key) : null, f = finished(), h = weekCard(f);
     if (r) {
       var st = rStats(r), ld = lastDone(key), seen = {}, strip = '';
       r.items.forEach(function (it) { var k = exi(it.ex).illo; if (seen[k] || Object.keys(seen).length >= 5) return; seen[k] = 1; strip += '<div class="illo">' + illoSvg(k, null, true) + '</div>'; });
-      h += '<section class="card next"><div class="spread"><span class="label">Next up</span><span class="pill">' + (ld ? 'last done ' + fmtDate(ld.date) : 'not logged yet') + '</span></div>' +
+      h += '<section class="card next"><div class="spread"><span class="label">Next up</span><span class="next-last">' + (ld ? 'last done ' + fmtDate(ld.date) : 'not logged yet') + '</span></div>' +
         '<div><div class="next-title">' + esc(shortName(r.name)) + '</div>' + (r.focus ? '<p class="sub">' + esc(r.focus) + '</p>' : '') + '</div>' +
         (strip ? '<div class="strip">' + strip + '</div>' : '') +
-        '<div class="pills"><span class="pill">' + plural(st.n, 'exercise') + '</span>' + (st.sets ? '<span class="pill">' + st.sets + ' sets</span>' : '') + '<span class="pill">about ' + st.minutes + ' min</span></div>' +
+        '<p class="next-meta">' + plural(st.n, 'exercise') + (st.sets ? ' · ' + st.sets + ' sets' : '') + ' · about ' + st.minutes + ' min</p>' +
         '<button class="btn start block" type="button" data-act="start" data-key="' + esc(key) + '">' + IC.play + 'Start ' + esc(shortName(r.name)) + '</button></section>';
     }
-    h += '<section class="card"><div><h3>Your sessions</h3><p class="sub">Tap one to start it. The pencil changes its exercises.</p></div><ul class="list">';
-    routineList().forEach(function (x, i) {
-      var l = lastDone(x.id), s = rStats(x);
-      h += '<li><button class="item" type="button" data-act="start" data-key="' + esc(x.id) + '"><span class="avatar av' + (i % 5) + '" aria-hidden="true">' + esc(initials(x.name)) + '</span><span class="txt"><b>' + esc(x.name) + '</b><small>' + plural(s.n, 'exercise') + ' · ' + (l ? 'last done ' + fmtDate(l.date) : 'not logged yet') + '</small></span></button>' +
-        '<button class="icon-btn" type="button" data-act="ed-open" data-key="' + esc(x.id) + '" aria-label="Edit ' + esc(x.name) + '">' + IC.edit + '</button></li>';
-    });
-    h += '</ul></section>';
-    h += '<p class="sec-title">Something else</p><div class="actions">' +
+    h += planCard();
+    h += '<div class="actions">' +
       '<button class="action" type="button" data-act="ed-new"><span class="ico">' + IC.plus + '</span><span><b>New session</b><small>Build your own from the exercise library</small></span></button>' +
       '<button class="action alt" type="button" data-act="start" data-key="free"><span class="ico">' + IC.bolt + '</span><span><b>Empty workout</b><small>Start now and add exercises as you go</small></span></button></div>';
     if (f.length) {
@@ -1349,8 +1417,8 @@ var LIBRARY = (function () {
     if (!ed.isNew) {
       var edited = BUILTIN.indexOf(ed.id) >= 0 && state.routines[ed.id];
       if (edited) h += '<button class="btn quiet" type="button" data-act="ed-reset">' + (armed === 'ed-reset' ? 'Tap again to reset' : 'Reset to the original plan') + '</button>';
-      h += '<button class="btn quiet danger" type="button" data-act="ed-remove">' + (armed === 'ed-remove' ? 'Tap again to delete this session' : 'Delete this session') + '</button>' +
-        '<p class="foot">Deleting a session keeps every workout you logged with it.</p>';
+      h += '<button class="btn quiet danger" type="button" data-act="ed-remove">Remove from the plan</button>' +
+        '<p class="foot">It moves to “Not in the plan” under Edit on the Train screen, where you can add it back. Workouts you logged with it are kept.</p>';
     }
     return h;
   }
@@ -1451,13 +1519,41 @@ var LIBRARY = (function () {
     for (i = 0; i < n - 1; i++) { var h = dx[i] / 3; d += 'C' + f(P[i][0] + h) + ' ' + f(P[i][1] + t[i] * h) + ' ' + f(P[i + 1][0] - h) + ' ' + f(P[i + 1][1] - t[i + 1] * h) + ' ' + f(P[i + 1][0]) + ' ' + f(P[i + 1][1]); }
     return d;
   }
-  function gradDefs(id, W, H, m) {
-    return '<defs><linearGradient id="' + id + '-l" gradientUnits="userSpaceOnUse" x1="' + m.l + '" y1="0" x2="' + (W - m.r) + '" y2="0"><stop offset="0" style="stop-color:var(--accent)"/><stop offset="0.6" style="stop-color:var(--teal)"/><stop offset="1" style="stop-color:var(--green)"/></linearGradient>' +
-      '<linearGradient id="' + id + '-a" gradientUnits="userSpaceOnUse" x1="0" y1="' + m.t + '" x2="0" y2="' + (H - m.b) + '"><stop offset="0" style="stop-color:var(--teal);stop-opacity:0.32"/><stop offset="1" style="stop-color:var(--teal);stop-opacity:0"/></linearGradient>' +
-      '<linearGradient id="' + id + '-b" gradientUnits="userSpaceOnUse" x1="0" y1="' + m.t + '" x2="0" y2="' + (H - m.b) + '"><stop offset="0" style="stop-color:var(--teal)"/><stop offset="1" style="stop-color:var(--accent)"/></linearGradient></defs>';
+  /* colour helpers: mix in OKLCH so the steps between two colours stay clean */
+  function hex2lch(h) {
+    function lin(i) { var c = parseInt(h.substr(i, 2), 16) / 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
+    var r = lin(1), g = lin(3), b = lin(5);
+    var l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b), m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b), s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+    var A = 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s, B = 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s;
+    return [0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s, Math.sqrt(A * A + B * B), Math.atan2(B, A)];
   }
-  /* pts: [{x: date, y, tip}]; trend: optional parallel array of smoothed values drawn as the line while pts stay as dots */
-  function lineChart(id, pts, trend) {
+  function lch2hex(L, C, H) {
+    var A = C * Math.cos(H), B = C * Math.sin(H);
+    var l = Math.pow(L + 0.3963377774 * A + 0.2158037573 * B, 3), m = Math.pow(L - 0.1055613458 * A - 0.0638541728 * B, 3), s = Math.pow(L - 0.0894841775 * A - 1.2914855480 * B, 3);
+    function gam(c) { c = Math.max(0, Math.min(1, c)); var v = Math.round(255 * (c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055)); return (v < 16 ? '0' : '') + v.toString(16); }
+    return '#' + gam(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s) + gam(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s) + gam(-0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s);
+  }
+  /* the scale for "how close to the mark": orange when far off, green only close to the mark. The stops live in the stylesheet (--ramp for bars, --ramp-line for lines). */
+  var rampMemo = {};
+  function ramp(name, t) {
+    var v = getComputedStyle(document.documentElement).getPropertyValue(name).trim(), st = rampMemo[v];
+    if (!st) {
+      /* each stop is #rrggbb or #rrggbb@position; without positions the stops are spread evenly */
+      st = rampMemo[v] = v.split(/\s+/).map(function (x) { var m = /^(#[0-9a-f]{6})(?:@([0-9.]+))?$/i.exec(x); return m ? { c: hex2lch(m[1]), p: m[2] == null ? null : +m[2] } : null; }).filter(Boolean);
+      st.forEach(function (x, k) { if (x.p == null) x.p = st.length > 1 ? k / (st.length - 1) : 0; });
+    }
+    if (st.length < 2) return '#1aa858';
+    t = Math.max(0, Math.min(1, t));
+    var i = 0; while (i < st.length - 2 && t > st[i + 1].p) i++;
+    var a = st[i], b = st[i + 1], f = b.p > a.p ? Math.max(0, Math.min(1, (t - a.p) / (b.p - a.p))) : 1;
+    return lch2hex(a.c[0] + (b.c[0] - a.c[0]) * f, a.c[1] + (b.c[1] - a.c[1]) * f, a.c[2] + (b.c[2] - a.c[2]) * f);
+  }
+  function gradDefs(id, W, H, m) {
+    return '<defs><linearGradient id="' + id + '-b" gradientUnits="userSpaceOnUse" x1="0" y1="' + m.t + '" x2="0" y2="' + (H - m.b) + '"><stop offset="0" style="stop-color:var(--teal)"/><stop offset="1" style="stop-color:var(--accent)"/></linearGradient></defs>';
+  }
+  /* pts: [{x: date, y, tip}]; trend: optional parallel array of smoothed values drawn as the line while pts stay as dots.
+     opt.scale [low, high]: the line is orange at or below low and green at or above high. opt.up: blue at the bottom of the chart, green at the top. Neither: one colour. */
+  function lineChart(id, pts, trend, opt) {
     var W = chartW(), H = 190, m = { l: 36, r: 46, t: 14, b: 24 };
     if (!pts.length) return '<p class="sub">No entries yet.</p>';
     var xs = pts.map(function (p) { return toDate(p.x).getTime(); }), ys = pts.map(function (p) { return p.y; }), all = trend ? ys.concat(trend) : ys;
@@ -1465,18 +1561,25 @@ var LIBRARY = (function () {
     var y0 = ticks[0], y1 = ticks[ticks.length - 1];
     function X(v) { return x1 === x0 ? m.l + (W - m.l - m.r) / 2 : m.l + (v - x0) / (x1 - x0) * (W - m.l - m.r); }
     function Y(v) { return H - m.b - (v - y0) / (y1 - y0) * (H - m.t - m.b); }
-    var lineY = trend || ys, last = lineY[lineY.length - 1];
-    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Line chart with ' + pts.length + ' entries, latest ' + fmt(Math.round(last * 10) / 10) + '">' + gradDefs(id, W, H, m);
+    var lineY = trend || ys, last = lineY[lineY.length - 1], stops = '', ga = H - m.b, gb = m.t, k;
+    opt = opt || {};
+    if (opt.scale) { ga = Y(opt.scale[0]); gb = Y(opt.scale[1]); for (k = 0; k <= 6; k++) stops += '<stop offset="' + (k / 6).toFixed(3) + '" stop-color="' + ramp('--ramp-line', k / 6) + '"/>'; }
+    else if (opt.up) stops = '<stop offset="0" style="stop-color:var(--accent)"/><stop offset="0.55" style="stop-color:var(--teal)"/><stop offset="1" style="stop-color:var(--green)"/>';
+    else stops = '<stop offset="0" style="stop-color:var(--accent)"/><stop offset="1" style="stop-color:var(--accent)"/>';
+    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Line chart with ' + pts.length + ' entries, latest ' + fmt(Math.round(last * 10) / 10) + '">' +
+      '<defs><linearGradient id="' + id + '-l" gradientUnits="userSpaceOnUse" x1="0" y1="' + ga.toFixed(1) + '" x2="0" y2="' + gb.toFixed(1) + '">' + stops + '</linearGradient>' +
+      '<linearGradient id="' + id + '-f" gradientUnits="userSpaceOnUse" x1="0" y1="' + m.t + '" x2="0" y2="' + (H - m.b) + '"><stop offset="0" stop-color="#fff" stop-opacity="0.3"/><stop offset="1" stop-color="#fff" stop-opacity="0.03"/></linearGradient>' +
+      '<mask id="' + id + '-m" maskUnits="userSpaceOnUse" x="0" y="0" width="' + W + '" height="' + H + '"><rect x="0" y="0" width="' + W + '" height="' + H + '" fill="url(#' + id + '-f)"/></mask></defs>';
     ticks.forEach(function (t) { s += '<line class="grid" x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + Y(t) + '" y2="' + Y(t) + '"/><text x="' + (m.l - 6) + '" y="' + (Y(t) + 4) + '" text-anchor="end">' + fmt(t) + '</text>'; });
     var P = pts.map(function (p, i) { return [X(xs[i]), Y(p.y)]; }), Lp = lineY.map(function (v, i) { return [X(xs[i]), Y(v)]; });
     if (Lp.length > 1) {
       var dstr = smoothPath(Lp);
-      s += '<path class="area" style="fill:url(#' + id + '-a)" d="' + dstr + ' L' + Lp[Lp.length - 1][0].toFixed(1) + ' ' + (H - m.b) + ' L' + Lp[0][0].toFixed(1) + ' ' + (H - m.b) + ' Z"/><path class="ln draw" pathLength="1" style="stroke:url(#' + id + '-l)" d="' + dstr + '"/>';
+      s += '<path class="area" style="fill:url(#' + id + '-l)" mask="url(#' + id + '-m)" d="' + dstr + ' L' + Lp[Lp.length - 1][0].toFixed(1) + ' ' + (H - m.b) + ' L' + Lp[0][0].toFixed(1) + ' ' + (H - m.b) + ' Z"/><path class="ln draw" pathLength="1" style="stroke:url(#' + id + '-l)" d="' + dstr + '"/>';
     }
     if (trend) P.forEach(function (p) { s += '<circle class="dot2" r="2.6" cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '"/>'; });
     var e = Lp[Lp.length - 1];
     s += '<line class="cross" id="' + id + '-x" y1="' + m.t + '" y2="' + (H - m.b) + '" x1="0" x2="0" visibility="hidden"/><circle class="dot" id="' + id + '-d" r="4" cx="0" cy="0" visibility="hidden"/>';
-    s += '<circle class="halo" r="5" cx="' + e[0] + '" cy="' + e[1] + '"/><circle class="dot end" r="5" cx="' + e[0] + '" cy="' + e[1] + '"/><text class="val" x="' + (e[0] + 10) + '" y="' + (e[1] + 4) + '">' + fmt(Math.round(last * 10) / 10) + '</text>';
+    s += '<circle class="halo" r="5" style="fill:url(#' + id + '-l)" cx="' + e[0] + '" cy="' + e[1] + '"/><circle class="dot end" r="5" style="fill:url(#' + id + '-l)" cx="' + e[0] + '" cy="' + e[1] + '"/><text class="val" x="' + (e[0] + 10) + '" y="' + (e[1] + 4) + '">' + fmt(Math.round(last * 10) / 10) + '</text>';
     s += '<text x="' + P[0][0] + '" y="' + (H - 6) + '" text-anchor="' + (P.length > 1 ? 'start' : 'middle') + '">' + fmtDate(pts[0].x, true) + '</text>';
     if (P.length > 1) s += '<text x="' + e[0] + '" y="' + (H - 6) + '" text-anchor="end">' + fmtDate(pts[pts.length - 1].x, true) + '</text>';
     s += '</svg><div class="tip" id="' + id + '-t" hidden></div>';
@@ -1535,23 +1638,22 @@ var LIBRARY = (function () {
       '<div class="cal-rows"><span>Mon</span><span></span><span>Wed</span><span></span><span>Fri</span><span></span><span>Sun</span></div><div class="cal-grid">' + h + '</div></div>';
   }
   function muscleBars(list) {
-    var ws = weekStart(today()), four = state.ui.musWin === 'four', from = four ? addDays(ws, -21) : ws, got = {}, h = '', plan = {};
-    PLAN.muscles.forEach(function (m) { plan[m.id] = m.plan; });
+    var ws = weekStart(today()), four = state.ui.musWin === 'four', from = four ? addDays(ws, -21) : ws, got = {}, h = '', plan = planTargets();
     list.forEach(function (s) { if (s.date < from) return; (s.entries || []).forEach(function (en) { var e = exi(en.ex); if (e.log === 'cardio') return; Object.keys(e.muscles).forEach(function (mu) { got[mu] = (got[mu] || 0) + en.sets.length * e.muscles[mu] / (four ? 4 : 1); }); }); });
     var rows = LIBRARY.MUSCLES.filter(function (m) { return plan[m.id] || got[m.id]; }), free = 10;
+    if (!rows.length) return '<p class="sub">Add a session to your plan to get weekly targets.</p>';
     rows.forEach(function (m) { if (!plan[m.id]) free = Math.max(free, got[m.id] || 0); });
     h += '<div class="mus">';
     rows.forEach(function (m) {
-      var g = Math.round((got[m.id] || 0) * 10) / 10, p = plan[m.id], pct = Math.min(1, g / (p || free)), hit = p && g >= p;
-      var fill = p ? 'background:color-mix(in oklab, var(--mus-hi) ' + Math.round(pct * 100) + '%, var(--mus-lo));' : '';
-      h += '<span>' + esc(m.name) + '</span><div class="mus-track" role="img" aria-label="' + esc(m.name) + ': ' + fmt(g) + (p ? ' of ' + p + ' planned sets' : ' sets') + '"><div class="mus-fill" style="' + fill + 'width:' + (g > 0 ? Math.max(4, pct * 100) : 0).toFixed(1) + '%"></div></div>' +
-        '<span class="mus-val">' + (hit ? IC.check : '') + '<span><b>' + fmt(g) + '</b>' + (p ? ' / ' + p : '') + '</span></span>';
+      var g = Math.round((got[m.id] || 0) * 10) / 10, p = plan[m.id] ? Math.round(plan[m.id] * 10) / 10 : 0, pct = Math.min(1, g / (p || free)), hit = p && g >= p;
+      h += '<span>' + esc(m.name) + '</span><div class="mus-track" role="img" aria-label="' + esc(m.name) + ': ' + fmt(g) + (p ? ' of ' + fmt(p) + ' planned sets' : ' sets') + '"><div class="mus-fill" style="' + (p ? 'background:' + ramp('--ramp', pct) + ';' : '') + 'width:' + (g > 0 ? Math.max(4, pct * 100) : 0).toFixed(1) + '%"></div></div>' +
+        '<span class="mus-val">' + (hit ? IC.check : '') + '<span><b>' + fmt(g) + '</b>' + (p ? ' / ' + fmt(p) : '') + '</span></span>';
     });
     return h + '</div>';
   }
   function badgesHtml(list) {
     return '<div class="badges">' + milestones(list).map(function (m) {
-      return '<div class="badge' + (m.got ? ' got' : '') + '"><i style="--p:' + Math.round((m.next ? m.pct : 1) * 100) + '"><b>' + m.show + '</b></i><span>' + esc(m.label) + '</span><span class="foot">' + (m.next ? (m.unit === 't' ? fmt(Math.round(m.value * 10) / 10) : Math.floor(m.value)) + ' of ' + m.next : 'all done') + '</span></div>';
+      return '<div class="badge' + (m.got ? ' got' : '') + (m.next ? '' : ' full') + '"><i style="--p:' + Math.round((m.next ? m.pct : 1) * 100) + '"><b>' + m.show + '</b>' + (m.got ? '<em class="tick">' + IC.check + '</em>' : '') + '</i><span>' + esc(m.label) + '</span><span class="foot">' + (m.next ? (m.unit === 't' ? fmt(Math.round(m.value * 10) / 10) : Math.floor(m.value)) + ' of ' + m.next : 'all done') + '</span></div>';
     }).join('') + '</div>';
   }
   function overviewView(list, demo) {
@@ -1572,12 +1674,12 @@ var LIBRARY = (function () {
       colChart('vol', vw, { label: 'Kilograms lifted per week for the last 10 weeks', fmt: function (t) { return t >= 1000 ? (t / 1000) + 'K' : t; }, tip: function (w) { return '<b>Week of ' + fmtDate(w.start, true) + '</b><br>' + compact(w.a) + ' kg lifted'; } }) + '</div></section>';
     var durs = list.map(function (s) { return { s: s, d: durOf(s) }; }).filter(function (x) { return x.d; }).slice(-24);
     h += '<section class="card"><div class="spread"><h3>Workout length</h3>' + (durs.length ? '<span class="pill">average ' + fmtDur(durs.reduce(function (a, x) { return a + x.d; }, 0) / durs.length) + '</span>' : '') + '</div>';
-    h += durs.length ? '<p class="sub">Minutes from start to finish.</p><div class="chart" data-chart="dur">' + lineChart('dur', durs.map(function (x) { return { x: x.s.date, y: Math.round(x.d / 60), tip: '<b>' + fmtDate(x.s.date) + '</b><br>' + esc(x.s.name || 'Workout') + ' · ' + fmtDur(x.d) }; })) + '</div>' : '<p class="sub">The clock at the top of a workout records how long it took. Your next finished workout shows up here.</p>';
+    h += durs.length ? '<p class="sub">Minutes from start to finish. The line is orange for short workouts and turns green at 60 minutes.</p><div class="chart" data-chart="dur">' + lineChart('dur', durs.map(function (x) { return { x: x.s.date, y: Math.round(x.d / 60), tip: '<b>' + fmtDate(x.s.date) + '</b><br>' + esc(x.s.name || 'Workout') + ' · ' + fmtDur(x.d) }; }), null, { scale: [30, 60] }) + '</div>' : '<p class="sub">The clock at the top of a workout records how long it took. Your next finished workout shows up here.</p>';
     h += '</section>';
     h += '<section class="card"><h3>Hard sets per muscle</h3>' +
       '<div class="seg" role="group" aria-label="Period"><button type="button" data-act="mus-win" data-v="week" aria-pressed="' + (state.ui.musWin !== 'four') + '">This week</button><button type="button" data-act="mus-win" data-v="four" aria-pressed="' + (state.ui.musWin === 'four') + '">Average of 4 weeks</button></div>' +
-      '<p class="sub">Each bar fills toward that muscle’s weekly target and turns green as it gets there. Assisting work counts as half a set.</p>' + muscleBars(list) + '</section>';
-    h += '<section class="card"><div><h3>Milestones</h3><p class="sub">The ring shows how close the next one is.</p></div>' + badgesHtml(list) + '</section>';
+      '<p class="sub">Each bar fills toward the sets your plan gives that muscle in a week, staying orange most of the way and turning green as it gets close. Assisting work counts as half a set.</p>' + muscleBars(list) + '</section>';
+    h += '<section class="card"><div><h3>Milestones</h3><p class="sub">A tick marks a level you have reached. The ring shows how close the next one is.</p></div>' + badgesHtml(list) + '</section>';
     return h;
   }
   function liftsView(list) {
@@ -1588,7 +1690,7 @@ var LIBRARY = (function () {
     var e = exi(exId), hist = historyOf(exId, list), rec = recs.filter(function (r) { return r.id === exId; })[0];
     h += '<section class="card"><h3>Exercise progress</h3><button class="btn block" type="button" data-act="pick-lift" style="justify-content:space-between"><span>' + esc(e.name) + '</span><span class="chev" aria-hidden="true">›</span></button>' +
       '<p class="sub">' + esc(metricLabel(e)) + (e.log === 'wr' ? ', from the best set of each workout (weight × (1 + reps ÷ 30)).' : ' in each workout.') + '</p>' +
-      '<div class="chart" data-chart="exc">' + lineChart('exc', hist.map(function (x) { return { x: x.date, y: metric(e, x.sets), tip: '<b>' + fmtDate(x.date) + '</b><br>' + esc(setsText(e, x.sets)) }; })) + '</div>';
+      '<div class="chart" data-chart="exc">' + lineChart('exc', hist.map(function (x) { return { x: x.date, y: metric(e, x.sets), tip: '<b>' + fmtDate(x.date) + '</b><br>' + esc(setsText(e, x.sets)) }; }), null, { up: true }) + '</div>';
     if (rec) h += '<div class="pills"><span class="pill hot">Best set: ' + esc(setsText(e, [topSet(e, rec.sets)])) + ' · ' + fmtDate(rec.date, true) + '</span>' + (rec.n > 1 && rec.first > 0 ? '<span class="pill' + (rec.last >= rec.first ? ' good' : '') + '">' + (rec.last >= rec.first ? '+' : '') + Math.round((rec.last - rec.first) / rec.first * 100) + '% since you started</span>' : '') + '</div>';
     h += '<table class="hist"><tbody>'; hist.slice(-5).reverse().forEach(function (x) { h += '<tr><td>' + fmtDate(x.date) + '</td><td>' + esc(setsText(e, x.sets)) + '</td></tr>'; }); h += '</tbody></table></section>';
     var gains = recs.filter(function (r) { return r.n >= 2 && r.first > 0 && r.last > r.first; }).map(function (r) { return { r: r, pct: (r.last - r.first) / r.first }; }).sort(function (a, b) { return b.pct - a.pct; }).slice(0, 5);
@@ -1666,7 +1768,7 @@ var LIBRARY = (function () {
   }
   function searchBox(id, val) { return '<div class="search">' + IC.search + '<input id="' + id + '" type="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Search ' + allEx().length + ' exercises" value="' + esc(val) + '" aria-label="Search exercises"></div>'; }
   function libraryView() {
-    var f = state.ui.lib || 'all', h = searchBox('lib-q', libQ) + chipsHtml(f, 'lib', [['mine', 'My sessions']]);
+    var f = state.ui.lib || 'all', h = searchBox('lib-q', libQ) + chipsHtml(f, 'lib', [['mine', 'In my plan']]);
     if (f === 'mine' && !libQ) {
       routineList().forEach(function (r) {
         h += '<section class="card"><div><h2>' + esc(r.name) + '</h2>' + (r.focus ? '<p class="sub">' + esc(r.focus) + '</p>' : '') + '</div><div class="guide">';
@@ -1791,7 +1893,7 @@ var LIBRARY = (function () {
     chrome(); observe();
   }
   function go(tab, push) {
-    state.ui.tab = tab; saveLocal(); render(); enter(); window.scrollTo(0, 0);
+    planEdit = false; state.ui.tab = tab; saveLocal(); render(); enter(); window.scrollTo(0, 0);
     if (push) { try { if (location.hash !== '#' + tab) location.hash = tab; } catch (e) {} }
   }
   function fromHash() { var h = (location.hash || '').replace('#', ''); if (h === 'log' || h === 'progress' || h === 'exercises') { if (h !== state.ui.tab) go(h, false); return true; } return false; }
@@ -1977,7 +2079,7 @@ var LIBRARY = (function () {
     if (ev.target === scrim) { closeSheet(); return; }
     var a = ev.target.closest('[data-act]'); if (!a) return;
     var act = a.dataset.act, d = state.draft, u = a.dataset.u, i = +a.dataset.i, it, e;
-    if (['discard', 'delete-session', 'finish', 'ed-reset', 'ed-remove', 'custom-del'].indexOf(act) < 0) armed = null;
+    if (['discard', 'delete-session', 'finish', 'ed-reset', 'plan-del', 'custom-del'].indexOf(act) < 0) armed = null;
     switch (act) {
       case 'start': if (!state.draft) startDraft(a.dataset.key); break;
       case 'go-workout': if (state.ui.tab !== 'log') go('log', true); else window.scrollTo(0, 0); break;
@@ -2030,7 +2132,7 @@ var LIBRARY = (function () {
       case 'edit-session': { var s2 = state.sessions[a.dataset.id]; if (s2 && !state.draft) { closeSheet(); startDraft(s2.key, s2); } break; }
       case 'delete-session': { var id = a.dataset.id; if (arm('del' + id, function () { if (!scrim.hidden) sessionSheet(id); })) { delete state.sessions[id]; mark('sessions/' + id); closeSheet(); render(); } break; }
       case 'settings': settingsSheet(); break;
-      case 'theme': state.settings.theme = a.dataset.v; saveSettings(); applyTheme(); settingsSheet(); break;
+      case 'theme': state.settings.theme = a.dataset.v; saveSettings(); applyTheme(); render(); settingsSheet(); break;
       case 'goal': state.settings.weeklyGoal = Math.max(1, Math.min(7, (state.settings.weeklyGoal || 4) + (+a.dataset.d))); saveSettings(); settingsSheet(); render(); break;
       case 'toggle': state.settings[a.dataset.k] = !state.settings[a.dataset.k]; saveSettings(); if (a.dataset.k === 'sound' && state.settings.sound) { unlockAudio(); beep(); } wake(); settingsSheet(); break;
       case 'backup-save': saveBackupFile(); break;
@@ -2069,10 +2171,14 @@ var LIBRARY = (function () {
       case 'ed-sets': editor.items[i].sets = Math.max(1, Math.min(10, editor.items[i].sets + (+a.dataset.d))); render(); break;
       case 'ed-save': saveEditor(); break;
       case 'ed-reset': if (arm('ed-reset', render)) { delete state.routines[editor.id]; mark('routines/' + editor.id); editor = null; render(); toast('Back to the original plan'); } break;
-      case 'ed-remove': if (arm('ed-remove', render)) {
-        if (BUILTIN.indexOf(editor.id) >= 0) { state.routines[editor.id] = { id: editor.id, hidden: true, updatedAt: Date.now() }; } else delete state.routines[editor.id];
-        mark('routines/' + editor.id); editor = null; render(); window.scrollTo(0, 0); toast('Session deleted');
-      } break;
+      case 'ed-remove': planRemove(editor.id); editor = null; planEdit = true; render(); window.scrollTo(0, 0); toast('Removed from your plan'); break;
+      case 'plan-edit': planEdit = true; render(); break;
+      case 'plan-done': planEdit = false; render(); break;
+      case 'plan-up': planMove(a.dataset.key, -1); render(); break;
+      case 'plan-down': planMove(a.dataset.key, 1); render(); break;
+      case 'plan-off': planRemove(a.dataset.key); render(); break;
+      case 'plan-on': planRestore(a.dataset.key); render(); break;
+      case 'plan-del': { var pk = a.dataset.key; if (arm('pdel' + pk, render)) { delete state.routines[pk]; mark('routines/' + pk); render(); toast('Session deleted'); } break; }
       case 'sum-update': case 'sum-save': {
         var sm = summary; if (!sm) break;
         var old = sm.key !== 'free' ? getRoutine(sm.key) : null, rich = {};
@@ -2080,7 +2186,7 @@ var LIBRARY = (function () {
         var items = sm.items.map(function (x) { var o = Object.assign({}, x), r0 = rich[x.ex]; if (r0) ['rir', 'cue', 'why', 'swap', 'detail'].forEach(function (k) { if (r0[k]) o[k] = r0[k]; }); return o; });
         if (act === 'sum-update' && old) saveRoutine({ id: old.id, name: old.name, focus: old.focus || '', core: old.core !== false, warmup: old.warmup || '', createdAt: old.createdAt || Date.now(), items: items });
         else { var rid = 'r' + uid(), nm2 = sm.name && sm.name !== 'Workout' ? sm.name : 'My session'; saveRoutine({ id: rid, name: nm2, focus: '', core: true, warmup: '', createdAt: Date.now(), items: items }); if (state.sessions[sm.id]) { state.sessions[sm.id].key = rid; state.sessions[sm.id].name = nm2; mark('sessions/' + sm.id); } sm.name = nm2; }
-        sm.offer = null; render(); openSummary(); toast(act === 'sum-update' ? 'Session updated' : 'Saved to your sessions');
+        sm.offer = null; render(); openSummary(); toast(act === 'sum-update' ? 'Session updated' : 'Saved to your plan');
         break;
       }
     }
@@ -2132,7 +2238,7 @@ var LIBRARY = (function () {
     if (!document.hidden) { flushDirty(); tickClock(); drawRest(); }
     wake();
   });
-  if (window.matchMedia) { try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme); } catch (e) {} }
+  if (window.matchMedia) { try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () { applyTheme(); if (!isTyping()) render(); }); } catch (e) {} }
 
   /* ================= boot ================= */
   state.draft = migrateDraft(state.draft);
