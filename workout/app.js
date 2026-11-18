@@ -1185,8 +1185,8 @@ var LIBRARY = (function () {
     var st = streakWeeks(list), gw = goalWeeks(list), t = vol / 1000;
     function step(v, steps) { for (var i = 0; i < steps.length; i++) if (v < steps[i]) return { goal: steps[i], prev: i ? steps[i - 1] : 0, got: i }; return { goal: steps[steps.length - 1], prev: steps[steps.length - 1], got: steps.length }; }
     function M(label, v, steps, unit) { var s = step(v, steps), done = s.got > 0; return { label: label, steps: steps, level: s.got, value: v, show: done ? (s.got === steps.length ? steps[steps.length - 1] : s.prev) : s.goal, unit: unit, got: done, next: s.got < steps.length ? s.goal : null, pct: s.got < steps.length ? Math.max(0, Math.min(1, (v - s.prev) / (s.goal - s.prev))) : 1 }; }
-    return [M('Workouts logged', n, [1, 5, 10, 25, 50, 100, 200], ''), M('Weeks in a row', st, [2, 4, 8, 12, 26, 52], 'wk'), M('Weeks on target', gw, [1, 4, 8, 12, 26], ''),
-      M('Tonnes lifted', t, [1, 5, 10, 25, 50, 100, 250, 500], 't'), M('Hard sets', sets, [50, 100, 250, 500, 1000, 2500], ''), M('Personal bests', prs, [1, 5, 10, 25, 50, 100], '')];
+    return [M('Workouts logged', n, [1, 5, 10, 25, 50, 100, 200, 400], ''), M('Weeks in a row', st, [2, 4, 8, 12, 26, 52, 78, 104], 'wk'), M('Weeks on target', gw, [1, 4, 8, 12, 26, 52, 78, 104], ''),
+      M('Tonnes lifted', t, [5, 10, 25, 50, 100, 250, 500, 1000], 't'), M('Hard sets', sets, [50, 100, 250, 500, 1000, 2500, 5000, 10000], ''), M('Personal bests', prs, [1, 5, 10, 25, 50, 100, 200, 400], '')];
   }
   var FUN = [[100, 'a newborn elephant'], [400, 'a grand piano'], [700, 'a dairy cow'], [1300, 'a small car'], [3000, 'a hippo'], [6000, 'an African elephant'], [8000, 'a T. rex'], [12000, 'a double-decker bus'], [20000, 'a fire engine'], [36000, 'a humpback whale']];
   function funVolume(kg) { if (kg < 100) return ''; var pick = FUN[0]; FUN.forEach(function (f) { if (kg >= f[0]) pick = f; }); var k = kg / pick[0]; return 'You moved ' + compact(kg) + ' kg in total. That is about ' + (k >= 1.75 ? (Math.round(k * 2) / 2) + ' times ' : '') + 'the weight of ' + pick[1] + '.'; }
@@ -1357,7 +1357,7 @@ var LIBRARY = (function () {
     var st = streakWeeks(f), C = 2 * Math.PI * 35, pct = Math.min(1, n / goal), left = goal - n;
     var note = st >= 2 ? '<span class="pill hot">' + IC.flame + st + ' weeks in a row</span>' : '<span class="sub">' + (left <= 0 ? 'Weekly goal reached.' : left + ' more to reach this week’s goal.') + '</span>';
     return '<section class="card"><div class="week"><div class="week-l"><div class="days" role="img" aria-label="' + n + ' of ' + goal + ' sessions done this week">' + h + '</div><div class="pills">' + note + '</div></div>' +
-      '<div class="ring"><svg viewBox="0 0 88 88" aria-hidden="true"><defs><linearGradient id="rg" gradientUnits="userSpaceOnUse" x1="44" y1="0" x2="44" y2="88"><stop offset="0" style="stop-color:var(--green)"/><stop offset="0.55" style="stop-color:var(--teal)"/><stop offset="1" style="stop-color:var(--accent)"/></linearGradient></defs>' +
+      '<div class="ring"><svg viewBox="0 0 88 88" aria-hidden="true"><defs><linearGradient id="rg" gradientUnits="userSpaceOnUse" x1="44" y1="0" x2="44" y2="88"><stop offset="0" style="stop-color:var(--lime)"/><stop offset="0.55" style="stop-color:var(--teal)"/><stop offset="1" style="stop-color:var(--accent)"/></linearGradient></defs>' +
       '<circle class="trk" cx="44" cy="44" r="35"/>' + (pct > 0 ? '<circle class="ring-arc" cx="44" cy="44" r="35" style="stroke:url(#rg);--c:' + C.toFixed(1) + '" stroke-dasharray="' + C.toFixed(1) + '" stroke-dashoffset="' + (C * (1 - pct)).toFixed(1) + '"/>' : '') + '</svg>' +
       '<div class="ring-n"><b>' + n + '/' + goal + '</b><span>this week</span></div></div></div></section>';
   }
@@ -1694,7 +1694,8 @@ var LIBRARY = (function () {
     return h + '</div>';
   }
   /* milestone levels climb through these, like ranks in a game */
-  var TIERS = [['Tin', '#9ba6a9', '#16262a'], ['Copper', '#c57a4c', '#ffffff'], ['Silver', '#c5ced2', '#16262a'], ['Gold', '#e4b93e', '#3b2a00'], ['Emerald', '#1faa72', '#ffffff'], ['Platinum', '#e8eef0', '#16262a'], ['Diamond', '#7fe2f5', '#06323a'], ['Onyx', '#161c1e', '#b6ff1a']];
+  /* name, fill, text on the fill, the name's colour on a light page, and on a dark page */
+  var TIERS = [['Tin', '#9ba6a9', '#16262a', '#6c797d', '#aab5b8'], ['Copper', '#c57a4c', '#ffffff', '#a9582a', '#dd9467'], ['Silver', '#c5ced2', '#16262a', '#7a878d', '#cfd8dc'], ['Gold', '#e4b93e', '#3b2a00', '#a07700', '#ecc552'], ['Emerald', '#1faa72', '#ffffff', '#0e8558', '#40d195'], ['Platinum', '#e8eef0', '#16262a', '#5c7c88', '#e8eef0'], ['Diamond', '#7fe2f5', '#06323a', '#0a8aab', '#7fe2f5'], ['Onyx', '#5b21b6', '#ffffff', '#6d28d9', '#a78bfa']];
   function tierOf(level) { return level > 0 ? TIERS[Math.min(level, TIERS.length) - 1] : null; }
   function msNum(m, v) { return m.unit === 't' ? fmt(Math.round(v * 10) / 10) : String(Math.floor(v)); }
   function badgesHtml(list) {
@@ -1711,7 +1712,7 @@ var LIBRARY = (function () {
     h += '<ul class="ms-list">';
     m.steps.forEach(function (g, k) {
       var tt = TIERS[Math.min(k, TIERS.length - 1)], done = k < m.level, cur = k === m.level;
-      h += '<li class="' + (cur ? 'cur' : '') + '"><span class="tier-dot' + (done ? '' : ' off') + '"' + (done ? ' style="--tier:' + tt[1] + '"' : '') + '></span><span class="txt"><b>' + tt[0] + '</b><small>' + g + unit + '</small></span><span class="st' + (done ? ' ok' : '') + '">' + (done ? 'Reached' : cur ? msNum(m, Math.max(0, g - m.value)) + unit + ' to go' : 'Locked') + '</span></li>';
+      h += '<li class="' + (cur ? 'cur' : done ? '' : 'off') + '" style="--tier:' + tt[1] + ';--tl:' + tt[3] + ';--td:' + tt[4] + '"><span class="tier-dot' + (done ? ' on' : ' off') + '">' + (done ? IC.check : '') + '</span><span class="txt"><b>' + tt[0] + '</b><small>' + g + unit + '</small></span><span class="st">' + (done ? '<span class="sr">Reached</span>' : cur ? msNum(m, Math.max(0, g - m.value)) + unit + ' to go' : 'Locked') + '</span></li>';
     });
     h += '</ul><button class="btn primary block" type="button" data-act="sheet-x">Done</button>';
     openSheet(h);
@@ -1761,11 +1762,10 @@ var LIBRARY = (function () {
     h += '<section class="card"><div class="spread" style="align-items:center"><h3>Exercise progress</h3><button class="info-btn" type="button" data-act="lift-info" aria-expanded="' + liftInfo + '" aria-label="What this chart shows">i</button></div>' +
       '<button class="btn block" type="button" data-act="pick-lift" style="justify-content:space-between"><span>' + esc(e.name) + '</span><span class="chev" aria-hidden="true">›</span></button>' +
       (wr ? modeSeg() : '') +
-      (liftInfo ? '<p class="note">' + (wr ? (mode === 'max' ? 'Top weight is the heaviest weight you used in each workout, in kg.' : 'Estimated 1-rep max (kg), from the best set of each workout: weight × (1 + reps ÷ 30). It lets sets with different weights and reps be compared.') : esc(metricLabel(e)) + ' in each workout.') + (onGraph ? ' Grey dots are the other sets; tap one to see its reps.' : '') + '</p>' : '') +
+      (liftInfo ? '<p class="note">' + (wr ? (mode === 'max' ? 'Top weight is the heaviest weight you used in each workout, in kg.' : 'Estimated 1-rep max (kg), from the best set of each workout: weight × (1 + reps ÷ 30). It lets sets with different weights and reps be compared.') : esc(metricLabel(e)) + ' in each workout.') + ' Tap a point to see the sets.' + (onGraph ? ' Grey dots are the sets below the top one.' : '') + '</p>' : '') +
       '<div class="chart" data-chart="exc">' + lineChart('exc', hist.map(function (x) { return { x: x.date, y: liftVal(e, x.sets, mode), tip: '<b>' + fmtDate(x.date) + '</b><br>' + esc(setsText(e, onGraph ? [bestSet(e, x.sets, mode)] : x.sets)) }; }), null, { up: true, extra: extra }) + '</div>';
     if (rec) h += '<div class="pills"><span class="pill hot">Best set: ' + esc(setsText(e, [bestSet(e, rec.sets, mode)])) + ' · ' + fmtDate(rec.date, true) + '</span>' + (rec.n > 1 && rec.first > 0 && rec.last !== rec.first ? '<span class="pill' + (rec.last >= rec.first ? ' good' : '') + '">' + (rec.last >= rec.first ? '+' : '') + Math.round((rec.last - rec.first) / rec.first * 100) + '% since you started</span>' : '') + '</div>';
-    h += '<div class="seg" role="group" aria-label="Where to show every set"><button type="button" data-act="lift-sets" data-v="list" aria-pressed="' + !onGraph + '">Sets as a list</button><button type="button" data-act="lift-sets" data-v="graph" aria-pressed="' + onGraph + '">Sets on the graph</button></div>';
-    if (!onGraph) { h += '<table class="hist"><tbody>'; hist.slice(-5).reverse().forEach(function (x) { h += '<tr><td>' + fmtDate(x.date) + '</td><td>' + esc(setsText(e, x.sets)) + '</td></tr>'; }); h += '</tbody></table>'; }
+    h += '<button class="toggle" type="button" data-act="lift-sets" data-v="' + (onGraph ? 'off' : 'graph') + '" aria-pressed="' + onGraph + '"><i>' + IC.check + '</i>All sets</button>';
     h += '</section>';
     var gains = recs.filter(function (r) { return r.n >= 2 && r.first > 0 && r.last > r.first; }).map(function (r) { return { r: r, pct: (r.last - r.first) / r.first }; }).sort(function (a, b) { return b.pct - a.pct; }).slice(0, 5);
     if (gains.length) {
@@ -2049,8 +2049,10 @@ var LIBRARY = (function () {
   }
 
   /* ================= chart hover ================= */
+  var tipTimer = null;
   function chartPointer(ev) {
     var box = ev.target.closest && ev.target.closest('.chart'); if (!box) return;
+    clearTimeout(tipTimer);
     var id = box.dataset.chart, c = charts[id], svg = box.querySelector('svg'), tip = document.getElementById(id + '-t'); if (!c || !svg || !tip) return;
     var r = svg.getBoundingClientRect(), x = (ev.clientX - r.left) / r.width * c.W, html = '', px = 0, py = 0;
     if (c.type === 'line') {
@@ -2074,15 +2076,22 @@ var LIBRARY = (function () {
     var sx = r.width / c.W, left = Math.max(0, Math.min(px * sx - tip.offsetWidth / 2, r.width - tip.offsetWidth));
     tip.style.left = left + 'px'; tip.style.top = Math.max(0, py * sx - tip.offsetHeight - 12) + 'px';
   }
+  function chartHide(id) {
+    var tip = document.getElementById(id + '-t'); if (tip) tip.hidden = true;
+    ['-x', '-d'].forEach(function (k) { var el = document.getElementById(id + k); if (el) el.setAttribute('visibility', 'hidden'); });
+  }
+  /* a finger lifts as soon as it taps, so on touch the pop-up stays for two seconds; a mouse hides it on leaving */
   function chartLeave(ev) {
     var box = ev.target.closest && ev.target.closest('.chart'); if (!box) return;
-    if (ev.relatedTarget && box.contains(ev.relatedTarget)) return;
-    var id = box.dataset.chart, tip = document.getElementById(id + '-t'); if (tip) tip.hidden = true;
-    ['-x', '-d'].forEach(function (s) { var el = document.getElementById(id + s); if (el) el.setAttribute('visibility', 'hidden'); });
+    if (ev.type === 'pointerout' && ev.relatedTarget && box.contains(ev.relatedTarget)) return;
+    var id = box.dataset.chart; clearTimeout(tipTimer);
+    if (ev.pointerType === 'mouse') chartHide(id); else tipTimer = setTimeout(function () { chartHide(id); }, 2000);
   }
   view.addEventListener('pointermove', chartPointer);
   view.addEventListener('pointerdown', chartPointer);
   view.addEventListener('pointerout', chartLeave);
+  view.addEventListener('pointerup', chartLeave);
+  view.addEventListener('pointercancel', chartLeave);
 
   /* ================= arriving on a screen: charts draw in and the big numbers count up ================= */
   var enterTimer = null;
