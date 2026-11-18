@@ -1877,7 +1877,7 @@ var LIBRARY = (function () {
     h += '<div class="setting stack"><div><b>Backup</b><small>' + (STANDALONE ? 'Everything is stored on this phone only. Save a backup file now and then.' : 'Your log syncs through Claude. A backup lets you move it elsewhere.') + '</small></div>' +
       '<div class="row">' + (STANDALONE ? '<button class="btn sm" type="button" data-act="backup-save">Save backup file</button>' : '') + '<button class="btn sm" type="button" data-act="backup-show">Show backup text</button><label class="btn sm">Restore from file<input id="backup-file" type="file" accept=".json,application/json,text/plain" hidden></label></div>' +
       '<div id="backup-box" hidden><textarea class="backup" id="backup-text" spellcheck="false" aria-label="Backup text"></textarea><div class="row"><button class="btn sm" type="button" data-act="backup-copy">Copy</button><button class="btn sm" type="button" data-act="backup-restore">Restore from this text</button></div></div></div>';
-    h += '<p class="foot">Workout Log · ' + allEx().length + ' exercises · ' + Object.keys(state.sessions).length + ' workouts saved</p>';
+    h += '<p class="foot">Hilo · ' + allEx().length + ' exercises · ' + Object.keys(state.sessions).length + ' workouts saved</p>';
     openSheet(h);
   }
   function openSummary() {
@@ -2031,8 +2031,8 @@ var LIBRARY = (function () {
   /* ================= backup ================= */
   function backupData() { return { app: 'workout-log', v: 2, exportedAt: new Date().toISOString(), sessions: state.sessions, body: state.body, routines: state.routines, custom: state.custom, settings: state.settings }; }
   function restore(text) {
-    var data; try { data = JSON.parse(text); } catch (e) { toast('That is not a Workout Log backup. Nothing was changed.'); return; }
-    if (!data || !data.sessions || typeof data.sessions !== 'object') { toast('That is not a Workout Log backup. Nothing was changed.'); return; }
+    var data; try { data = JSON.parse(text); } catch (e) { toast('That is not a Hilo backup. Nothing was changed.'); return; }
+    if (!data || !data.sessions || typeof data.sessions !== 'object') { toast('That is not a Hilo backup. Nothing was changed.'); return; }
     var n = 0;
     [['sessions', 'sessions', 'sessions/'], ['body', 'body', 'body/'], ['routines', 'routines', 'routines/'], ['custom', 'custom', 'exercises/']].forEach(function (c) {
       var src = data[c[0]] || {}, dst = state[c[1]];
@@ -2046,7 +2046,7 @@ var LIBRARY = (function () {
     var text = JSON.stringify(backupData()), name = 'workout-log-' + today() + '.json';
     try {
       var file = new File([text], name, { type: 'application/json' });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) { navigator.share({ files: [file], title: 'Workout Log backup' }).catch(function () {}); return; }
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { navigator.share({ files: [file], title: 'Hilo backup' }).catch(function () {}); return; }
     } catch (e) {}
     try { var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); } catch (e) { toast('Could not save a file here. Use the backup text instead.'); }
   }

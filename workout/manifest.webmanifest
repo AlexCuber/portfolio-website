@@ -1,6 +1,6 @@
 {
-  "name": "Workout Log",
-  "short_name": "Workout Log",
+  "name": "Hilo",
+  "short_name": "Hilo",
   "description": "A gym logbook that works offline.",
   "start_url": "./",
   "scope": "./",
