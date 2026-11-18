@@ -1253,6 +1253,17 @@ var LIBRARY = (function () {
     if (changed) touchDraft(true);
     return restarted;
   }
+  /* when this phone last made a backup; kept beside the log, never inside a backup */
+  var BK_KEY = 'hilo-backup-v1';
+  function backupInfo() { try { return JSON.parse(localStorage.getItem(BK_KEY)) || {}; } catch (e) { return {}; } }
+  function setBackupInfo(o) { try { localStorage.setItem(BK_KEY, JSON.stringify(Object.assign(backupInfo(), o))); } catch (e) {} }
+  function backupDone() { setBackupInfo({ at: Date.now(), n: Object.keys(state.sessions).length, later: 0 }); }
+  /* how many workouts are not in any backup yet, and whether it is time to say so */
+  function backupState() {
+    var b = backupInfo(), n = Object.keys(state.sessions).length, fresh = Math.max(0, n - (b.n || 0)), days = b.at ? Math.floor((Date.now() - b.at) / 864e5) : null;
+    var due = n >= 3 && fresh > 0 && (!b.at || fresh >= 5 || days >= 30) && n - (b.later || 0) >= 5;
+    return { at: b.at || null, fresh: fresh, n: n, due: due };
+  }
   function finishDraft() {
     var d = state.draft, entries = [], prs = [], r = d.key === 'free' ? null : getRoutine(d.key);
     var before = finished().filter(function (s) { return s.id !== d.id; });
@@ -1401,6 +1412,9 @@ var LIBRARY = (function () {
         '<p class="next-meta">' + plural(st.n, 'exercise') + (st.sets ? ' · ' + st.sets + ' sets' : '') + ' · about ' + st.minutes + ' min</p>' +
         '<button class="btn start block" type="button" data-act="start" data-key="' + esc(key) + '">' + IC.play + 'Start ' + esc(shortName(r.name)) + '</button></section>';
     }
+    var bk = STANDALONE && !planEdit ? backupState() : null;
+    if (bk && bk.due) h += '<section class="card backup-card"><div><h3>Back up your log</h3><p class="sub">' + (bk.at ? plural(bk.fresh, 'workout') + ' since your last backup on ' + fmtDate(iso(new Date(bk.at))) + '.' : 'Your ' + plural(bk.n, 'workout') + ' are stored on this phone only.') + ' A backup file lets you bring everything back if the app is removed or the phone is reset.</p></div>' +
+      '<div class="row"><button class="btn sm primary-sm" type="button" data-act="backup-save">Save backup file</button><button class="btn sm quiet" type="button" data-act="backup-later">Later</button></div></section>';
     h += planCard();
     h += '<div class="actions">' +
       '<button class="action" type="button" data-act="ed-new"><span class="ico">' + IC.plus + '</span><span><b>New session</b><small>Build your own from the exercise library</small></span></button>' +
@@ -1921,7 +1935,7 @@ var LIBRARY = (function () {
     function sw(key, title, sub) { return '<div class="setting"><div><b>' + title + '</b><small>' + sub + '</small></div><button class="switch" type="button" role="switch" data-act="toggle" data-k="' + key + '" aria-checked="' + (s[key] ? 'true' : 'false') + '" aria-label="' + title + '"></button></div>'; }
     h += sw('autoRest', 'Start the rest timer', 'When you tick a set.') + sw('sound', 'Sound when rest ends', 'A short beep. Your phone must not be on silent.') + sw('awake', 'Keep the screen on', 'During a workout, where the phone allows it.');
     h += '<div class="setting"><div><b>Goal body weight</b><small>Shown on the Body page. Leave empty for none.</small></div><div class="fld" style="width:96px"><input id="set-goalw" type="text" inputmode="decimal" autocomplete="off" value="' + (s.goalWeight != null ? fmt(s.goalWeight) : '') + '" placeholder="kg" aria-label="Goal body weight in kg"></div></div>';
-    h += '<div class="setting stack"><div><b>Backup</b><small>' + (STANDALONE ? 'Everything is stored on this phone only. Save a backup file now and then.' : 'Your log syncs through Claude. A backup lets you move it elsewhere.') + '</small></div>' +
+    h += '<div class="setting stack"><div><b>Backup</b><small>' + (STANDALONE ? 'Everything is stored on this phone only. ' + (function () { var b = backupState(); return b.at ? 'Last backup ' + fmtDate(iso(new Date(b.at))) + (b.fresh ? ', ' + plural(b.fresh, 'workout') + ' since then.' : ', nothing new since then.') : 'No backup made yet.'; })() + ' To bring a backup back, use Restore from file.' : 'Your log syncs through Claude. A backup lets you move it elsewhere.') + '</small></div>' +
       '<div class="row">' + (STANDALONE ? '<button class="btn sm" type="button" data-act="backup-save">Save backup file</button>' : '') + '<button class="btn sm" type="button" data-act="backup-show">Show backup text</button><label class="btn sm">Restore from file<input id="backup-file" type="file" accept=".json,application/json,text/plain" hidden></label></div>' +
       '<div id="backup-box" hidden><textarea class="backup" id="backup-text" spellcheck="false" aria-label="Backup text"></textarea><div class="row"><button class="btn sm" type="button" data-act="backup-copy">Copy</button><button class="btn sm" type="button" data-act="backup-restore">Restore from this text</button></div></div></div>';
     h += '<p class="foot">Hilo · ' + allEx().length + ' exercises · ' + Object.keys(state.sessions).length + ' workouts saved</p>';
@@ -2097,12 +2111,13 @@ var LIBRARY = (function () {
     toast('Backup restored. ' + plural(n, 'workout') + ' added.');
   }
   function saveBackupFile() {
-    var text = JSON.stringify(backupData()), name = 'workout-log-' + today() + '.json';
+    var text = JSON.stringify(backupData()), name = 'hilo-backup-' + today() + '.json';
+    function done() { backupDone(); toast('Backup saved'); if (scrim.hidden) render(); else settingsSheet(); }
     try {
       var file = new File([text], name, { type: 'application/json' });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) { navigator.share({ files: [file], title: 'Hilo backup' }).catch(function () {}); return; }
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { navigator.share({ files: [file], title: 'Hilo backup' }).then(done, function () {}); return; }
     } catch (e) {}
-    try { var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); } catch (e) { toast('Could not save a file here. Use the backup text instead.'); }
+    try { var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); done(); } catch (e) { toast('Could not save a file here. Use the backup text instead.'); }
   }
 
   /* ================= actions ================= */
@@ -2204,8 +2219,9 @@ var LIBRARY = (function () {
       case 'goal': state.settings.weeklyGoal = Math.max(1, Math.min(7, (state.settings.weeklyGoal || 4) + (+a.dataset.d))); saveSettings(); settingsSheet(); render(); break;
       case 'toggle': state.settings[a.dataset.k] = !state.settings[a.dataset.k]; saveSettings(); if (a.dataset.k === 'sound' && state.settings.sound) { unlockAudio(); beep(); } wake(); settingsSheet(); break;
       case 'backup-save': saveBackupFile(); break;
+      case 'backup-later': setBackupInfo({ later: Object.keys(state.sessions).length }); render(); break;
       case 'backup-show': { var bx = document.getElementById('backup-box'); bx.hidden = false; document.getElementById('backup-text').value = JSON.stringify(backupData()); break; }
-      case 'backup-copy': { var ta = document.getElementById('backup-text'); try { navigator.clipboard.writeText(ta.value).then(function () { toast('Backup copied'); }, function () { ta.select(); toast('Select all and copy the text'); }); } catch (err) { ta.select(); toast('Select all and copy the text'); } break; }
+      case 'backup-copy': { var ta = document.getElementById('backup-text'); try { navigator.clipboard.writeText(ta.value).then(function () { backupDone(); toast('Backup copied'); }, function () { ta.select(); toast('Select all and copy the text'); }); } catch (err) { ta.select(); toast('Select all and copy the text'); } break; }
       case 'backup-restore': restore(document.getElementById('backup-text').value); break;
       case 'prog': state.ui.prog = a.dataset.v; saveLocal(); render(); enter(); break;
       case 'mus-win': state.ui.musWin = a.dataset.v; saveLocal(); render(); enter(); break;
