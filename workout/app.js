@@ -660,6 +660,54 @@ var ILLO = (function () {
     fn: function (t) { var a = t * TAU, k1 = 0.5 + 0.5 * Math.sin(a), k2 = 1 - k1; return { hip: [51.5, 82], t: -19, head: -8, hands: [[79, 105.2, 1]], feet: [['fk', 160 - 92 * k1, 160 - 6 * k1, 95], ['fk', 160 - 92 * k2, 160 - 6 * k2, 95]] }; } };
 })();
 
+/* Outdoor endurance: run, ride, swim. Same mannequin, but under a sky with a sun, on a road that moves or in
+   water, so they read as a different kind of workout at a glance. The app tints these in its outdoor colour. */
+(function () {
+  'use strict';
+  var EX = ILLO.EX, U = ILLO._, n1 = U.n1, G = U.G, TAU = Math.PI * 2, RAD = Math.PI / 180;
+  function L(a, b, w, cls) { return '<line x1="' + n1(a[0]) + '" y1="' + n1(a[1]) + '" x2="' + n1(b[0]) + '" y2="' + n1(b[1]) + '" stroke-width="' + w + '" class="' + cls + '"/>'; }
+  function sky(low) { return '<circle class="sun" cx="97" cy="24" r="9"/><path class="hill" d="M0 ' + (low + 4) + 'C18 ' + (low - 12) + ' 34 ' + (low - 10) + ' 52 ' + (low - 2) + 'C68 ' + (low - 16) + ' 92 ' + (low - 20) + ' 120 ' + (low - 4) + 'V120H0Z"/>'; }
+  /* the road: a ground line and lane dashes that slide back as the figure moves forward */
+  function road(t, k) {
+    var s = '<line class="rd" x1="0" y1="' + (G + 0.5) + '" x2="120" y2="' + (G + 0.5) + '"/>', off = (t * 24 * k) % 24;
+    for (var x = -off; x < 120; x += 24) s += '<line class="dash" x1="' + n1(x) + '" y1="' + (G + 6) + '" x2="' + n1(x + 10) + '" y2="' + (G + 6) + '"/>';
+    return s;
+  }
+  function gait(t, amp, flex) {
+    var a = t * TAU, th1 = 90 - amp * Math.sin(a), th2 = 90 + amp * Math.sin(a);
+    return [['fk', th1, th1 + 6 + flex * Math.max(0, Math.cos(a))], ['fk', th2, th2 + 6 + flex * Math.max(0, -Math.cos(a))]];
+  }
+  EX['out-run'] = { v: 'side', hot: ['quads', 'calves'], period: 900, ground: false,
+    fn: function (t) { var a = t * TAU; return { hip: [56, 55.5 + 1.6 * Math.cos(2 * a)], t: -78, hands: [['fk', 90 + 34 * Math.sin(a), 90 + 34 * Math.sin(a) - 88], ['fk', 90 - 34 * Math.sin(a), 90 - 34 * Math.sin(a) - 88]], feet: gait(t, 34, 62) }; },
+    props: function (J, t) { return { b: [sky(96), road(t, 1)] }; } };
+
+  var BB = [58, 93], RW = [30, 93], FW = [92, 93], HT = [80, 66], ST = [48, 71], WR = 15;
+  function wheel(c, t) {
+    var s = '<circle cx="' + c[0] + '" cy="' + c[1] + '" r="' + WR + '" stroke-width="2.4" class="w"/>';
+    for (var i = 0; i < 4; i++) { var d = t * TAU + i * Math.PI / 4, dx = Math.cos(d) * (WR - 1.4), dy = Math.sin(d) * (WR - 1.4); s += L([c[0] - dx, c[1] - dy], [c[0] + dx, c[1] + dy], 0.7, 'c'); }
+    return s + '<circle cx="' + c[0] + '" cy="' + c[1] + '" r="1.8" class="wf"/>';
+  }
+  EX['out-ride'] = { v: 'side', hot: ['quads', 'glutes'], period: 1100, ground: false,
+    fn: function (t) { var a = t * TAU, r = 8; return { hip: [46, 60.5], t: -34, head: -32, hands: [[85.5, 62.5, 1]], feet: [[BB[0] + r * Math.cos(a), BB[1] + r * Math.sin(a) - 3, -1, 12], [BB[0] - r * Math.cos(a), BB[1] - r * Math.sin(a) - 3, -1, 12]] }; },
+    props: function (J, t) {
+      var frame = L(ST, BB, 2.6, 'w') + L(ST, HT, 2.6, 'w') + L(HT, BB, 2.6, 'w') + L(BB, RW, 2.2, 'w') + L(ST, RW, 2, 'w') + L(HT, FW, 2.4, 'w') + L(HT, [83, 60.5], 2.4, 'w') +
+        '<path class="w" stroke-width="2.4" d="M81.5 60.5H86C89.5 60.5 90 66 86.5 67"/>' + L([41, 68.8], [52, 68.8], 4, 'w');
+      return { b: [sky(96), road(t, 2), wheel(RW, t), wheel(FW, t), frame, L([J.ankle[1][0] + 2, J.ankle[1][1] + 3], BB, 2.2, 'w')],
+        f: [L([J.ankle[0][0] + 2, J.ankle[0][1] + 3], BB, 2.2, 'w'), '<circle cx="' + BB[0] + '" cy="' + BB[1] + '" r="3.4" class="wf"/>'] };
+    } };
+
+  /* front crawl: the arms turn over one after the other, the legs flutter, and the water line crosses the body */
+  function water(t, y) {
+    var d = 'M0 ' + y, x;
+    for (x = 0; x <= 120; x += 6) d += 'L' + x + ' ' + n1(y + 1.4 * Math.sin(x / 120 * TAU * 3 - t * TAU));
+    return '<path class="wa" d="' + d + 'V120H0Z"/><path class="wl" d="' + d.replace('M0 ' + y + 'L', 'M') + '"/>';
+  }
+  function crawl(d) { var s = Math.sin(d * RAD); return ['fk', d, d + (s > 0 ? 22 * s : 38 * s)]; }
+  EX['out-swim'] = { v: 'side', hot: ['back', 'delts'], period: 1500, ground: false, still: 0.06,
+    fn: function (t) { var a = t * TAU, k = 9 * Math.sin(3 * a); return { hip: [52, 75 + 0.7 * Math.sin(2 * a)], t: -5, head: 4, hands: [crawl(360 * t), crawl(360 * t + 180)], feet: [['fk', 177 + k, 183 + k, 180, 0.9, 0.9], ['fk', 177 - k, 183 - k, 180, 0.9, 0.9]] }; },
+    props: function (J, t) { return { b: [sky(74)], f: [water(t, 71.5)] }; } };
+})();
+
 /* Exercise library. Each row: id, name, equipment, muscle group, muscles worked (1 = main, .5 = assisting),
    figure, kind (sets the default sets, reps and rest), one coaching cue, optional overrides. */
 var LIBRARY = (function () {
@@ -672,9 +720,10 @@ var LIBRARY = (function () {
     B: { log: 'bw', sets: 3, lo: 6, hi: 12, restSec: 120, rir: '1–2' },   /* body-weight strength */
     A: { log: 'bw', sets: 3, lo: 10, hi: 20, restSec: 60, rir: '1' },     /* body-weight core */
     T: { log: 'time', sets: 3, lo: 30, hi: 60, restSec: 45, rir: '—' },   /* timed hold */
-    K: { log: 'cardio', sets: 1, lo: 20, hi: 30, restSec: 0, rir: '—' }   /* cardio, minutes */
+    K: { log: 'cardio', sets: 1, lo: 20, hi: 30, restSec: 0, rir: '—' },  /* cardio, minutes */
+    D: { log: 'cardio', sets: 1, lo: 20, hi: 60, restSec: 0, rir: '—' }   /* run, ride, swim: distance and time (the row's options name the sport) */
   };
-  var GROUPS = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Forearms', 'Quads', 'Hamstrings', 'Glutes', 'Calves', 'Core', 'Cardio'];
+  var GROUPS = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Forearms', 'Quads', 'Hamstrings', 'Glutes', 'Calves', 'Core', 'Cardio', 'Endurance'];
   var MUSCLES = [
     { id: 'chest', name: 'Chest' }, { id: 'back', name: 'Back' }, { id: 'frontDelts', name: 'Front delts' }, { id: 'sideDelts', name: 'Side delts' },
     { id: 'rearDelts', name: 'Rear delts' }, { id: 'traps', name: 'Traps' }, { id: 'biceps', name: 'Biceps' }, { id: 'triceps', name: 'Triceps' },
@@ -787,14 +836,19 @@ var LIBRARY = (function () {
     ['cable-woodchop', 'Cable woodchop', 'Cable', 'Core', 'abs:1', 'woodchop', 'I', 'Arms nearly straight. Rotate from high on one side to low on the other, pivoting the back foot.'],
     ['mountain-climber', 'Mountain climbers', 'Bodyweight', 'Core', 'abs:1', 'mountain-climber', 'T', 'Hands under shoulders, hips level. Drive your knees toward your chest at a steady pace.', { lo: 20, hi: 45 }],
     /* ---------------- Cardio ---------------- */
-    ['treadmill-run', 'Run', 'Cardio machine', 'Cardio', '', 'run', 'K', 'Easy runs should feel conversational. Save the hard efforts for one session a week.'],
+    ['treadmill-run', 'Treadmill run', 'Cardio machine', 'Cardio', '', 'run', 'K', 'Easy runs should feel conversational. Save the hard efforts for one session a week.'],
     ['incline-walk', 'Incline treadmill walk', 'Cardio machine', 'Cardio', '', 'walk', 'K', 'A steep incline at a brisk walk, without holding the rails.', { lo: 20, hi: 40 }],
     ['stationary-bike', 'Stationary bike', 'Cardio machine', 'Cardio', '', 'bike', 'K', 'Saddle at hip height, a steady cadence of 80 to 90 rpm.'],
     ['rowing-machine', 'Rowing machine', 'Cardio machine', 'Cardio', '', 'rower', 'K', 'Legs, then body, then arms on the drive. Reverse the order on the way back.', { lo: 10, hi: 20 }],
     ['elliptical', 'Elliptical', 'Cardio machine', 'Cardio', '', 'elliptical', 'K', 'Stand tall and push and pull the handles in rhythm with your legs.'],
     ['stair-climber', 'Stair climber', 'Cardio machine', 'Cardio', '', 'stairs', 'K', 'Whole foot on each step, light hands on the rails.', { lo: 10, hi: 20 }],
     ['jump-rope', 'Jump rope', 'Other', 'Cardio', 'calves:.5', 'jump-rope', 'K', 'Small hops, wrists turning the rope, elbows close to your sides.', { lo: 5, hi: 15 }],
-    ['air-bike-intervals', 'Air bike intervals', 'Cardio machine', 'Cardio', '', 'bike', 'K', 'Hard for 20 to 30 seconds, easy for 90. Repeat.', { lo: 8, hi: 15 }]
+    ['air-bike-intervals', 'Air bike intervals', 'Cardio machine', 'Cardio', '', 'bike', 'K', 'Hard for 20 to 30 seconds, easy for 90. Repeat.', { lo: 8, hi: 15 }],
+    ['outdoor-run', 'Run', 'Outdoors', 'Endurance', '', 'out-run', 'D', 'Most runs should be easy enough to talk in full sentences. Keep the hard efforts to one or two a week.', { sport: 'run' }],
+    ['trail-run', 'Trail run', 'Outdoors', 'Endurance', '', 'out-run', 'D', 'Shorter steps on climbs and rough ground. Go by effort, not by pace.', { sport: 'run' }],
+    ['bike-ride', 'Bike ride', 'Outdoors', 'Endurance', '', 'out-ride', 'D', 'A steady cadence, around 80 to 95 turns a minute. Eat and drink on anything over an hour.', { sport: 'ride', lo: 30, hi: 120 }],
+    ['pool-swim', 'Swim', 'Pool', 'Endurance', '', 'out-swim', 'D', 'Long strokes, breathe out under water, and swim in sets of lengths so they are easy to count.', { sport: 'swim', lo: 15, hi: 45 }],
+    ['open-water-swim', 'Open-water swim', 'Outdoors', 'Endurance', '', 'out-swim', 'D', 'Look up to check your line every six to ten strokes. Swim with someone, and take a tow float.', { sport: 'swim', lo: 15, hi: 45 }]
   ];
   /* where the exercises that came with the plan belong, and which figure they use */
   var PLAN_META = {
@@ -810,7 +864,7 @@ var LIBRARY = (function () {
     'ab-wheel-rollout': ['Other', 'Core', 'ab-wheel-rollout'], 'lateral-raise': ['Dumbbell', 'Shoulders', 'lateral-raise'], 'face-pull': ['Cable', 'Shoulders', 'face-pull'],
     'hammer-curl': ['Dumbbell', 'Biceps', 'hammer-curl'], 'overhead-triceps-extension': ['Cable', 'Triceps', 'overhead-triceps'], 'side-plank': ['Bodyweight', 'Core', 'side-plank']
   };
-  var GROUP_ILLO = { Chest: 'm-chest', Back: 'm-back', Shoulders: 'm-shoulders', Biceps: 'm-biceps', Triceps: 'm-triceps', Forearms: 'm-forearms', Quads: 'm-quads', Hamstrings: 'm-hamstrings', Glutes: 'm-glutes', Calves: 'm-calves', Core: 'm-core', Cardio: 'm-cardio' };
+  var GROUP_ILLO = { Chest: 'm-chest', Back: 'm-back', Shoulders: 'm-shoulders', Biceps: 'm-biceps', Triceps: 'm-triceps', Forearms: 'm-forearms', Quads: 'm-quads', Hamstrings: 'm-hamstrings', Glutes: 'm-glutes', Calves: 'm-calves', Core: 'm-core', Cardio: 'm-cardio', Endurance: 'out-run' };
   var GROUP_MUSCLE = { Chest: 'chest', Back: 'back', Shoulders: 'sideDelts', Biceps: 'biceps', Triceps: 'triceps', Forearms: 'forearms', Quads: 'quads', Hamstrings: 'hams', Glutes: 'glutes', Calves: 'calves', Core: 'abs' };
 
   function parseMuscles(s) { var o = {}; if (!s) return o; s.split(',').forEach(function (p) { var kv = p.split(':'); o[kv[0]] = +kv[1]; }); return o; }
@@ -830,7 +884,7 @@ var LIBRARY = (function () {
       if (seen[r[0]]) return; seen[r[0]] = 1;
       var k = KIND[r[6]], o = r[8] || {};
       list.push({ id: r[0], name: r[1], equip: r[2], group: r[3], muscles: parseMuscles(r[4]), illo: r[5], log: k.log, unit: unitOf(k.log), sets: o.sets || k.sets, lo: o.lo || k.lo, hi: o.hi || k.hi,
-        restSec: o.restSec != null ? o.restSec : k.restSec, rir: o.rir || k.rir, cue: r[7], detail: '', why: '', swap: '',
+        restSec: o.restSec != null ? o.restSec : k.restSec, rir: o.rir || k.rir, cue: r[7], detail: '', why: '', swap: '', sport: o.sport || '',
         weightHint: k.log === 'bw' ? 'Leave the weight empty for body weight only, or enter the weight you added.' : (r[2] === 'Dumbbell' && k.log === 'wr' ? 'Weight per dumbbell.' : '') });
     });
     return list;
@@ -999,6 +1053,7 @@ var LIBRARY = (function () {
   }
   /* a session by id, whether or not it is in the plan right now */
   function anyRoutine(id) {
+    if (OUT[id]) return outRoutine(id);
     var o = state.routines[id];
     if (o && o.items) return o;
     if (!PLAN.sessions[id]) return null;
@@ -1060,6 +1115,7 @@ var LIBRARY = (function () {
   function finished() { return Object.keys(state.sessions).map(function (k) { return state.sessions[k]; }).sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : (a.finishedAt || 0) - (b.finishedAt || 0); }); }
   function metric(e, sets) {
     if (!sets || !sets.length) return null;
+    if (e.sport) return sumSets(sets).dist; /* an outing counts by how far it went */
     if (e.log === 'cardio' || e.log === 'time' || e.log === 'bw') return Math.max.apply(null, sets.map(function (s) { return s.r; }));
     return Math.max.apply(null, sets.map(function (s) { return s.w * (1 + s.r / 30); }));
   }
@@ -1074,10 +1130,11 @@ var LIBRARY = (function () {
     if (e.log === 'wr' && mode !== 'e1rm') return sets.reduce(function (a, x) { return x.w > a.w || (x.w === a.w && x.r > a.r) ? x : a; });
     return sets.reduce(function (a, x) { return metric(e, [x]) > metric(e, [a]) ? x : a; });
   }
-  function metricLabel(e) { return e.log === 'cardio' ? 'Minutes' : e.log === 'time' ? 'Longest hold (s)' : e.log === 'bw' ? 'Most reps in a set' : 'Estimated 1-rep max (' + UW() + ')'; }
-  function metricUnit(e) { return e.log === 'cardio' ? 'min' : e.log === 'time' ? 's' : e.log === 'bw' ? 'reps' : UW(); }
+  function metricLabel(e) { return e.sport ? 'Distance (' + UD(e) + ')' : e.log === 'cardio' ? 'Minutes' : e.log === 'time' ? 'Longest hold (s)' : e.log === 'bw' ? 'Most reps in a set' : 'Estimated 1-rep max (' + UW() + ')'; }
+  function metricUnit(e) { return e.sport ? UD(e) : e.log === 'cardio' ? 'min' : e.log === 'time' ? 's' : e.log === 'bw' ? 'reps' : UW(); }
   function setsText(e, sets) {
     if (!sets || !sets.length) return '—';
+    if (e.sport) return sportText(e, sets);
     if (e.log === 'cardio') return sets.map(function (s) { return fmt(s.r) + ' min'; }).join(', ');
     if (e.log === 'time') return sets.map(function (s) { return fmt(s.r) + ' s'; }).join(', ');
     var sameW = sets.every(function (s) { return s.w === sets[0].w; });
@@ -1132,11 +1189,12 @@ var LIBRARY = (function () {
     var t = [];
     if (rc.w) t.push('record weight ' + fmt(rc.maxW) + ' ' + UW() + '');
     if (rc.v) t.push('record volume ' + compact(rc.vol) + ' ' + UW() + '');
-    if (rc.b) t.push(e.log === 'wr' ? 'best set ' + setsText(e, [topSet(e, sets)]) : e.log === 'bw' ? 'most reps in a set, ' + fmt(rc.best) : e.log === 'time' ? 'longest hold, ' + fmt(rc.best) + ' s' : 'longest yet, ' + fmt(rc.best) + ' min');
+    if (rc.b) t.push(e.log === 'wr' ? 'best set ' + setsText(e, [topSet(e, sets)]) : e.log === 'bw' ? 'most reps in a set, ' + fmt(rc.best) : e.log === 'time' ? 'longest hold, ' + fmt(rc.best) + ' s' : e.sport ? 'longest yet, ' + distText(e, rc.best) : 'longest yet, ' + fmt(rc.best) + ' min');
     return t;
   }
   function hint(it, e, last) {
     var range = repsText(it, e);
+    if (e.sport) return { t: last ? sportHint(e, last) : 'First time: start the stopwatch when you set off, or type the distance and time afterwards.' };
     if (!last) {
       if (e.log === 'cardio') return { t: 'First time: an easy pace you can hold a conversation at.' };
       if (e.log === 'time') return { t: 'First time: hold good form for ' + range + '.' };
@@ -1174,7 +1232,7 @@ var LIBRARY = (function () {
     var seen = {}, out = [];
     list.forEach(function (s) { (s.entries || []).forEach(function (en) { seen[en.ex] = en.name; }); });
     Object.keys(seen).forEach(function (id) {
-      var e = exi(id, seen[id]), h = historyOf(id, list), best = -Infinity, bi = 0, prs = 0, vals = [];
+      var e = exi(id, seen[id]), h = e.sport ? [] : historyOf(id, list), best = -Infinity, bi = 0, prs = 0, vals = [];
       h.forEach(function (x, i) { var v = mode ? liftVal(e, x.sets, mode) : metric(e, x.sets); vals.push(v); if (v > best + 1e-9) { if (i) prs++; best = v; bi = i; } });
       if (h.length) out.push({ id: id, e: e, name: e.gone ? seen[id] : e.name, best: best, date: h[bi].date, sets: h[bi].sets, vals: vals, n: h.length, prs: prs, first: vals[0], last: vals[vals.length - 1], lastDate: h[h.length - 1].date });
     });
@@ -1216,12 +1274,12 @@ var LIBRARY = (function () {
       var src = Object.assign({}, it, { n: it.n || String(i + 1) });
       var prev = from ? (from.entries || []).filter(function (en, j) { if (used[j]) return false; if (en.n === src.n && en.ex === it.ex) { used[j] = 1; return true; } return false; })[0] : null;
       var last = lastEntry(key, it.ex, d.id), count = prev ? Math.max(prev.sets.length, it.sets) : Math.max(it.sets, last && last.key === key ? Math.min(last.sets.length, it.sets + 2) : 0), rows = [];
-      for (var k = 0; k < count; k++) { var ps = prev && prev.sets[k], row = { w: ps ? fmt(ps.w) : '', r: ps ? fmt(ps.r) : '', d: !!ps }; if (ps && ps.rir != null) row.rir = ps.rir; rows.push(row); }
+      for (var k = 0; k < count; k++) { var ps = prev && prev.sets[k]; rows.push(ps ? rowFrom(exi(it.ex), ps) : { w: '', r: '', d: false }); }
       d.items.push(itemFrom(src, rows, prev ? prev.note : ''));
     });
     if (from) (from.entries || []).forEach(function (en, j) {
       if (used[j]) return; var e = exi(en.ex, en.name);
-      d.items.push(itemFrom({ ex: en.ex, n: en.n || 'x', sets: en.sets.length, lo: e.lo, hi: e.hi, restSec: e.restSec }, en.sets.map(function (x) { var row = { w: fmt(x.w), r: fmt(x.r), d: true }; if (x.rir != null) row.rir = x.rir; return row; }), en.note));
+      d.items.push(itemFrom({ ex: en.ex, n: en.n || 'x', sets: en.sets.length, lo: e.lo, hi: e.hi, restSec: e.restSec }, en.sets.map(function (x) { return rowFrom(e, x); }), en.note));
     });
     state.draft = d; touchDraft(true); stopRest(); summary = null; editor = null;
     state.ui.tab = 'log'; applyTheme(); wake();
@@ -1237,7 +1295,7 @@ var LIBRARY = (function () {
   function findItem(u) { var d = state.draft; if (!d) return null; for (var i = 0; i < d.items.length; i++) if (d.items[i].u === u) return d.items[i]; return null; }
   function rowSets(it) {
     var e = exi(it.ex), out = [];
-    it.rows.forEach(function (s) { var r = num(s.r), w = num(s.w); if (r == null || r <= 0) return; var o = { w: (e.log === 'cardio' || e.log === 'time') ? 0 : (w == null || w < 0 ? 0 : w), r: r }; if (s.rir != null && s.d) o.rir = s.rir; out.push(o); });
+    it.rows.forEach(function (s) { var r = e.sport ? Math.round(((num(s.r) || 0) + (num(s.sec) || 0) / 60) * 1e4) / 1e4 : num(s.r), w = num(s.w); if (r == null || r <= 0) return; var o = { w: (e.log === 'cardio' || e.log === 'time') ? 0 : (w == null || w < 0 ? 0 : w), r: r }; if (e.sport) { var ds = num(s.dist); if (ds != null && ds > 0) o.dist = ds; } if (s.rir != null && s.d) o.rir = s.rir; out.push(o); });
     return out;
   }
   function draftCount() { var n = 0; state.draft.items.forEach(function (it) { n += rowSets(it).length; }); return n; }
@@ -1272,10 +1330,12 @@ var LIBRARY = (function () {
     d.items.forEach(function (it) {
       var e = exi(it.ex), sets = rowSets(it); if (!sets.length) return;
       entries.push({ n: it.n, ex: it.ex, name: e.name, note: it.note || '', sets: sets });
-      if (!d.editing) { var rc = recordsOf(it.ex, sets, d.id), tags = recordTags(e, rc, sets); if (tags.length) { prs.push({ name: e.name, tags: tags }); if (rc.w) recEx[it.ex] = 'Record weight'; else if (rc.b && e.log !== 'wr') recEx[it.ex] = 'Best yet'; } }
+      if (!d.editing) { var rc = recordsOf(it.ex, sets, d.id), tags = recordTags(e, rc, sets); if (e.sport && paceRecord(e, sets, d.id)) { var so = sumSets(sets); tags.push('fastest pace yet, ' + paceText(e, so.dist, so.dmin)); recEx[it.ex] = 'Fastest pace'; } if (tags.length) { prs.push({ name: e.name, tags: tags }); if (rc.w) recEx[it.ex] = 'Record weight'; else if (rc.b && e.sport) recEx[it.ex] = 'Longest yet'; else if (rc.b && e.log !== 'wr') recEx[it.ex] = 'Best yet'; } }
     });
     if (!entries.length) return;
     var now = Date.now(), dur = d.editing ? d.dur : (function () { var x = (now - d.startedAt) / 1000; return x >= 60 && x <= 18000 ? Math.round(x) : null; })();
+    /* a run, ride or swim is usually logged afterwards, so its length is the time logged and not how long the screen was open */
+    if (!d.editing && entries.every(function (en) { return exi(en.ex).sport; })) { var mins = 0; entries.forEach(function (en) { en.sets.forEach(function (x) { mins += x.r; }); }); dur = Math.round(mins * 60); }
     var doc = { v: 2, id: d.id, key: d.key, name: d.name || (r ? shortName(r.name) : 'Workout'), date: d.date, startedAt: d.startedAt, finishedAt: d.editing ? (state.sessions[d.id] || {}).finishedAt || now : now,
       dur: dur, core: r ? r.core !== false : true, notes: d.notes || '', entries: entries, updatedAt: now };
     var sameKey = before.filter(function (x) { return x.key === d.key; }), volRec = !d.editing && d.key !== 'free' && sameKey.length > 0 && volOf(doc) > Math.max.apply(null, sameKey.map(volOf)) + 1e-9;
@@ -1284,7 +1344,7 @@ var LIBRARY = (function () {
     var logged = d.key === 'free' ? d.items.filter(function (it) { return rowSets(it).length; }) : d.items;
     var same = r && r.items.length === d.items.length && r.items.every(function (it, i) { return it.ex === d.items[i].ex; });
     summary = { id: d.id, key: d.key, name: doc.name, sets: countSets(doc), vol: volOf(doc), dur: dur, prs: prs, volRec: volRec, edited: d.editing, first: wasFirst, cmp: d.editing ? null : compareSession(doc, before, recEx, d.items),
-      offer: d.editing ? null : (d.key === 'free' ? 'save' : (r && !same ? 'update' : null)), items: logged.map(function (it) { return { ex: it.ex, sets: Math.max(1, rowSets(it).length || it.sets), lo: it.lo, hi: it.hi, restSec: it.restSec < 30 ? exi(it.ex).restSec : it.restSec, link: it.link }; }),
+      offer: d.editing ? null : (d.key === 'free' ? 'save' : (r && !same && !r.fixed ? 'update' : null)), items: logged.map(function (it) { return { ex: it.ex, sets: Math.max(1, rowSets(it).length || it.sets), lo: it.lo, hi: it.hi, restSec: it.restSec < 30 ? exi(it.ex).restSec : it.restSec, link: it.link }; }),
       fresh: milestones(finished()).filter(function (m) { return m.got && msBefore.indexOf(m.label + m.show) < 0; }) };
     state.draft = null; stopRest();
     mark('sessions/' + d.id); touchDraft(true); applyTheme(); wake();
@@ -1306,7 +1366,7 @@ var LIBRARY = (function () {
     var h = hint(it, e, last);
     if (!last || !last.sets || !last.sets.length) return { sets: null, text: h.t, up: false };
     var prev = last.sets, n = e.log === 'cardio' ? 1 : Math.max(it.sets || 1, prev.length), sets = [], i, k = -1;
-    for (i = 0; i < n; i++) { var p = prev[i] || prev[prev.length - 1]; sets.push({ w: p.w || 0, r: p.r }); }
+    for (i = 0; i < n; i++) { var p = prev[i] || prev[prev.length - 1]; sets.push({ w: p.w || 0, r: p.r, dist: p.dist }); }
     if (e.log === 'cardio' || !it.hi) return { sets: sets, text: h.t, up: false };
     var planned = prev.slice(0, it.sets), top = planned.length >= it.sets && planned.every(function (s) { return s.r >= it.hi; });
     var loaded = e.log === 'wr' || (e.log === 'bw' && prev.some(function (s) { return s.w > 0; }));
@@ -1333,6 +1393,15 @@ var LIBRARY = (function () {
   function entryDelta(e, a, b) {
     function sum(x) { return x.reduce(function (t, s) { return t + s.r; }, 0); }
     function topW(x) { return Math.max.apply(null, x.map(function (s) { return s.w || 0; })); }
+    if (e.sport) {
+      var A = sumSets(a), B = sumSets(b);
+      if (A.dist > 0 && B.dist > 0) {
+        var dd = A.dist - B.dist;
+        if (Math.abs(dd) > Math.max(B.dist * 0.01, 0.005)) return { st: dd > 0 ? 'up' : 'down', label: (dd > 0 ? '+' : '−') + distText(e, Math.abs(dd)) };
+        var pa = A.dmin / A.dist, pb = B.dmin / B.dist;
+        return Math.abs(pa - pb) / pb < 0.005 ? { st: 'same', label: 'same' } : { st: pa < pb ? 'up' : 'down', label: pa < pb ? 'faster' : 'slower' };
+      }
+    }
     var timed = e.log === 'cardio' || e.log === 'time', dw = timed ? 0 : r2(topW(a) - topW(b)), dr = r2(sum(a) - sum(b));
     if (dw) return { st: dw > 0 ? 'up' : 'down', label: (dw > 0 ? '+' : '−') + fmt(Math.abs(dw)) + ' ' + UW() + '' };
     if (!dr) return { st: 'same', label: 'same' };
@@ -1484,7 +1553,7 @@ var LIBRARY = (function () {
     var f = to === 'lb' ? 1 / 0.45359237 : 0.45359237, fl = to === 'lb' ? 1 / 2.54 : 2.54, now = Date.now(), s = state.settings;
     Object.keys(state.sessions).forEach(function (id) {
       var doc = state.sessions[id], any = false;
-      (doc.entries || []).forEach(function (en) { (en.sets || []).forEach(function (x) { if (x.w) { x.w = roundTo(x.w * f, 0.25); any = true; } }); });
+      (doc.entries || []).forEach(function (en) { var swim = exi(en.ex, en.name).sport === 'swim'; (en.sets || []).forEach(function (x) { if (x.w) { x.w = roundTo(x.w * f, 0.25); any = true; } if (x.dist) { x.dist = swim ? Math.round(x.dist * (to === 'lb' ? 1.0936133 : 0.9144)) : Math.round(x.dist * (to === 'lb' ? 0.6213712 : 1.609344) * 100) / 100; any = true; } }); });
       if (any) { doc.updatedAt = now; mark('sessions/' + id); }
     });
     Object.keys(state.body).forEach(function (k) {
@@ -1563,6 +1632,7 @@ var LIBRARY = (function () {
     var e = exi(it.ex), el = document.getElementById('r-' + u + '-' + i), v = num(it.rows[i].r);
     if (v == null && el && el.placeholder) v = num(el.placeholder);
     if (v == null && it.lo) v = it.lo; /* nothing typed and no target yet: the bottom of the planned range */
+    if (e.sport) { d.timer = { u: u, i: i, start: Date.now(), total: 0, mul: 60, go: true, sw: true }; stopRest(); touchDraft(true); render(); drawRest(); return; }
     var mul = e.log === 'cardio' ? 60 : 1, lead = e.log === 'time' ? 5000 : 0;
     d.timer = { u: u, i: i, start: Date.now() + lead, total: v ? Math.round(v * mul) : 0, mul: mul, go: !lead };
     stopRest(); unlockAudio(); touchDraft(true); render(); drawRest();
@@ -1572,6 +1642,12 @@ var LIBRARY = (function () {
     var d = state.draft, t = d && d.timer; if (!t) return;
     var it = findItem(t.u), el = Math.floor((Date.now() - t.start) / 1000), secs = done && t.total ? t.total : el;
     delete d.timer;
+    if (t.sw) {
+      if (it && it.rows[t.i] && el >= 5) { it.rows[t.i].r = String(Math.floor(el / 60)); it.rows[t.i].sec = String(el % 60); }
+      touchDraft(true); render(); drawRest();
+      var df = document.getElementById('d-' + t.u + '-' + t.i); if (df && el >= 5 && !df.value) df.focus();
+      return;
+    }
     if (!it || !it.rows[t.i] || secs < (t.mul === 60 ? 30 : 1)) { touchDraft(true); render(); drawRest(); return; }
     var row = it.rows[t.i]; row.r = fmt(t.mul === 60 ? Math.max(1, Math.round(secs / 60)) : secs);
     touchDraft(true); render();
@@ -1638,6 +1714,65 @@ var LIBRARY = (function () {
   }
 
 
+  /* ================= endurance: run, ride, swim ================= */
+  /* These are cardio exercises with a sport. A set keeps minutes in r as before, plus an optional distance:
+     { w: 0, r: minutes, dist }. Distance is in km or miles (metres or yards for swimming), as typed. */
+  var OUT = {
+    'out-run': { name: 'Run', ini: 'RU', ex: ['outdoor-run'] },
+    'out-ride': { name: 'Ride', ini: 'RI', ex: ['bike-ride'] },
+    'out-swim': { name: 'Swim', ini: 'SW', ex: ['pool-swim'] },
+    'out-brick': { name: 'Brick', ini: 'BR', focus: 'Ride, then run straight off the bike.', ex: ['bike-ride', 'outdoor-run'] }
+  };
+  var SPORTS = [['run', 'Run', 'out-run'], ['ride', 'Ride', 'out-ride'], ['swim', 'Swim', 'out-swim']];
+  /* the fixed one-tap sessions behind the Endurance card; they are not part of the plan and cannot be edited */
+  function outRoutine(id) {
+    var o = OUT[id]; if (!o) return null;
+    return { id: id, name: o.name, focus: o.focus || '', core: !!state.settings.outCore, warmup: '', fixed: true,
+      items: o.ex.map(function (x, i) { var e = exi(x); return { ex: x, n: String(i + 1), sets: 1, lo: e.lo, hi: e.hi, restSec: 0, link: false }; }) };
+  }
+  function UD(e) { return e.sport === 'swim' ? (isLb() ? 'yd' : 'm') : (isLb() ? 'mi' : 'km'); }
+  function mmss(min) { var s = Math.round(min * 60), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return (h ? h + ':' + pad(m) : m) + ':' + pad(x); }
+  function minText(r) { return Math.abs(r - Math.round(r)) < 1e-6 ? fmt(Math.round(r)) + ' min' : mmss(r); }
+  /* total distance and time of an entry; dmin is the time of the sets that have a distance, which is what pace uses */
+  function sumSets(sets) { var o = { dist: 0, min: 0, dmin: 0 }; (sets || []).forEach(function (x) { o.min += x.r; if (x.dist > 0) { o.dist += x.dist; o.dmin += x.r; } }); o.dist = r2(o.dist); return o; }
+  /* pace the way each sport says it: minutes per km for a run, km an hour for a ride, minutes per 100 m for a swim */
+  function paceVal(e, dist, min) { return !(dist > 0) || !(min > 0) ? null : e.sport === 'ride' ? dist / (min / 60) : e.sport === 'swim' ? min / (dist / 100) : min / dist; }
+  function paceUnit(e) { return e.sport === 'ride' ? (isLb() ? 'mph' : 'km/h') : e.sport === 'swim' ? '/100 ' + UD(e) : '/' + UD(e); }
+  function paceFmt(e, v) { return e.sport === 'ride' ? fmt(Math.round(v * 10) / 10) : mmss(v); }
+  function paceText(e, dist, min) { var v = paceVal(e, dist, min); return v == null ? '' : paceFmt(e, v) + ' ' + paceUnit(e); }
+  function distText(e, d) { return fmt(e.sport === 'swim' ? Math.round(d) : Math.round(d * 100) / 100) + ' ' + UD(e); }
+  function sportText(e, sets) { return sets.map(function (x) { return x.dist > 0 ? distText(e, x.dist) + ' in ' + mmss(x.r) : minText(x.r); }).join(', '); }
+  function sportHint(e, last) { var o = sumSets(last.sets), p = paceText(e, o.dist, o.dmin); return (p ? 'Last time ' + p + '. ' : '') + 'Match it, or go a little further.'; }
+  /* today's average pace beats every earlier outing of at least four fifths the distance */
+  function paceRecord(e, sets, excludeId) {
+    var me = sumSets(sets), least = e.sport === 'swim' ? 200 : e.sport === 'ride' ? 5 : 1; if (!e.sport || me.dist < least || !(me.dmin > 0)) return false;
+    var p = me.dmin / me.dist, n = 0, beat = true;
+    historyOf(e.id).forEach(function (h) { if (h.id === excludeId) return; var o = sumSets(h.sets); if (o.dist >= 0.8 * me.dist && o.dmin > 0) { n++; if (o.dmin / o.dist <= p + 1e-9) beat = false; } });
+    return n > 0 && beat;
+  }
+  /* a saved set as the fields of a row in the workout */
+  function rowFrom(e, ps) {
+    var row = { w: fmt(ps.w), r: fmt(ps.r), d: true };
+    if (e.sport) { var t = Math.round(ps.r * 60); row.r = String(Math.floor(t / 60)); row.sec = t % 60 ? String(t % 60) : ''; row.dist = ps.dist != null ? fmt(ps.dist) : ''; }
+    if (ps.rir != null) row.rir = ps.rir;
+    return row;
+  }
+  /* every outing of one sport, oldest first */
+  function sportLog(sport, list) {
+    var out = [];
+    (list || finished()).forEach(function (s) { (s.entries || []).forEach(function (en) { var e = exi(en.ex, en.name); if (e.sport !== sport) return; var o = sumSets(en.sets); out.push({ id: s.id, date: s.date, name: e.name, dist: o.dist, min: o.min, dmin: o.dmin }); }); });
+    return out;
+  }
+  /* what a workout covered, per sport: [{ sport, dist, min, dmin }] */
+  function sessSports(s) {
+    var by = {}, out = [];
+    (s.entries || []).forEach(function (en) { var e = exi(en.ex, en.name); if (!e.sport) return; var o = sumSets(en.sets), b = by[e.sport]; if (!b) { b = by[e.sport] = { sport: e.sport, dist: 0, min: 0, dmin: 0 }; out.push(b); } b.dist = r2(b.dist + o.dist); b.min += o.min; b.dmin += o.dmin; });
+    return out;
+  }
+  function allSport(s) { return !!(s.entries || []).length && s.entries.every(function (en) { return exi(en.ex, en.name).sport; }); }
+  function sportWord(sp) { return sp === 'ride' ? 'ride' : sp === 'swim' ? 'swim' : 'run'; }
+
+
   /* ================= small pieces ================= */
   var view = document.getElementById('view');
   var IC = {
@@ -1660,7 +1795,7 @@ var LIBRARY = (function () {
     swap: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h13l-3.2-3.2M19 16H6l3.2 3.2"/></svg>',
     bar: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9.5v5M6.5 7v10M17.5 7v10M21 9.5v5M6.5 12h11"/></svg>'
   };
-  function illoSvg(key, t, live) { return '<svg viewBox="0 0 120 120" aria-hidden="true"' + (live ? ' data-illo="' + esc(key) + '"' : '') + '>' + ILLO.render(key, t == null ? ILLO.restT(key) : t) + '</svg>'; }
+  function illoSvg(key, t, live) { return '<svg viewBox="0 0 120 120" aria-hidden="true"' + (key.indexOf('out-') === 0 ? ' class="out"' : '') + (live ? ' data-illo="' + esc(key) + '"' : '') + '>' + ILLO.render(key, t == null ? ILLO.restT(key) : t) + '</svg>'; }
   function muscleNames(e, mainOnly) {
     var out = []; LIBRARY.MUSCLES.forEach(function (m) { var v = e.muscles[m.id]; if (v && (!mainOnly || v >= 1)) out.push(m.name); });
     return out;
@@ -1707,6 +1842,7 @@ var LIBRARY = (function () {
       if (w[0].length > 2) c.push((w[0].charAt(0) + w[0].charAt(2)).toUpperCase(), (w[0].charAt(0) + w[0].charAt(w[0].length - 1)).toUpperCase());
       var pick = c.filter(function (x) { return !seen[x]; })[0] || base; seen[pick] = 1; m[r.id] = pick;
     });
+    Object.keys(OUT).forEach(function (k) { m[k] = OUT[k].ini; });
     return m;
   }
   function weekCard(f) {
@@ -1714,7 +1850,7 @@ var LIBRARY = (function () {
     for (var i = 0; i < 7; i++) {
       var dt = addDays(ws, i), day = f.filter(function (s) { return s.date === dt; });
       n += day.filter(isCore).length;
-      h += '<div class="day' + (day.length ? ' done' : '') + (dt === today() ? ' today' : '') + '"><i>' + (day.length ? IC.check : '') + '</i>' + letters[i] + '</div>';
+      h += '<div class="day' + (day.length ? ' done' : '') + (day.length && day.every(allSport) ? ' out' : '') + (dt === today() ? ' today' : '') + '"><i>' + (day.length ? IC.check : '') + '</i>' + letters[i] + '</div>';
     }
     var st = streakWeeks(f), C = 2 * Math.PI * 35, pct = Math.min(1, n / goal), left = goal - n;
     var note = st >= 2 ? '<span class="pill hot">' + IC.flame + st + ' weeks in a row</span>' : '<span class="sub">' + (left <= 0 ? 'Weekly goal reached.' : left + ' more to reach this week’s goal.') + '</span>';
@@ -1778,6 +1914,7 @@ var LIBRARY = (function () {
     if (bk && bk.due) h += '<section class="card backup-card"><div><h3>Back up your log</h3><p class="sub">' + (bk.at ? plural(bk.fresh, 'workout') + ' since your last backup on ' + fmtDate(iso(new Date(bk.at))) + '.' : 'Your ' + plural(bk.n, 'workout') + ' are stored on this phone only.') + ' A backup file lets you bring everything back if the app is removed or the phone is reset.</p></div>' +
       '<div class="row"><button class="btn sm primary-sm" type="button" data-act="backup-save">Save backup file</button><button class="btn sm quiet" type="button" data-act="backup-later">Later</button></div></section>';
     h += planCard();
+    if (!planEdit) h += outCard(f);
     h += '<div class="actions">' +
       '<button class="action" type="button" data-act="ed-new"><span class="ico">' + IC.plus + '</span><span><b>New session</b><small>Build your own from the exercise library</small></span></button>' +
       '<button class="action alt" type="button" data-act="start" data-key="free"><span class="ico">' + IC.bolt + '</span><span><b>Empty workout</b><small>Start now and add exercises as you go</small></span></button></div>';
@@ -1818,6 +1955,7 @@ var LIBRARY = (function () {
   /* ================= log tab: the workout ================= */
   function setRow(it, e, i, s, lastSets) {
     var d = state.draft, ls = lastSets ? (lastSets[i] || lastSets[lastSets.length - 1]) : null, one = e.log === 'cardio' || e.log === 'time';
+    if (e.sport) return sportRow(it, e, i, s, ls);
     var tm = one && !d.editing && !s.d, run = !!(d.timer && d.timer.u === it.u && d.timer.i === i), left = s.d && s.rir != null ? (s.rir >= 3 ? '3+' : String(s.rir)) : '';
     var h = '<div class="set' + (one ? ' one' : '') + (tm ? ' tm' : '') + (s.d ? ' done' : '') + (s.d && s.pr ? ' pr' : '') + '"><span class="set-n">' + (i + 1) + '</span>';
     if (!one) h += '<div class="field"><input id="w-' + it.u + '-' + i + '" type="text" inputmode="decimal" autocomplete="off" data-f="w" data-u="' + it.u + '" data-i="' + i + '" value="' + esc(s.w) + '" placeholder="' + (ls ? fmt(ls.w) : (e.log === 'bw' ? '0' : '')) + '" aria-label="Set ' + (i + 1) + ' weight in ' + UW() + '"><span>' + UW() + '</span></div><span class="set-x">×</span>';
@@ -1857,7 +1995,7 @@ var LIBRARY = (function () {
         (last && last.note ? '<span class="last-hint">Note: ' + esc(last.note) + '</span>' : '') +
         '<span class="last-hint' + (hi.up ? ' up' : '') + '">' + esc(hi.t) + '</span></div>';
       var anyDone = it.rows.some(function (x) { return x.d; });
-      if (!d.editing && !allDone) h += '<div class="tools">' + (e.log === 'wr' ? '<button class="tool" type="button" data-act="help-open" data-u="' + it.u + '">' + IC.bar + (isBar(e) ? 'Warm-up and plates' : 'Warm-up') + '</button>' : '') + (anyDone ? '' : '<button class="tool" type="button" data-act="swap-open" data-u="' + it.u + '">' + IC.swap + 'Swap</button>') + '</div>';
+      if (!d.editing && !allDone) h += '<div class="tools">' + (e.log === 'wr' ? '<button class="tool" type="button" data-act="help-open" data-u="' + it.u + '">' + IC.bar + (isBar(e) ? 'Warm-up and plates' : 'Warm-up') + '</button>' : '') + (e.sport ? (function () { var open = 0; while (open < it.rows.length - 1 && it.rows[open].d) open++; var on = !!(d.timer && d.timer.u === it.u); return '<button class="tool' + (on ? ' on' : '') + '" type="button" data-act="timer" data-u="' + it.u + '" data-i="' + (on ? d.timer.i : open) + '">' + (on ? IC.stop + 'Stop the stopwatch' : IC.timer + 'Stopwatch') + '</button>'; })() : '') + (anyDone ? '' : '<button class="tool" type="button" data-act="swap-open" data-u="' + it.u + '">' + IC.swap + 'Swap</button>') + '</div>';
       h += '<div class="sets">';
       it.rows.forEach(function (s, i) { h += setRow(it, e, i, s, tg && tg.sets ? tg.sets : (last ? last.sets : null)); if (s.d && s.pr) anyPr = true; s.pop = false; });
       h += '</div>';
@@ -1972,13 +2110,14 @@ var LIBRARY = (function () {
     var lineY = trend || ys, last = lineY[lineY.length - 1], stops = '', ga = H - m.b, gb = m.t, k;
     opt = opt || {};
     if (opt.scale) { ga = Y(opt.scale[0]); gb = Y(opt.scale[1]); for (k = 0; k <= 6; k++) stops += '<stop offset="' + (k / 6).toFixed(3) + '" stop-color="' + ramp('--ramp-line', k / 6) + '"/>'; }
+    else if (opt.out) stops = '<stop offset="0" style="stop-color:var(--out)"/><stop offset="1" style="stop-color:var(--out)"/>';
     else if (opt.up) stops = '<stop offset="0" style="stop-color:var(--accent)"/><stop offset="0.55" style="stop-color:var(--teal)"/><stop offset="1" style="stop-color:var(--green)"/>';
     else stops = '<stop offset="0" style="stop-color:var(--accent)"/><stop offset="1" style="stop-color:var(--accent)"/>';
     var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Line chart with ' + pts.length + ' entries, latest ' + fmt(Math.round(last * 10) / 10) + '">' +
       '<defs><linearGradient id="' + id + '-l" gradientUnits="userSpaceOnUse" x1="0" y1="' + ga.toFixed(1) + '" x2="0" y2="' + gb.toFixed(1) + '">' + stops + '</linearGradient>' +
       '<linearGradient id="' + id + '-f" gradientUnits="userSpaceOnUse" x1="0" y1="' + m.t + '" x2="0" y2="' + (H - m.b) + '"><stop offset="0" stop-color="#fff" stop-opacity="0.3"/><stop offset="1" stop-color="#fff" stop-opacity="0.03"/></linearGradient>' +
       '<mask id="' + id + '-m" maskUnits="userSpaceOnUse" x="0" y="0" width="' + W + '" height="' + H + '"><rect x="0" y="0" width="' + W + '" height="' + H + '" fill="url(#' + id + '-f)"/></mask></defs>';
-    ticks.forEach(function (t) { s += '<line class="grid" x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + Y(t) + '" y2="' + Y(t) + '"/><text x="' + (m.l - 6) + '" y="' + (Y(t) + 4) + '" text-anchor="end">' + fmt(t) + '</text>'; });
+    ticks.forEach(function (t) { s += '<line class="grid" x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + Y(t) + '" y2="' + Y(t) + '"/><text x="' + (m.l - 6) + '" y="' + (Y(t) + 4) + '" text-anchor="end">' + (opt && opt.fmt ? opt.fmt(t) : fmt(t)) + '</text>'; });
     var P = pts.map(function (p, i) { return [X(xs[i]), Y(p.y)]; }), Lp = lineY.map(function (v, i) { return [X(xs[i]), Y(v)]; });
     if (Lp.length > 1) {
       var dstr = smoothPath(Lp);
@@ -1990,7 +2129,7 @@ var LIBRARY = (function () {
     if (trend) P.forEach(function (p) { s += '<circle class="dot2" r="2.6" cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '"/>'; });
     var e = Lp[Lp.length - 1];
     s += '<line class="cross" id="' + id + '-x" y1="' + m.t + '" y2="' + (H - m.b) + '" x1="0" x2="0" visibility="hidden"/><circle class="dot" id="' + id + '-d" r="4" cx="0" cy="0" visibility="hidden"/>';
-    s += '<circle class="halo" r="5" style="fill:url(#' + id + '-l)" cx="' + e[0] + '" cy="' + e[1] + '"/><circle class="dot end" r="5" style="fill:url(#' + id + '-l)" cx="' + e[0] + '" cy="' + e[1] + '"/><text class="val" x="' + (e[0] + 10) + '" y="' + (e[1] + 4) + '">' + fmt(Math.round(last * 10) / 10) + '</text>';
+    s += '<circle class="halo" r="5" style="fill:url(#' + id + '-l)" cx="' + e[0] + '" cy="' + e[1] + '"/><circle class="dot end" r="5" style="fill:url(#' + id + '-l)" cx="' + e[0] + '" cy="' + e[1] + '"/><text class="val" x="' + (e[0] + 10) + '" y="' + (e[1] + 4) + '">' + (opt.fmt ? opt.fmt(last) : fmt(Math.round(last * 10) / 10)) + '</text>';
     s += '<text x="' + P[0][0] + '" y="' + (H - 6) + '" text-anchor="' + (P.length > 1 ? 'start' : 'middle') + '">' + fmtDate(pts[0].x, true) + '</text>';
     if (P.length > 1) s += '<text x="' + e[0] + '" y="' + (H - 6) + '" text-anchor="end">' + fmtDate(pts[pts.length - 1].x, true) + '</text>';
     s += '</svg><div class="tip" id="' + id + '-t" hidden></div>';
@@ -2180,10 +2319,10 @@ var LIBRARY = (function () {
     return h;
   }
   function progressView() {
-    var real = finished(), sub = state.ui.prog, demo = sub === 'body' ? !Object.keys(state.body).length : !real.length, list = real.length ? real : demoSessions(), h = '';
-    h += '<div class="seg" role="group" aria-label="Progress section">' + [['overview', 'Overview'], ['lifts', 'Lifts'], ['body', 'Body']].map(function (s) { return '<button type="button" data-act="prog" data-v="' + s[0] + '" aria-pressed="' + (sub === s[0]) + '">' + s[1] + '</button>'; }).join('') + '</div>';
+    var real = finished(), sub = state.ui.prog, demo = sub === 'endur' ? false : sub === 'body' ? !Object.keys(state.body).length : !real.length, list = real.length ? real : demoSessions(), h = '';
+    h += '<div class="seg" role="group" aria-label="Progress section">' + [['overview', 'Overview'], ['lifts', 'Lifts'], ['endur', 'Endurance'], ['body', 'Body']].map(function (s) { return '<button type="button" data-act="prog" data-v="' + s[0] + '" aria-pressed="' + (sub === s[0]) + '">' + s[1] + '</button>'; }).join('') + '</div>';
     if (demo) h += '<p class="demo"><b>Example data.</b> ' + (sub === 'body' ? 'These are made-up measurements so you can see how this page works. Your own replace them after your first entry.' : 'This is a made-up eight weeks so you can see how this page works. Your own numbers replace it after your first saved workout.') + '</p>';
-    return h + (sub === 'lifts' ? liftsView(list) : sub === 'body' ? bodyView(demo) : overviewView(list, demo));
+    return h + (sub === 'endur' ? endurView() : sub === 'lifts' ? liftsView(list) : sub === 'body' ? bodyView(demo) : overviewView(list, demo));
   }
 
   /* ================= exercises tab and picker ================= */
@@ -2303,7 +2442,7 @@ var LIBRARY = (function () {
     h += unitRow();
     h += '<div class="setting"><div><b>Sessions per week</b><small>Your weekly goal.</small></div><div class="stepper"><button type="button" data-act="goal" data-d="-1" aria-label="One fewer">−</button><b>' + s.weeklyGoal + '</b><button type="button" data-act="goal" data-d="1" aria-label="One more">+</button></div></div>';
     function sw(key, title, sub) { return '<div class="setting"><div><b>' + title + '</b><small>' + sub + '</small></div><button class="switch" type="button" role="switch" data-act="toggle" data-k="' + key + '" aria-checked="' + (s[key] ? 'true' : 'false') + '" aria-label="' + title + '"></button></div>'; }
-    h += sw('autoRest', 'Start the rest timer', 'When you tick a set.') + sw('sound', 'Sound when rest ends', 'A short beep. Your phone must not be on silent.') + sw('awake', 'Keep the screen on', 'During a workout, where the phone allows it.') + sw('rir', 'Ask for reps left in the tank', 'After each set, tap how many more reps you had in you. Three or more on every set raises the next target.');
+    h += sw('autoRest', 'Start the rest timer', 'When you tick a set.') + sw('sound', 'Sound when rest ends', 'A short beep. Your phone must not be on silent.') + sw('awake', 'Keep the screen on', 'During a workout, where the phone allows it.') + sw('outCore', 'Count runs, rides and swims toward the weekly goal', 'Off, they still show in the week and in History, in their own colour.') + sw('rir', 'Ask for reps left in the tank', 'After each set, tap how many more reps you had in you. Three or more on every set raises the next target.');
     h += '<div class="setting"><div><b>Goal body weight</b><small>Shown on the Body page. Leave empty for none.</small></div><div class="fld" style="width:96px"><input id="set-goalw" type="text" inputmode="decimal" autocomplete="off" value="' + (s.goalWeight != null ? fmt(s.goalWeight) : '') + '" placeholder="' + UW() + '" aria-label="Goal body weight in ' + UW() + '"></div></div>';
     h += '<div class="setting"><div><b>Target pace</b><small>Kilograms a week toward your goal weight.</small></div><div class="fld" style="width:96px"><input id="set-goalr" type="text" inputmode="decimal" autocomplete="off" value="' + fmt(s.goalRate || (isLb() ? 0.5 : 0.25)) + '" placeholder="' + (isLb() ? '0.5' : '0.25') + '" aria-label="Target pace in ' + UW() + ' per week"></div></div>';
     h += '<div class="setting stack"><div><b>Backup</b><small>' + (STANDALONE ? 'Everything is stored on this phone only. ' + (function () { var b = backupState(); return b.at ? 'Last backup ' + fmtDate(iso(new Date(b.at))) + (b.fresh ? ', ' + plural(b.fresh, 'workout') + ' since then.' : ', nothing new since then.') : 'No backup made yet.'; })() + ' To bring a backup back, use Restore from file.' : 'Your log syncs through Claude. A backup lets you move it elsewhere.') + '</small></div>' +
@@ -2316,7 +2455,7 @@ var LIBRARY = (function () {
     var s = summary; if (!s) return;
     var doc = state.sessions[s.id], h = '<div class="done-hero"><span class="label">' + (s.edited ? 'Changes saved' : 'Workout complete') + '</span><div class="big gtext">' + esc(s.name) + '</div><p class="sub">' + (doc ? fmtDate(doc.date) : '') + '</p></div>';
     var c = s.cmp, dT = c && c.durDiff != null && s.dur ? (c.durDiff === 0 ? 'same as last time' : Math.abs(c.durDiff) + ' min ' + (c.durDiff < 0 ? 'shorter' : 'longer')) : '', dV = c && c.volPct != null ? (c.volPct === 0 ? 'same as last time' : (c.volPct > 0 ? 'up ' : 'down ') + Math.abs(c.volPct) + '%') : '';
-    h += '<div class="tiles three"><div class="tile"><b>' + (s.dur ? fmtClock(s.dur) : '–') + '</b><span>time' + (dT ? '<em>' + dT + '</em>' : '') + '</span></div><div class="tile"><b>' + s.sets + '</b><span>sets</span></div><div class="tile"><b>' + compact(s.vol) + '</b><span>' + UW() + ' lifted' + (dV ? '<em>' + dV + '</em>' : '') + '</span></div></div>';
+    h += outTiles(doc, dT) || '<div class="tiles three"><div class="tile"><b>' + (s.dur ? fmtClock(s.dur) : '–') + '</b><span>time' + (dT ? '<em>' + dT + '</em>' : '') + '</span></div><div class="tile"><b>' + s.sets + '</b><span>sets</span></div><div class="tile"><b>' + compact(s.vol) + '</b><span>' + UW() + ' lifted' + (dV ? '<em>' + dV + '</em>' : '') + '</span></div></div>';
     if (c) h += cmpHtml(s);
     else if (s.prs.length || s.volRec) {
       h += '<div><h3>' + (s.prs.length ? plural(s.prs.length, 'exercise') + ' with a record' : 'A record') + '</h3></div><div class="pr-list">';
@@ -2426,7 +2565,7 @@ var LIBRARY = (function () {
 
   /* ================= third tab: history and exercises ================= */
   var histMonth = null, histDay = null, histQ = '';
-  function sessTint() { var m = {}; routineList().forEach(function (r, i) { m[r.id] = i % 5; }); return m; }
+  function sessTint() { var m = {}; routineList().forEach(function (r, i) { m[r.id] = i % 5; }); Object.keys(OUT).forEach(function (k) { m[k] = 'o'; }); return m; }
   function histBody() {
     var f = finished(), h = '', i, t = today();
     if (!f.length) return '<section class="card"><h3>No workouts yet</h3><p class="sub">Every workout you finish lands here, on a calendar you can page through and search.</p></section>';
@@ -2467,7 +2606,7 @@ var LIBRARY = (function () {
     if (sel) {
       var rec = recordsBy(f);
       by[sel].forEach(function (s) {
-        var du = durOf(s), vol = volOf(s), bits = [du ? fmtDur(du) : '', plural(countSets(s), 'set'), vol ? massText(vol) + ' lifted' : '', rec[s.id] ? plural(rec[s.id], 'new best') : ''].filter(Boolean);
+        var du = durOf(s), vol = volOf(s), bits = [du ? fmtDur(du) : '', countSets(s) ? plural(countSets(s), 'set') : '', sessSports(s).filter(function (b) { return b.dist; }).map(function (b) { return distText({ sport: b.sport }, b.dist) + ' ' + sportWord(b.sport); }).join(', '), vol ? massText(vol) + ' lifted' : '', rec[s.id] ? plural(rec[s.id], 'new best') : ''].filter(Boolean);
         h += '<section class="card" id="hist-day"><div><span class="label">' + fmtDate(s.date) + (toDate(s.date).getFullYear() !== new Date().getFullYear() ? ' ' + toDate(s.date).getFullYear() : '') + '</span><h2>' + esc(s.name || 'Workout') + '</h2><p class="sub">' + esc(bits.join(' · ')) + '</p></div><div>';
         (s.entries || []).forEach(function (en) { var e = exi(en.ex, en.name); h += '<div class="sess-entry"><b>' + esc(e.gone ? en.name : e.name) + '</b><span>' + esc(setsText(e, en.sets)) + '</span>' + rirLine(en.sets) + '</div>'; });
         h += '</div>' + (s.notes ? '<p class="sub">Notes: ' + esc(s.notes) + '</p>' : '') +
@@ -2497,10 +2636,12 @@ var LIBRARY = (function () {
   };
   function cmpHtml(s) {
     var c = s.cmp; if (!c) return '';
-    var h = '<div><h3>Compared with last time</h3><p class="sub">Your last ' + esc(s.name) + ' was on ' + fmtDate(c.date) + '.' + (c.n ? ' ' + c.up + ' of ' + plural(c.n, 'exercise') + ' improved.' : '') + '</p></div><ul class="cmp">';
+    var doc = state.sessions[s.id], sporty = !!(doc && allSport(doc));
+    var h = '<div><h3>Compared with last time</h3><p class="sub">Your last ' + esc(s.name) + ' was on ' + fmtDate(c.date) + '.' + (c.n && !sporty ? ' ' + c.up + ' of ' + plural(c.n, 'exercise') + ' improved.' : '') + '</p></div><ul class="cmp">';
     c.rows.forEach(function (r) { h += '<li><span class="txt"><b>' + esc(r.name) + '</b><small>' + esc(r.sets) + '</small></span><span class="delta ' + r.st + '">' + DELTA_IC[r.st] + esc(r.label) + '</span></li>'; });
     h += '</ul>';
     if (s.volRec) h += '<div class="pills"><span class="pill hot">' + IC.star + 'Most weight lifted in ' + esc(/^[aeiou]/i.test(s.name) ? 'an ' : 'a ') + esc(s.name) + ' workout</span></div>';
+    if (sporty) return h + '<p class="note"><b>Next time.</b> Match today, or go a little further.</p>';
     h += '<p class="note"><b>Next time.</b> ' + (c.next.length ? esc(c.next.slice(0, 3).join('. ')) + (c.next.length > 3 ? ', and ' + (c.next.length - 3) + ' more.' : '.') : 'The weights stay as they are. Aim for one more rep where you can.') + '</p>';
     return h;
   }
@@ -2687,6 +2828,89 @@ var LIBRARY = (function () {
     var h = '<div class="setting stack"><div><b>Units</b><small>' + (cur === 'lb' ? 'Pounds and inches.' : 'Kilograms and centimetres.') + '</small></div><div class="seg" role="group" aria-label="Units"><button type="button" data-act="unit" data-v="kg" aria-pressed="' + (cur === 'kg') + '">Kilograms</button><button type="button" data-act="unit" data-v="lb" aria-pressed="' + (cur === 'lb') + '">Pounds</button></div>';
     if (armed === 'unit') h += '<p class="note">' + (state.draft ? 'Finish or discard the workout in progress first.' : 'This converts your ' + n + ' saved ' + (n === 1 ? 'entry' : 'entries') + ' to ' + (other === 'lb' ? 'pounds and inches' : 'kilograms and centimetres') + ', rounded to the nearest quarter. Tap ' + (other === 'lb' ? 'Pounds' : 'Kilograms') + ' again to go ahead.') + '</p>';
     return h + '</div>';
+  }
+
+
+  /* ================= endurance: the workout row ================= */
+  /* distance, minutes and seconds in three fields; grey numbers are last time's and a tick accepts them */
+  function sportRow(it, e, i, s, ls) {
+    var lt = ls ? Math.round(ls.r * 60) : null, id = it.u + '-' + i, u = UD(e), left = '';
+    function fld(f, pre, val, ph, unit, label, mode) {
+      return '<div class="field"><input id="' + pre + '-' + id + '" type="text" inputmode="' + mode + '" autocomplete="off" data-f="' + f + '" data-u="' + it.u + '" data-i="' + i + '" value="' + esc(val || '') + '" placeholder="' + ph + '" aria-label="Set ' + (i + 1) + ', ' + label + '"><span>' + unit + '</span></div>';
+    }
+    var h = '<div class="set sp' + (s.d ? ' done' : '') + (s.d && s.pr ? ' pr' : '') + '"><span class="set-n">' + (i + 1) + '</span>' +
+      fld('dist', 'd', s.dist, ls && ls.dist ? fmt(ls.dist) : '', u, 'distance in ' + u, 'decimal') +
+      fld('r', 'r', s.r, lt != null ? Math.floor(lt / 60) : '', 'min', 'minutes', 'numeric') +
+      fld('sec', 's', s.sec, lt != null && lt % 60 ? lt % 60 : '', 's', 'seconds', 'numeric') +
+      '<button class="tick' + (s.pop ? ' pop' : '') + '" type="button" data-act="tick" data-u="' + it.u + '" data-i="' + i + '" aria-pressed="' + (s.d ? 'true' : 'false') + '" aria-label="Set ' + (i + 1) + ' done">' + (s.d && s.pr ? IC.star : IC.check) + left + '</button></div>';
+    var one = rowSets({ ex: it.ex, rows: [s] }), p = one.length && one[0].dist ? paceText(e, one[0].dist, one[0].r) : '';
+    return h + '<div class="pace" id="p-' + id + '">' + (p ? 'Pace ' + p : '') + '</div>';
+  }
+
+  /* ================= endurance: the card on Train ================= */
+  function outCard(f) {
+    var ws = weekStart(today()), wk = {}, bits = [], h = '';
+    f.forEach(function (s) { if (s.date < ws) return; sessSports(s).forEach(function (b) { wk[b.sport] = r2((wk[b.sport] || 0) + b.dist); }); });
+    SPORTS.forEach(function (sp) { if (wk[sp[0]]) bits.push(distText({ sport: sp[0] }, wk[sp[0]]) + ' ' + sportWord(sp[0])); });
+    h += '<section class="card"><div class="spread"><h3>Endurance</h3><span class="next-last">' + (bits.length ? 'this week ' + esc(bits.join(', ')) : 'run, ride, swim') + '</span></div><div class="out-tiles">';
+    SPORTS.forEach(function (sp) {
+      var ld = lastDone(sp[2]), sub = 'not logged yet';
+      if (ld) { var b = sessSports(ld).filter(function (x) { return x.sport === sp[0]; })[0]; sub = b && b.dist ? distText({ sport: sp[0] }, b.dist) : fmtDate(ld.date, true); }
+      h += '<button class="out-tile" type="button" data-act="start" data-key="' + sp[2] + '" aria-label="Start a ' + sp[1].toLowerCase() + '"><span class="illo">' + illoSvg(sp[2], null, true) + '</span><b>' + sp[1] + '</b><small>' + esc(ld ? 'last ' + sub : sub) + '</small></button>';
+    });
+    return h + '</div><button class="btn quiet" type="button" data-act="start" data-key="out-brick">Brick: a ride, then a run straight after</button></section>';
+  }
+
+  /* ================= endurance: the finish summary ================= */
+  function outTiles(doc, dT) {
+    if (!doc || !allSport(doc)) return '';
+    var sp = sessSports(doc), min = 0; sp.forEach(function (b) { min += b.min; });
+    var h = '<div class="tiles three"><div class="tile"><b>' + mmss(min) + '</b><span>time' + (dT ? '<em>' + dT + '</em>' : '') + '</span></div>';
+    if (sp.length === 1) {
+      var b = sp[0], e = { sport: b.sport }, pv = paceVal(e, b.dist, b.dmin);
+      h += '<div class="tile"><b>' + (b.dist ? fmt(b.sport === 'swim' ? Math.round(b.dist) : Math.round(b.dist * 100) / 100) : '–') + '</b><span>' + UD(e) + '</span></div><div class="tile"><b>' + (pv == null ? '–' : paceFmt(e, pv)) + '</b><span>' + (b.sport === 'ride' ? paceUnit(e) : 'pace ' + paceUnit(e)) + '</span></div>';
+    } else sp.slice(0, 2).forEach(function (b) { var e = { sport: b.sport }; h += '<div class="tile"><b>' + (b.dist ? fmt(b.sport === 'swim' ? Math.round(b.dist) : Math.round(b.dist * 100) / 100) : mmss(b.min)) + '</b><span>' + (b.dist ? UD(e) + ' ' : '') + sportWord(b.sport) + '</span></div>'; });
+    return h + '</div>';
+  }
+
+  /* ================= endurance: the Progress page ================= */
+  function endurView() {
+    var f = finished(), logs = {}, any = false, h = '';
+    SPORTS.forEach(function (sp) { logs[sp[0]] = sportLog(sp[0], f); if (logs[sp[0]].length) any = true; });
+    var cur = state.ui.sport && logs[state.ui.sport] ? state.ui.sport : (SPORTS.filter(function (sp) { return logs[sp[0]].length; })[0] || SPORTS[0])[0];
+    var meta = SPORTS.filter(function (sp) { return sp[0] === cur; })[0], e = { sport: cur }, log = logs[cur], u = UD(e), word = sportWord(cur);
+    h += '<div class="seg" role="group" aria-label="Sport">' + SPORTS.map(function (sp) { return '<button type="button" data-act="sport" data-v="' + sp[0] + '" aria-pressed="' + (sp[0] === cur) + '">' + sp[1] + '</button>'; }).join('') + '</div>';
+    if (!log.length) {
+      return h + '<section class="card out-empty"><div class="illo">' + illoSvg(meta[2], null, true) + '</div><div><h3>No ' + word + 's logged yet</h3><p class="sub">Log the distance and the time of a ' + word + ' and this page shows your weekly distance, your pace over time and your bests.</p></div>' +
+        (state.draft ? '' : '<button class="btn primary-sm" type="button" data-act="start" data-key="' + meta[2] + '">Log a ' + word + '</button>') + '</section>';
+    }
+    var ws = weekStart(today()), weeks = lastWeeks(12), by = {}, longest = log[0], fast = null, least = cur === 'swim' ? 200 : cur === 'ride' ? 5 : 1, four = 0, total = 0, mins = 0;
+    weeks.forEach(function (w) { by[w.start] = w; });
+    log.forEach(function (x) {
+      var w = by[weekStart(x.date)]; if (w) w.a = r2(w.a + x.dist);
+      if (x.dist > longest.dist) longest = x;
+      total += x.dist; mins += x.min;
+      if (x.dist >= least && x.dmin > 0 && (!fast || x.dmin / x.dist < fast.dmin / fast.dist)) fast = x;
+      if (x.date >= addDays(ws, -28) && x.date < ws) four += x.dist;
+    });
+    var best = weeks.reduce(function (a, w) { return w.a > a.a ? w : a; }, weeks[0]), now = weeks[weeks.length - 1].a, sw = cur === 'swim';
+    function D(v) { return fmt(sw ? Math.round(v) : Math.round(v * 10) / 10); }
+    h += '<div class="tiles three"><div class="tile"><b>' + D(now) + '</b><span>' + u + ' this week</span></div><div class="tile"><b>' + D(four / 4) + '</b><span>' + u + ' a week, last 4 weeks</span></div><div class="tile"><b>' + log.length + '</b><span>' + (log.length === 1 ? word : word + 's') + ' logged</span></div></div>';
+    h += '<section class="card"><div><h3>Distance per week</h3><p class="sub">' + D(total) + ' ' + u + ' in ' + mmss(mins) + ' so far.</p></div><div class="chart out" data-chart="ew">' +
+      colChart('ew', weeks, { label: 'Distance per week for the last 12 weeks, in ' + u, tip: function (w) { return '<b>Week of ' + fmtDate(w.start, true) + '</b><br>' + D(w.a) + ' ' + u; } }) + '</div></section>';
+    var pts = log.filter(function (x) { return x.dist > 0 && x.dmin > 0; }).map(function (x) { return { x: x.date, y: paceVal(e, x.dist, x.dmin), tip: '<b>' + fmtDate(x.date) + '</b><br>' + distText(e, x.dist) + ' in ' + mmss(x.dmin) + '<br>' + paceText(e, x.dist, x.dmin) }; });
+    if (pts.length > 1) h += '<section class="card"><div><h3>' + (cur === 'ride' ? 'Speed' : 'Pace') + '</h3><p class="sub">' + (cur === 'ride' ? 'Average speed of each ride, in ' + paceUnit(e) + '. Higher is faster.' : 'Average pace of each ' + word + ', per ' + (sw ? '100 ' + u : u) + '. Lower is faster.') + '</p></div><div class="chart out" data-chart="ep">' +
+      lineChart('ep', pts, null, { out: true, fmt: function (v) { return paceFmt(e, v); } }) + '</div></section>';
+    h += '<section class="card"><h3>Bests</h3><ul class="list">' +
+      '<li><button class="item" type="button" data-act="open-session" data-id="' + esc(longest.id) + '"><span class="txt"><b>Longest ' + word + '</b><small>' + fmtDate(longest.date) + '</small></span><span class="num">' + esc(distText(e, longest.dist)) + '</span></button></li>' +
+      (fast ? '<li><button class="item" type="button" data-act="open-session" data-id="' + esc(fast.id) + '"><span class="txt"><b>Fastest ' + (cur === 'ride' ? 'average speed' : 'pace') + '</b><small>' + fmtDate(fast.date) + ' · ' + esc(distText(e, fast.dist)) + '</small></span><span class="num">' + esc(paceText(e, fast.dist, fast.dmin)) + '</span></button></li>' : '') +
+      (best.a > 0 ? '<li><div class="item"><span class="txt"><b>Biggest week</b><small>week of ' + fmtDate(best.start, true) + '</small></span><span class="num">' + D(best.a) + ' ' + u + '</span></div></li>' : '') + '</ul></section>';
+    h += '<section class="card"><h3>Latest</h3><ul class="list">';
+    log.slice(-6).reverse().forEach(function (x) {
+      var dd = toDate(x.date);
+      h += '<li><button class="item" type="button" data-act="open-session" data-id="' + esc(x.id) + '"><span class="date-tile" aria-hidden="true"><b>' + dd.getDate() + '</b><span>' + MONTHS[dd.getMonth()] + '</span></span><span class="txt"><b>' + (x.dist ? esc(distText(e, x.dist)) + ' in ' + mmss(x.min) : esc(minText(x.min))) + '</b><small>' + esc(x.name) + (x.dist && x.dmin ? ' · ' + esc(paceText(e, x.dist, x.dmin)) : '') + '</small></span></button><span class="chev" aria-hidden="true">›</span></li>';
+    });
+    return h + '</ul></section>';
   }
 
 
@@ -2917,9 +3141,17 @@ var LIBRARY = (function () {
         it = findItem(u); if (!it) break; e = exi(it.ex); var s = it.rows[i];
         if (!s.d) {
           var wi = document.getElementById('w-' + u + '-' + i), ri = document.getElementById('r-' + u + '-' + i);
-          if (wi && !s.w && wi.placeholder) s.w = wi.placeholder;
-          if (ri && !s.r && ri.placeholder) s.r = ri.placeholder;
-          if (num(s.r) == null) { if (ri) ri.focus(); break; }
+          if (e.sport) {
+            /* a run, ride or swim: empty fields take last time's grey numbers, the time as a whole (minutes and seconds together) */
+            var di = document.getElementById('d-' + u + '-' + i), si = document.getElementById('s-' + u + '-' + i);
+            if (di && !s.dist && di.placeholder) s.dist = di.placeholder;
+            if (!s.r && !s.sec) { if (ri && ri.placeholder) s.r = ri.placeholder; if (si && si.placeholder) s.sec = si.placeholder; }
+            if (!rowSets({ ex: it.ex, rows: [s] }).length) { if (ri) ri.focus(); break; }
+          } else {
+            if (wi && !s.w && wi.placeholder) s.w = wi.placeholder;
+            if (ri && !s.r && ri.placeholder) s.r = ri.placeholder;
+            if (num(s.r) == null) { if (ri) ri.focus(); break; }
+          }
           s.d = true; s.pop = true; s.pr = false;
           if (!d.editing) {
             unlockAudio();
@@ -2932,7 +3164,7 @@ var LIBRARY = (function () {
             var was = it.rec || {}, rc = itemRecords(it, d), news = [];
             if (rc.w && !was.w) news.push('Record weight on ' + e.name + ': ' + fmt(rc.maxW) + ' ' + UW() + '');
             if (rc.v && !was.v) news.push('Record volume on ' + e.name + ': ' + compact(rc.vol) + ' ' + UW() + '');
-            if (rc.b && !was.b && e.log !== 'wr') news.push(e.log === 'bw' ? 'Most reps yet on ' + e.name + ': ' + fmt(rc.best) : e.log === 'time' ? 'Longest hold yet on ' + e.name + ': ' + fmt(rc.best) + ' s' : 'Longest ' + e.name + ' yet: ' + fmt(rc.best) + ' min');
+            if (rc.b && !was.b && e.log !== 'wr') news.push(e.log === 'bw' ? 'Most reps yet on ' + e.name + ': ' + fmt(rc.best) : e.log === 'time' ? 'Longest hold yet on ' + e.name + ': ' + fmt(rc.best) + ' s' : e.sport ? 'Longest ' + e.name.toLowerCase() + ' yet: ' + distText(e, rc.best) : 'Longest ' + e.name + ' yet: ' + fmt(rc.best) + ' min');
             it.recNew = news.length ? { w: rc.w && !was.w, v: rc.v && !was.v, b: rc.b && !was.b } : null;
             it.rec = { w: rc.w, v: rc.v, b: rc.b };
             if (news.length) toast(news[0], true);
@@ -2967,7 +3199,7 @@ var LIBRARY = (function () {
       case 'settings': settingsSheet(); break;
       case 'theme': state.settings.theme = a.dataset.v; saveSettings(); applyTheme(); render(); settingsSheet(); break;
       case 'goal': state.settings.weeklyGoal = Math.max(1, Math.min(7, (state.settings.weeklyGoal || 4) + (+a.dataset.d))); saveSettings(); settingsSheet(); render(); break;
-      case 'toggle': state.settings[a.dataset.k] = !state.settings[a.dataset.k]; saveSettings(); if (a.dataset.k === 'sound' && state.settings.sound) { unlockAudio(); beep(); } wake(); if (a.dataset.k === 'rir') render(); settingsSheet(); break;
+      case 'toggle': state.settings[a.dataset.k] = !state.settings[a.dataset.k]; saveSettings(); if (a.dataset.k === 'sound' && state.settings.sound) { unlockAudio(); beep(); } wake(); if (a.dataset.k === 'rir' || a.dataset.k === 'outCore') render(); settingsSheet(); break;
       case 'backup-save': saveBackupFile(); break;
       case 'backup-later': setBackupInfo({ later: Object.keys(state.sessions).length }); render(); break;
       case 'backup-show': { var bx = document.getElementById('backup-box'); bx.hidden = false; document.getElementById('backup-text').value = JSON.stringify(backupData()); break; }
@@ -3010,6 +3242,7 @@ var LIBRARY = (function () {
       case 'lift-sets': state.ui.liftSets = a.dataset.v; saveLocal(); render(); enter(); break;
       case 'lift-info': liftInfo = !liftInfo; render(); break;
       case 'ms-open': msSheet(+a.dataset.i); break;
+      case 'sport': state.ui.sport = a.dataset.v; saveLocal(); render(); enter(); break;
       case 'rir': it = findItem(u); if (it && it.rows[i]) { it.rows[i].rir = +a.dataset.v; touchDraft(); render(); } break;
       case 'timer': if (d && d.timer && d.timer.u === u && d.timer.i === i) timerStop(false); else timerStart(u, i); break;
       case 'help-open': helpSheet(u); break;
@@ -3077,7 +3310,7 @@ var LIBRARY = (function () {
     if (!el.dataset || !el.dataset.f) return;
     var f = el.dataset.f;
     if (f === 'notes') d.notes = el.value;
-    else { var it = findItem(el.dataset.u); if (!it) return; if (f === 'note') it.note = el.value; else { it.rows[+el.dataset.i][f] = el.value; var n = draftCount(), fb = document.getElementById('finish-btn'), wf = document.getElementById('wbar-fin'); if (fb) fb.disabled = !n; if (wf) wf.disabled = !n; } }
+    else { var it = findItem(el.dataset.u); if (!it) return; if (f === 'note') it.note = el.value; else { it.rows[+el.dataset.i][f] = el.value; var pe = document.getElementById('p-' + el.dataset.u + '-' + el.dataset.i); if (pe) { var se = exi(it.ex), so = rowSets({ ex: it.ex, rows: [it.rows[+el.dataset.i]] }), pt = so.length && so[0].dist ? paceText(se, so[0].dist, so[0].r) : ''; pe.textContent = pt ? 'Pace ' + pt : ''; } var n = draftCount(), fb = document.getElementById('finish-btn'), wf = document.getElementById('wbar-fin'); if (fb) fb.disabled = !n; if (wf) wf.disabled = !n; } }
     touchDraft();
   });
   document.addEventListener('change', function (ev) {
