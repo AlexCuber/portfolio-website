@@ -1695,7 +1695,7 @@ var LIBRARY = (function () {
   }
   /* milestone levels climb through these, like ranks in a game */
   /* name, fill, text on the fill, the name's colour on a light page, and on a dark page */
-  var TIERS = [['Tin', '#9ba6a9', '#16262a', '#6c797d', '#aab5b8'], ['Copper', '#c57a4c', '#ffffff', '#a9582a', '#dd9467'], ['Silver', '#c5ced2', '#16262a', '#7a878d', '#cfd8dc'], ['Gold', '#e4b93e', '#3b2a00', '#a07700', '#ecc552'], ['Emerald', '#1faa72', '#ffffff', '#0e8558', '#40d195'], ['Platinum', '#e8eef0', '#16262a', '#5c7c88', '#e8eef0'], ['Diamond', '#7fe2f5', '#06323a', '#0a8aab', '#7fe2f5'], ['Onyx', '#161c1e', '#b6ff1a', '#161c1e', '#b6ff1a']];
+  var TIERS = [['Tin', '#9ba6a9', '#16262a', '#6c797d', '#aab5b8'], ['Copper', '#c57a4c', '#ffffff', '#a9582a', '#dd9467'], ['Silver', '#c5ced2', '#16262a', '#7a878d', '#cfd8dc'], ['Gold', '#e4b93e', '#3b2a00', '#a07700', '#ecc552'], ['Emerald', '#1faa72', '#ffffff', '#0e8558', '#40d195'], ['Platinum', '#e8eef0', '#16262a', '#5c7c88', '#e8eef0'], ['Diamond', '#7fe2f5', '#06323a', '#0a8aab', '#7fe2f5'], ['Onyx', '#5b21b6', '#ffffff', '#6d28d9', '#a78bfa']];
   function tierOf(level) { return level > 0 ? TIERS[Math.min(level, TIERS.length) - 1] : null; }
   function msNum(m, v) { return m.unit === 't' ? fmt(Math.round(v * 10) / 10) : String(Math.floor(v)); }
   function badgesHtml(list) {
@@ -1712,7 +1712,7 @@ var LIBRARY = (function () {
     h += '<ul class="ms-list">';
     m.steps.forEach(function (g, k) {
       var tt = TIERS[Math.min(k, TIERS.length - 1)], done = k < m.level, cur = k === m.level;
-      h += '<li class="' + (cur ? 'cur' : done ? '' : 'off') + '" style="--tier:' + tt[1] + ';--tl:' + tt[3] + ';--td:' + tt[4] + '"><span class="tier-dot' + (done ? '' : ' off') + '"></span><span class="txt"><b>' + tt[0] + '</b><small>' + g + unit + '</small></span><span class="st' + (done ? ' ok' : '') + '">' + (done ? 'Reached' : cur ? msNum(m, Math.max(0, g - m.value)) + unit + ' to go' : 'Locked') + '</span></li>';
+      h += '<li class="' + (cur ? 'cur' : done ? '' : 'off') + '" style="--tier:' + tt[1] + ';--tl:' + tt[3] + ';--td:' + tt[4] + '"><span class="tier-dot' + (done ? ' on' : ' off') + '">' + (done ? IC.check : '') + '</span><span class="txt"><b>' + tt[0] + '</b><small>' + g + unit + '</small></span><span class="st">' + (done ? '<span class="sr">Reached</span>' : cur ? msNum(m, Math.max(0, g - m.value)) + unit + ' to go' : 'Locked') + '</span></li>';
     });
     h += '</ul><button class="btn primary block" type="button" data-act="sheet-x">Done</button>';
     openSheet(h);
