@@ -665,3 +665,62 @@ main { flex: 1; padding: 8px 16px 28px; display: flex; flex-direction: column; g
 .legend i.ln-k.dash { width: 19px; background: repeating-linear-gradient(90deg, var(--accent) 0 5px, transparent 5px 8px); }
 .legend i.ln-k.dash.grey { background: repeating-linear-gradient(90deg, var(--muted) 0 2px, transparent 2px 5px); }
 .draft-head:empty { display: none; }
+
+/* ---------- workout helpers ---------- */
+.tools { display: flex; flex-wrap: wrap; gap: 8px; }
+.tool { appearance: none; border: 1px solid var(--line-strong); background: var(--surface); border-radius: 99px; min-height: 38px; padding: 6px 14px 6px 10px; font-size: 0.875rem; font-weight: 600; color: var(--ink-2); display: inline-flex; align-items: center; gap: 7px; }
+.tool svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.tool:active { background: var(--surface-2); }
+.set.one.tm { grid-template-columns: 22px minmax(0, 1fr) 50px 50px; }
+.tbtn { appearance: none; width: 50px; height: 50px; border-radius: 16px; border: 0; background: var(--accent-soft); color: var(--accent-ink); display: grid; place-items: center; padding: 0; }
+.tbtn svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.tbtn.on { background: var(--board); color: var(--lime); }
+.tbtn.on svg { fill: currentColor; stroke: none; }
+.tick { position: relative; }
+.rir-b { position: absolute; top: -5px; right: -5px; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 11px; background: var(--ink); color: var(--surface); font-size: 0.72rem; font-weight: 700; line-height: 22px; text-align: center; font-variant-numeric: tabular-nums; box-shadow: 0 0 0 2px var(--surface); }
+.rir { display: flex; align-items: center; gap: 6px; background: var(--surface-2); border-radius: 14px; padding: 6px 6px 6px 12px; margin-left: 30px; }
+.rir span { flex: 1; min-width: 0; font-size: 0.82rem; font-weight: 600; color: var(--ink-2); }
+.rir button { appearance: none; border: 1px solid var(--line-strong); background: var(--surface); min-width: 44px; min-height: 38px; border-radius: 11px; font-family: var(--font-display); font-weight: 800; font-size: 1.15rem; color: var(--ink); padding: 0 6px; }
+.rir button:active { background: var(--accent-soft); }
+.rest.timing .arc { stroke: var(--lime); }
+.help-w { display: grid; grid-template-columns: 50px minmax(0, 1fr) auto 50px; gap: 8px; align-items: center; }
+.help-w .fld input { height: 56px; text-align: center; font-family: var(--font-display); font-weight: 800; font-size: 1.9rem; font-variant-numeric: tabular-nums; }
+.help-u { font-weight: 600; color: var(--ink-2); }
+.step { appearance: none; width: 50px; height: 56px; border-radius: 14px; border: 1px solid var(--line-strong); background: var(--surface); font-size: 1.5rem; color: var(--ink-2); padding: 0; }
+.step:active { background: var(--surface-2); }
+.plates { display: flex; flex-direction: column; gap: 10px; background: var(--surface-2); border-radius: 18px; padding: 14px; }
+.plates svg { display: block; width: 100%; max-width: 340px; height: auto; align-self: center; }
+.plates .pb { fill: var(--line-strong); }
+.plates .pc { fill: var(--muted); }
+.plates .pp { fill: var(--accent); }
+.plates text { font-family: var(--font-body); font-size: 10px; font-weight: 600; fill: var(--ink-2); text-anchor: middle; font-variant-numeric: tabular-nums; }
+.plate-t { margin: 0; text-align: center; color: var(--ink-2); }
+.plate-t b { color: var(--ink); font-family: var(--font-display); font-weight: 800; font-size: 1.35rem; letter-spacing: 0.01em; display: block; font-variant-numeric: tabular-nums; }
+.bar-pick { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: center; }
+.bar-pick .chips { margin: 0; padding: 0 0 2px; }
+.warm-list { list-style: none; margin: 0; padding: 0; counter-reset: wu; display: flex; flex-direction: column; }
+.warm-list li { counter-increment: wu; display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 8px; align-items: baseline; padding: 10px 0; border-top: 1px solid var(--line); }
+.warm-list li:first-child { border-top: 0; }
+.warm-list li::before { content: counter(wu); font-family: var(--font-display); font-weight: 800; font-size: 1.1rem; color: var(--muted); text-align: center; }
+.warm-list b { font-family: var(--font-display); font-weight: 700; font-size: 1.35rem; font-variant-numeric: tabular-nums; letter-spacing: 0.01em; }
+.warm-list span { color: var(--ink-2); font-size: 0.875rem; font-variant-numeric: tabular-nums; text-align: right; }
+.thumb.sm { width: 46px; height: 46px; border-radius: 12px; display: block; }
+
+/* ---------- first-run setup and templates ---------- */
+body.setup .tabs { display: none; }
+.setup-top { display: flex; flex-direction: column; gap: 4px; padding: 6px 2px 0; }
+.setup-top h2 { font-size: 2.1rem; line-height: 1; }
+.tpls { display: flex; flex-direction: column; gap: 8px; }
+.tpl { appearance: none; text-align: left; border: 1.5px solid var(--line-strong); background: var(--surface); border-radius: 18px; padding: 12px 14px; display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 12px; align-items: start; width: 100%; }
+.tpl .txt { display: grid; gap: 4px; min-width: 0; }
+.tpl b { font-weight: 700; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tpl small { color: var(--ink-2); font-size: 0.875rem; line-height: 1.35; }
+.tpl-s { font-size: 0.8rem; font-weight: 600; color: var(--accent-ink); }
+.tpl-dot { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--line-strong); display: grid; place-items: center; margin-top: 1px; }
+.tpl-dot svg { width: 14px; height: 14px; fill: none; stroke: var(--lime-ink); stroke-width: 3.4; stroke-linecap: round; stroke-linejoin: round; }
+.tpl.on { border-color: var(--accent); background: var(--accent-soft); }
+.tpl.on .tpl-dot { background: var(--lime); border-color: var(--lime); }
+.sheet .tpl-dot { display: none; }
+.sheet .tpl { grid-template-columns: minmax(0, 1fr); }
+.setup-foot { text-align: center; }
+.link { color: var(--accent-ink); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
