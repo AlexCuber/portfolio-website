@@ -549,3 +549,6 @@ main { flex: 1; padding: 8px 16px 28px; display: flex; flex-direction: column; g
 @media (max-width: 380px) { .ed-grid { grid-template-columns: auto minmax(0, 1fr); } .ed-grid > :nth-child(3) { grid-column: 1 / -1; } .mini .icon-btn { width: 34px; } }
 @media (max-width: 350px) { .next-title { font-size: 2.8rem; } .wbar-clock { font-size: 2rem; min-width: 84px; } .field input { font-size: 1.5rem; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+.backup-card { border: 1px solid var(--hero-line); }
+.btn.primary-sm { background: var(--accent); color: var(--on-accent); border-color: transparent; font-weight: 700; }
