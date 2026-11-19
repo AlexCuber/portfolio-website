@@ -2136,3 +2136,11 @@ body.has-mini .rest { display: none; }
 .rir { padding-left: 16px; }
 .search input { padding-left: 46px; padding-right: 16px; }
 .search svg { left: 16px; }
+
+/* ---- warm-up sets: above the working sets, marked W, quieter than the sets that count ---- */
+.warm-cap { margin: 2px 0 -4px 30px; font-size: 0.78rem; font-weight: 600; color: var(--muted); }
+.set.warm .set-n { font-size: 0.9rem; color: var(--hot-ink); background: var(--hot-soft); border-radius: 7px; line-height: 22px; height: 22px; }
+.set.warm .field input { height: 44px; font-size: 1.35rem; border-style: dashed; }
+.set.warm .tick { width: 44px; height: 44px; justify-self: center; }
+.set.warm.done .field input { border-style: solid; }
+.sess-entry .warm-l { color: var(--muted); }
