@@ -14,7 +14,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Hilo">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<script>try{var s=(JSON.parse(localStorage.getItem('workout-log-v1'))||{}).settings||{},t=s.theme,p=s.palette;if(t==='light'||t==='dark')document.documentElement.setAttribute('data-app-theme',t);if(p==='graphite'||p==='violet'||p==='lime')document.documentElement.setAttribute('data-palette',p)}catch(e){}</script>
+<script>try{var s=(JSON.parse(localStorage.getItem('workout-log-v1'))||{}).settings||{},t=s.theme,p=s.palette;if(t==='light'||t==='dark')document.documentElement.setAttribute('data-app-theme',t);if(p&&/^[a-z]{3,12}$/.test(p))document.documentElement.setAttribute('data-palette',p)}catch(e){}</script>
 <link rel="stylesheet" href="app.css">
 </head>
 <body>

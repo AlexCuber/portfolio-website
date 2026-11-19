@@ -923,7 +923,7 @@ var LIBRARY = (function () {
 
   /* ================= state and storage ================= */
   var LS = 'workout-log-v1';
-  var PALETTES = [['', 'Default', '#008a9c'], ['graphite', 'Graphite', '#1b1e19'], ['violet', 'Violet', '#5b3fe0'], ['lime', 'Lime', '#47780a']];
+  var PALETTES = [['', 'Default', '#008a9c, #2fb5a0 45%, #b6ff1a'], ['graphite', 'Graphite', '#1b1e19, #4b5140 50%, #b6ff1a'], ['violet', 'Violet', '#4a30c4, #9a7df5 55%, #b6ff1a'], ['lime', 'Lime', '#2f5204, #5f9612 50%, #b6ff1a'], ['blossom', 'Blossom', '#d6336c, #ff8ab8 50%, #b596ff']];
   var DEF_SET = { theme: 'auto', palette: '', sound: true, autoRest: true, awake: true, weeklyGoal: 4, goalWeight: null, goalRate: 0.25, unit: 'kg', rir: false, setupDone: false };
   var DEF_UI = { tab: 'log', ex: null, lib: 'all', prog: 'overview', measure: 'weight', musWin: 'week', lib3: 'history' };
   var state = { sessions: {}, body: {}, routines: {}, custom: {}, settings: Object.assign({}, DEF_SET), settingsAt: 0, draft: null, draftAt: 0, dirty: {}, ui: Object.assign({}, DEF_UI) };
@@ -2466,7 +2466,7 @@ var LIBRARY = (function () {
   function settingsSheet() {
     var s = state.settings, h = head('Settings');
     h += '<div class="setting stack"><div><b>Appearance</b><small>Automatic follows your phone.</small></div><div class="seg" role="group" aria-label="Appearance">' + [['auto', 'Automatic'], ['light', 'Light'], ['dark', 'Dark']].map(function (t) { return '<button type="button" data-act="theme" data-v="' + t[0] + '" aria-pressed="' + (s.theme === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div></div>';
-    h += '<div class="setting stack"><div><b>Colour theme</b><small>Lime stays the colour for actions and violet for endurance in all of them.</small></div><div class="pal" role="group" aria-label="Colour theme">' + PALETTES.map(function (p) { return '<button type="button" data-act="palette" data-v="' + p[0] + '" aria-pressed="' + ((s.palette || '') === p[0]) + '"><span class="pal-sw" style="--a:' + p[2] + ';--b:#b6ff1a" aria-hidden="true"></span>' + p[1] + '</button>'; }).join('') + '</div></div>';
+    h += '<div class="setting stack"><div><b>Theme</b></div><div class="pal" role="group" aria-label="Theme">' + PALETTES.map(function (p) { return '<button type="button" data-act="palette" data-v="' + p[0] + '" aria-pressed="' + ((s.palette || '') === p[0]) + '"><span class="pal-sw" style="background-image:linear-gradient(135deg, ' + p[2] + ')" aria-hidden="true"></span><span>' + p[1] + '</span></button>'; }).join('') + '</div></div>';
     h += unitRow();
     h += '<div class="setting"><div><b>Sessions per week</b><small>Your weekly goal.</small></div><div class="stepper"><button type="button" data-act="goal" data-d="-1" aria-label="One fewer">−</button><b>' + s.weeklyGoal + '</b><button type="button" data-act="goal" data-d="1" aria-label="One more">+</button></div></div>';
     function sw(key, title, sub) { return '<div class="setting"><div><b>' + title + '</b><small>' + sub + '</small></div><button class="switch" type="button" role="switch" data-act="toggle" data-k="' + key + '" aria-checked="' + (s[key] ? 'true' : 'false') + '" aria-label="' + title + '"></button></div>'; }
