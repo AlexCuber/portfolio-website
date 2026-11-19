@@ -14,7 +14,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Hilo">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<script>try{var t=((JSON.parse(localStorage.getItem('workout-log-v1'))||{}).settings||{}).theme;if(t==='light'||t==='dark')document.documentElement.setAttribute('data-app-theme',t)}catch(e){}</script>
+<script>try{var s=(JSON.parse(localStorage.getItem('workout-log-v1'))||{}).settings||{},t=s.theme,p=s.palette;if(t==='light'||t==='dark')document.documentElement.setAttribute('data-app-theme',t);if(p==='graphite'||p==='violet'||p==='lime')document.documentElement.setAttribute('data-palette',p)}catch(e){}</script>
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
@@ -27,6 +27,7 @@
     </div>
   </header>
   <header class="wbar" id="wbar" hidden>
+    <button class="wbar-min" type="button" data-act="wmin" aria-label="Minimise the workout and go to the rest of the app"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9.5l6 6 6-6"/></svg></button>
     <button class="wbar-main" type="button" data-act="go-workout"><span class="wbar-name" id="wbar-name">Workout</span><span class="wbar-sub" id="wbar-sub"></span></button>
     <button class="wbar-clock" type="button" id="wbar-clock" data-act="clock" aria-label="Workout time. Tap to change the date or start time.">0:00</button>
     <button class="wbar-fin" type="button" id="wbar-fin" data-act="finish">Finish</button>
@@ -39,6 +40,10 @@
     <div class="rest-step" id="rest-step"><button type="button" data-act="rest-sub" aria-label="30 seconds less">−</button><span id="rest-by">30 s</span><button type="button" data-act="rest-add" aria-label="30 seconds more">+</button></div>
     <button type="button" data-act="rest-skip">Skip</button>
   </div>
+  <button class="wmini" id="wmini" type="button" data-act="go-workout" hidden>
+    <span class="wmini-up" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 14.5l6-6 6 6"/></svg></span>
+    <span class="wmini-main"><span class="wmini-top"><i id="wmini-dot" hidden></i><b id="wmini-a">Workout</b><span id="wmini-t">0:00</span></span><small id="wmini-s">Back to your workout</small></span>
+  </button>
   <nav class="tabs" aria-label="Sections"><div class="tabs-in">
     <button class="tab" type="button" data-tab="log" aria-label="Train"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9.5v5M6.5 7v10M17.5 7v10M21 9.5v5M6.5 12h11"/></svg></button>
     <button class="tab" type="button" data-tab="progress" aria-label="Progress"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l5.5-5.5 4 4L20 8"/><path d="M15 8h5v5"/></svg></button>
