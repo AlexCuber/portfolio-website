@@ -2126,3 +2126,13 @@ body.has-mini .rest { display: none; }
 .rest button, .rest-step { border-radius: 999px; }
 .rest > button { padding: 0 16px; }
 .wmini { border-radius: 999px; }
+
+/* ---- every button and pill has fully round ends (asked for on 19 Nov 2026); cards, tiles and number fields keep their corners ---- */
+.btn, .btn.primary, .btn.sm, .btn.start, .wbar-fin, .seg, .seg button, .stepper, .rir, .rir button, .step, .add-ex, .search input, .icon-btn, .tbtn, .hist-sb { border-radius: 999px; }
+.btn { padding-left: 20px; padding-right: 20px; }
+.btn.sm { padding-left: 16px; padding-right: 16px; }
+.btn.quiet { padding-left: 6px; padding-right: 6px; }
+.wbar-fin { padding: 0 16px; }
+.rir { padding-left: 16px; }
+.search input { padding-left: 46px; padding-right: 16px; }
+.search svg { left: 16px; }
