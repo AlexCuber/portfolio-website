@@ -770,3 +770,53 @@ svg.out { --illo-bg: var(--out-sky); --hot: var(--out); background: var(--out-sk
 .seg button { min-width: 0; }
 @media (max-width: 350px) { .set.sp { grid-template-columns: 16px minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 0.9fr) 46px; gap: 5px; } .set.sp .field input { font-size: 1.2rem; padding-right: 20px; } }
 @media (max-width: 360px) { .seg button { font-size: 0.8rem; padding-left: 4px; padding-right: 4px; letter-spacing: -0.01em; } }
+
+/* ---------- endurance card: editing, and tiles with longer names ---------- */
+.out-tile b { text-align: center; padding: 0 4px; overflow-wrap: anywhere; }
+.out-tile b.long { font-size: 1.02rem; line-height: 1.05; }
+.out-row .icon-btn { width: 36px; }
+.out-row .thumb.sm { width: 40px; height: 40px; border-radius: 11px; overflow: hidden; flex: none; }
+.out-row .thumb.sm svg { display: block; width: 100%; height: 100%; }
+/* ---------- history: search behind an icon, workouts as summaries that open ---------- */
+.hist-top { display: grid; grid-template-columns: minmax(0, 1fr) 46px; gap: 8px; align-items: stretch; }
+.hist-sb { appearance: none; border: 0; background: var(--surface-2); border-radius: 14px; color: var(--ink-2); display: grid; place-items: center; padding: 0; min-height: 46px; }
+.hist-sb svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; }
+.hist-sb.on { background: var(--accent-soft); color: var(--accent-ink); }
+.hist-list { display: flex; flex-direction: column; gap: 10px; }
+.hist-h { padding: 4px 2px 0; }
+.hcard { padding: 0; gap: 0; }
+.hc-head { appearance: none; border: 0; background: none; width: 100%; text-align: left; display: grid; grid-template-columns: minmax(0, 1fr) 24px; gap: 12px; align-items: center; padding: 14px 14px 14px 16px; color: inherit; border-radius: inherit; }
+.hc-head .txt { display: grid; gap: 2px; min-width: 0; }
+.hc-head b { font-weight: 700; overflow-wrap: anywhere; }
+.hc-head small { color: var(--ink-2); font-size: 0.85rem; line-height: 1.35; }
+.hc-chev { color: var(--muted); display: grid; place-items: center; transition: transform 0.18s ease; }
+.hc-chev svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.hcard.open .hc-chev { transform: rotate(180deg); }
+.hcard.open > div, .hcard.open > p { padding: 0 16px; }
+.hcard.open > .row { padding: 12px 16px 16px; }
+.hcard.open > p.sub { margin: 8px 0 0; }
+.avatar.avo { background: var(--out-soft); color: var(--out-ink); }
+.avatar.avx { background: var(--surface-2); color: var(--ink-2); }
+.hist-count { text-align: center; }
+@media (prefers-reduced-motion: reduce) { .hc-chev { transition: none; } }
+
+/* ---- history summaries: the name carries the session's colour, as its square does on the calendar ---- */
+.hc-head b { font-size: 1.04rem; color: var(--ink); }
+.hc-head b.nm0 { color: var(--accent-ink); } .hc-head b.nm1 { color: var(--teal-ink); } .hc-head b.nm2 { color: var(--rose-ink); }
+.hc-head b.nm3 { color: var(--green-ink); } .hc-head b.nm4 { color: var(--hot-ink); } .hc-head b.nmo { color: var(--out-ink); }
+/* ---- overview: six small tiles ---- */
+.tiles.six { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.tiles.six .tile { padding: 11px 12px 12px; border-radius: 16px; }
+.tiles.six .tile .ico { position: absolute; top: 10px; right: 10px; width: 18px; height: 18px; margin: 0; background: none; border-radius: 0; }
+.tiles.six .tile .ico svg { width: 17px; height: 17px; }
+.tiles.six .tile b { font-size: 1.8rem; }
+.tiles.six .tile b small { font-size: 0.92rem; margin-left: 3px; }
+.tiles.six .tile b + span { font-size: 0.76rem; margin-top: 3px; }
+.tile.t-teal .ico { background: var(--teal-soft); color: var(--teal-ink); }
+.tile.t-star .ico { background: var(--hot-soft); color: var(--hot-ink); }
+.tile.t-star .ico svg { fill: currentColor; stroke: none; }
+.tiles.six .tile.t-teal .ico, .tiles.six .tile.t-star .ico, .tiles.six .tile.t-green .ico, .tiles.six .tile.t-hot .ico, .tiles.six .tile.t-violet .ico { background: none; }
+@media (max-width: 360px) { .tiles.six { gap: 6px; } .tiles.six .tile { padding: 10px 10px 11px; } .tiles.six .tile .ico { display: none; } .tiles.six .tile b { font-size: 1.6rem; } }
+/* ---- endurance tiles: a wide, shorter picture and no line when nothing is logged ---- */
+.out-tile .illo { aspect-ratio: 4 / 3; margin-bottom: 6px; }
+.out-tile { padding-bottom: 9px; }
