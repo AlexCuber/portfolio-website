@@ -2113,3 +2113,31 @@ body.has-mini .rest { display: none; }
 @media (max-width: 350px) { .pal-sw { width: 38px; height: 38px; } .pal button { font-size: 0.7rem; } }
 /* ---- Graphite: the next-up card is black with light text in light mode ---- */
 :root[data-palette="graphite"] .next { --ink: var(--nx-ink); --ink-2: var(--nx-ink-2); --muted: var(--nx-muted); --accent-ink: var(--nx-label); --fig: var(--nx-fig); --fig-far: var(--nx-fig-far); --equip: var(--nx-equip); --pad: var(--nx-pad); --weight: var(--nx-weight); color: var(--ink); }
+
+/* ---- the line under an exercise's name stays on one line: it runs under the menu button, and narrow phones drop a word ---- */
+.exc-head > div { display: contents; }
+.exc-head > .thumb { grid-row: 1 / span 2; }
+.exc-name { grid-column: 2; align-self: end; }
+.exc-head > .icon-btn { grid-column: 3; grid-row: 1; }
+.exc-target { grid-column: 2 / -1; grid-row: 2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; align-self: start; margin-top: -8px; }
+@media (max-width: 370px) { .xs-hide { display: none; } .exc-target { font-size: 0.84rem; } }
+/* ---- the countdown bar and the minimised workout bar have fully round ends, and so do their buttons ---- */
+.rest { border-radius: 999px; padding: 8px 10px 8px 12px; }
+.rest button, .rest-step { border-radius: 999px; }
+.rest > button { padding: 0 16px; }
+.wmini { border-radius: 999px; }
+
+/* ---- every button and pill has fully round ends (asked for on 19 Nov 2026); cards, tiles and number fields keep their corners ---- */
+.btn, .btn.primary, .btn.sm, .btn.start, .wbar-fin, .seg, .seg button, .stepper, .rir, .rir button, .step, .add-ex, .search input, .icon-btn, .tbtn, .hist-sb { border-radius: 999px; }
+.btn { padding-left: 20px; padding-right: 20px; }
+.btn.sm { padding-left: 16px; padding-right: 16px; }
+.btn.quiet { padding-left: 6px; padding-right: 6px; }
+.wbar-fin { padding: 0 16px; }
+.rir { padding-left: 16px; }
+.search input { padding-left: 46px; padding-right: 16px; }
+.search svg { left: 16px; }
+
+/* ---- warm-up sets: ordinary set rows above set 1, with a W where the number would be ---- */
+.set.warm { background: none; border-radius: 0; padding: 0; font-size: inherit; color: inherit; }
+.set.warm .set-n { font-size: 0.9rem; color: var(--hot-ink); background: var(--hot-soft); border-radius: 7px; line-height: 22px; height: 22px; }
+.sess-entry .warm-l { color: var(--muted); }

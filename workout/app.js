@@ -1271,6 +1271,10 @@ var LIBRARY = (function () {
     var e = exi(it.ex);
     return { u: uid(), ex: it.ex, n: it.n || '', group: it.group || '', link: !!it.link, sets: it.sets, lo: it.lo, hi: it.hi, reps: it.reps || '', rir: it.rir || e.rir, rest: it.rest || '', restSec: it.link ? 10 : it.restSec, cue: it.cue || '', note: note || '', rows: rows };
   }
+  /* Warm-up sets: kept in it.warm (and entry.warm once saved), apart from the working sets, so targets, records,
+     set counts and weight lifted never see them. */
+  function warmRows(sets) { return (sets || []).map(function (x) { return { w: fmt(x.w), r: fmt(x.r), d: true }; }); }
+  function warmSets(it) { var out = []; (it.warm || []).forEach(function (x) { var r = num(x.r), w = num(x.w); if (x.d && r != null && r > 0) out.push({ w: w == null || w < 0 ? 0 : w, r: r }); }); return out; }
   function blankRows(n) { var r = []; for (var i = 0; i < n; i++) r.push({ w: '', r: '', d: false }); return r; }
   function startDraft(key, from) {
     var r = key === 'free' ? null : getRoutine(key);
@@ -1282,11 +1286,11 @@ var LIBRARY = (function () {
       var prev = from ? (from.entries || []).filter(function (en, j) { if (used[j]) return false; if (en.n === src.n && en.ex === it.ex) { used[j] = 1; return true; } return false; })[0] : null;
       var last = lastEntry(key, it.ex, d.id), count = prev ? Math.max(prev.sets.length, it.sets) : Math.max(it.sets, last && last.key === key ? Math.min(last.sets.length, it.sets + 2) : 0), rows = [];
       for (var k = 0; k < count; k++) { var ps = prev && prev.sets[k]; rows.push(ps ? rowFrom(exi(it.ex), ps) : { w: '', r: '', d: false }); }
-      d.items.push(itemFrom(src, rows, prev ? prev.note : ''));
+      var ni = itemFrom(src, rows, prev ? prev.note : ''); if (prev && prev.warm) ni.warm = warmRows(prev.warm); d.items.push(ni);
     });
     if (from) (from.entries || []).forEach(function (en, j) {
       if (used[j]) return; var e = exi(en.ex, en.name);
-      d.items.push(itemFrom({ ex: en.ex, n: en.n || 'x', sets: en.sets.length, lo: e.lo, hi: e.hi, restSec: e.restSec }, en.sets.map(function (x) { return rowFrom(e, x); }), en.note));
+      var xi = itemFrom({ ex: en.ex, n: en.n || 'x', sets: en.sets.length, lo: e.lo, hi: e.hi, restSec: e.restSec }, en.sets.map(function (x) { return rowFrom(e, x); }), en.note); if (en.warm) xi.warm = warmRows(en.warm); d.items.push(xi);
     });
     state.draft = d; touchDraft(true); stopRest(); summary = null; editor = null;
     state.ui.tab = 'log'; state.ui.wmin = false; applyTheme(); wake();
@@ -1336,7 +1340,7 @@ var LIBRARY = (function () {
     var before = finished().filter(function (s) { return s.id !== d.id; });
     d.items.forEach(function (it) {
       var e = exi(it.ex), sets = rowSets(it); if (!sets.length) return;
-      entries.push({ n: it.n, ex: it.ex, name: e.name, note: it.note || '', sets: sets });
+      var en = { n: it.n, ex: it.ex, name: e.name, note: it.note || '', sets: sets }, wm = warmSets(it); if (wm.length) en.warm = wm; entries.push(en);
       if (!d.editing) { var rc = recordsOf(it.ex, sets, d.id), tags = recordTags(e, rc, sets); if (e.sport && paceRecord(e, sets, d.id)) { var so = sumSets(sets); tags.push('fastest pace yet, ' + paceText(e, so.dist, so.dmin)); recEx[it.ex] = 'Fastest pace'; } if (tags.length) { prs.push({ name: e.name, tags: tags }); if (rc.w) recEx[it.ex] = 'Record weight'; else if (rc.b && e.sport) recEx[it.ex] = 'Longest yet'; else if (rc.b && e.log !== 'wr') recEx[it.ex] = 'Best yet'; } }
     });
     if (!entries.length) return;
@@ -1818,8 +1822,10 @@ var LIBRARY = (function () {
   function targetOf(it, e) {
     if (e.log === 'cardio') return repsText(it, e);
     var rest = it.link ? 'then next' : (it.rest || restText(it.restSec));
-    return it.sets + ' × ' + repsText(it, e) + (it.rir && it.rir !== '—' ? ' · RIR ' + it.rir : '') + (rest && rest !== '—' ? (/^then/.test(rest) ? ' · ' : ' · rest ') + rest : '');
+    return (it.sets + ' × ' + repsText(it, e) + (it.rir && it.rir !== '—' ? ' · RIR ' + it.rir : '') + (rest && rest !== '—' ? (/^then/.test(rest) ? ' · ' : ' · rest ') + rest : '')).replace(/–/g, '-');
   }
+  /* the same line for the workout card, where it must stay on one line: on a narrow phone the word "rest" is dropped */
+  function targetHtml(it, e) { return esc(targetOf(it, e)).replace(' · rest ', ' · <span class="xs-hide">rest </span>'); }
   function toast(msg, rec) {
     var el = document.getElementById('toast'); el.textContent = msg; el.className = 'toast' + (rec ? ' rec' : ''); el.hidden = false;
     clearTimeout(toastTimer); toastTimer = setTimeout(function () { el.hidden = true; }, rec ? 3400 : 2600);
@@ -1830,7 +1836,7 @@ var LIBRARY = (function () {
   function chrome() {
     var d = state.draft, live = wLive() && !state.ui.wmin && state.ui.tab === 'log' && !editor, bar = document.getElementById('bar'), wbar = document.getElementById('wbar'), tab = state.ui.tab, now = new Date();
     bar.hidden = !!live; wbar.hidden = !live;
-    if (document.body.classList.contains('setup')) { document.getElementById('bar-title').textContent = 'Hilo'; document.getElementById('bar-date').textContent = 'Welcome'; return; }
+    if (document.body.classList.contains('setup')) { document.getElementById('bar-title').textContent = 'Uphill'; document.getElementById('bar-date').textContent = 'Welcome'; return; }
     document.getElementById('bar-title').textContent = tab === 'progress' ? 'Progress' : tab === 'exercises' ? (state.ui.lib3 === 'exercises' ? 'Exercises' : 'History') : DAYS_FULL[now.getDay()];
     document.getElementById('bar-date').textContent = tab === 'progress' ? plural(Object.keys(state.sessions).length, 'workout') + ' logged' : tab === 'exercises' ? (state.ui.lib3 === 'exercises' ? allEx().length + ' exercises' : plural(Object.keys(state.sessions).length, 'workout')) : now.getDate() + ' ' + MONTHS_FULL[now.getMonth()];
     if (!live) return;
@@ -1972,6 +1978,13 @@ var LIBRARY = (function () {
   }
 
   /* ================= log tab: the workout ================= */
+  function warmRow(it, i, s) {
+    var n = i + 1;
+    return '<div class="set warm' + (s.d ? ' done' : '') + '"><span class="set-n" title="Warm-up set">W</span>' +
+      '<div class="field"><input type="text" inputmode="decimal" autocomplete="off" data-wf="w" data-u="' + it.u + '" data-i="' + i + '" value="' + esc(s.w) + '" aria-label="Warm-up set ' + n + ' weight in ' + UW() + '"><span>' + UW() + '</span></div><span class="set-x">×</span>' +
+      '<div class="field"><input type="text" inputmode="numeric" autocomplete="off" data-wf="r" data-u="' + it.u + '" data-i="' + i + '" value="' + esc(s.r) + '" aria-label="Warm-up set ' + n + ' reps"><span>reps</span></div>' +
+      '<button class="tick" type="button" data-act="wtick" data-u="' + it.u + '" data-i="' + i + '" aria-pressed="' + (s.d ? 'true' : 'false') + '" aria-label="Warm-up set ' + n + ' done">' + IC.check + '</button></div>';
+  }
   function setRow(it, e, i, s, lastSets) {
     var d = state.draft, ls = lastSets ? (lastSets[i] || lastSets[lastSets.length - 1]) : null, one = e.log === 'cardio' || e.log === 'time';
     if (e.sport) return sportRow(it, e, i, s, ls);
@@ -2005,7 +2018,7 @@ var LIBRARY = (function () {
       var allDone = it.rows.length && it.rows.every(function (x) { return x.d; });
       h += '<section class="card exc' + (grouped ? ' in-group' : '') + (allDone ? ' all-done' : '') + '" id="x-' + it.u + '"><div class="exc-head">' +
         '<button class="thumb" type="button" data-act="open-ex" data-ex="' + esc(it.ex) + '" data-u="' + it.u + '" aria-label="How to do ' + esc(e.name) + '">' + illoSvg(e.illo) + '</button>' +
-        '<div><div class="exc-name">' + (it.n && it.n.charAt(0) !== 'x' ? '<span class="exc-n">' + esc(it.n) + '</span>' : '') + esc(e.name) + '</div><div class="exc-target">' + esc(targetOf(it, e)) + '</div></div>' +
+        '<div><div class="exc-name">' + (it.n && it.n.charAt(0) !== 'x' ? '<span class="exc-n">' + esc(it.n) + '</span>' : '') + esc(e.name) + '</div><div class="exc-target">' + targetHtml(it, e) + '</div></div>' +
         '<button class="icon-btn" type="button" data-act="ex-menu" data-u="' + it.u + '" aria-label="More options for ' + esc(e.name) + '">' + IC.more + '</button></div>';
       if (showT) anyTarget = true;
       h += '<div class="last"><div class="last-row"><span class="label">' + (last ? 'Last time · ' + fmtDate(last.date) : 'Last time') + '</span>' +
@@ -2016,6 +2029,7 @@ var LIBRARY = (function () {
       var anyDone = it.rows.some(function (x) { return x.d; });
       if (!d.editing && !allDone) h += '<div class="tools">' + (e.log === 'wr' ? '<button class="tool" type="button" data-act="help-open" data-u="' + it.u + '">' + IC.bar + (isBar(e) ? 'Warm-up and plates' : 'Warm-up') + '</button>' : '') + (e.sport ? (function () { var open = 0; while (open < it.rows.length - 1 && it.rows[open].d) open++; var on = !!(d.timer && d.timer.u === it.u); return '<button class="tool' + (on ? ' on' : '') + '" type="button" data-act="timer" data-u="' + it.u + '" data-i="' + (on ? d.timer.i : open) + '">' + (on ? IC.stop + 'Stop the stopwatch' : IC.timer + 'Stopwatch') + '</button>'; })() : '') + (anyDone ? '' : '<button class="tool" type="button" data-act="swap-open" data-u="' + it.u + '">' + IC.swap + 'Swap</button>') + '</div>';
       h += '<div class="sets">';
+      if (it.warm && it.warm.length) it.warm.forEach(function (s, i) { h += warmRow(it, i, s); });
       it.rows.forEach(function (s, i) { h += setRow(it, e, i, s, tg && tg.sets ? tg.sets : (last ? last.sets : null)); if (s.d && s.pr) anyPr = true; s.pop = false; });
       h += '</div>';
       var rc = itemRecords(it, d), chips = '', nw = it.recNew || {};
@@ -2424,7 +2438,7 @@ var LIBRARY = (function () {
     var s = state.sessions[id]; if (!s) return;
     var du = durOf(s), vol = volOf(s);
     var h = head(s.name || 'Workout', fmtDate(s.date) + ' · ' + countSets(s) + ' sets' + (du ? ' · ' + fmtDur(du) : '') + (vol ? ' · ' + compact(vol) + ' ' + UW() + ' lifted' : ''));
-    (s.entries || []).forEach(function (en) { var e = exi(en.ex, en.name); h += '<div class="sess-entry"><b>' + esc(e.gone ? en.name : e.name) + '</b><span>' + esc(setsText(e, en.sets)) + '</span>' + rirLine(en.sets) + (en.note ? '<span>Note: ' + esc(en.note) + '</span>' : '') + '</div>'; });
+    (s.entries || []).forEach(function (en) { var e = exi(en.ex, en.name); h += '<div class="sess-entry"><b>' + esc(e.gone ? en.name : e.name) + '</b>' + (en.warm && en.warm.length ? '<span class="warm-l">Warm-up: ' + esc(setsText(e, en.warm)) + '</span>' : '') + '<span>' + esc(setsText(e, en.sets)) + '</span>' + rirLine(en.sets) + (en.note ? '<span>Note: ' + esc(en.note) + '</span>' : '') + '</div>'; });
     if (s.notes) h += '<p class="sub">Notes: ' + esc(s.notes) + '</p>';
     h += '<div class="row"><button class="btn primary-sm" type="button" data-act="again" data-id="' + esc(id) + '"' + (state.draft ? ' disabled' : '') + '>Do this again</button><button class="btn" type="button" data-act="edit-session" data-id="' + esc(id) + '"' + (state.draft ? ' disabled' : '') + '>Edit</button><button class="btn danger" type="button" data-act="delete-session" data-id="' + esc(id) + '">' + (armed === 'del' + id ? 'Tap again to delete' : 'Delete') + '</button></div>';
     if (state.draft) h += '<p class="foot">Finish or discard the workout in progress before editing or repeating an older one.</p>';
@@ -2476,7 +2490,7 @@ var LIBRARY = (function () {
     h += '<div class="setting stack"><div><b>Backup</b><small>' + (STANDALONE ? 'Everything is stored on this phone only. ' + (function () { var b = backupState(); return b.at ? 'Last backup ' + fmtDate(iso(new Date(b.at))) + (b.fresh ? ', ' + plural(b.fresh, 'workout') + ' since then.' : ', nothing new since then.') : 'No backup made yet.'; })() + ' To bring a backup back, use Restore from file.' : 'Your log syncs through Claude. A backup lets you move it elsewhere.') + '</small></div>' +
       '<div class="row">' + (STANDALONE ? '<button class="btn sm" type="button" data-act="backup-save">Save backup file</button>' : '') + '<button class="btn sm" type="button" data-act="backup-show">Show backup text</button><label class="btn sm">Restore from file<input id="backup-file" type="file" accept=".json,application/json,text/plain" hidden></label></div>' +
       '<div id="backup-box" hidden><textarea class="backup" id="backup-text" spellcheck="false" aria-label="Backup text"></textarea><div class="row"><button class="btn sm" type="button" data-act="backup-copy">Copy</button><button class="btn sm" type="button" data-act="backup-restore">Restore from this text</button></div></div></div>';
-    h += '<p class="foot">Hilo · ' + allEx().length + ' exercises · ' + Object.keys(state.sessions).length + ' workouts saved</p>';
+    h += '<p class="foot">Uphill · ' + allEx().length + ' exercises · ' + Object.keys(state.sessions).length + ' workouts saved</p>';
     openSheet(h);
   }
   function openSummary() {
@@ -2641,7 +2655,7 @@ var LIBRARY = (function () {
         '<span class="txt"><b' + (tint[s.key] != null ? ' class="nm' + tint[s.key] + '"' : '') + '>' + esc(s.name || 'Workout') + '</b><small>' + fmtDate(s.date) + yr + (bits.length ? ' · ' + esc(bits.join(' · ')) : '') + '</small></span><span class="hc-chev" aria-hidden="true">' + IC.down + '</span></button>';
       if (open) {
         h += '<div>';
-        (s.entries || []).forEach(function (en) { var e = exi(en.ex, en.name); h += '<div class="sess-entry"><b>' + esc(e.gone ? en.name : e.name) + '</b><span>' + esc(setsText(e, en.sets)) + '</span>' + rirLine(en.sets) + (en.note ? '<span>Note: ' + esc(en.note) + '</span>' : '') + '</div>'; });
+        (s.entries || []).forEach(function (en) { var e = exi(en.ex, en.name); h += '<div class="sess-entry"><b>' + esc(e.gone ? en.name : e.name) + '</b>' + (en.warm && en.warm.length ? '<span class="warm-l">Warm-up: ' + esc(setsText(e, en.warm)) + '</span>' : '') + '<span>' + esc(setsText(e, en.sets)) + '</span>' + rirLine(en.sets) + (en.note ? '<span>Note: ' + esc(en.note) + '</span>' : '') + '</div>'; });
         h += '</div>' + (s.notes ? '<p class="sub">Notes: ' + esc(s.notes) + '</p>' : '') +
           '<div class="row"><button class="btn sm primary-sm" type="button" data-act="again" data-id="' + esc(s.id) + '">Do this again</button><button class="btn sm" type="button" data-act="open-session" data-id="' + esc(s.id) + '">Edit or delete</button></div>';
       }
@@ -2805,8 +2819,10 @@ var LIBRARY = (function () {
         h += '<li><b>' + (x.bar ? 'Empty bar' : fmt(x.w) + uw) + ' × ' + x.r + '</b><span>' + (x.bar ? fmt(x.w) + uw : pl2 && pl2.side.length ? 'each side ' + pl2.side.map(fmt).join(' + ') : pl2 ? 'just the bar' : '') + '</span></li>';
       });
       h += '</ol>';
+      var has = it.warm && it.warm.length;
+      h += '<div class="row"><button class="btn sm primary-sm" type="button" data-act="warm-add">' + (has ? 'Replace the warm-up sets' : (ws.length > 1 ? 'Add these to the workout' : 'Add this to the workout')) + '</button>' + (has ? '<button class="btn sm quiet danger" type="button" data-act="warm-clear">Remove them</button>' : '') + '</div>';
     }
-    h += '<p class="foot">' + (full ? 'About 50, 70 and 85 percent of the working weight. Keep them easy and rest about a minute between them.' : 'About 60 percent. After the first exercise you are warm, and this is only to feel the movement.') + ' Warm-up sets are not logged.</p></div>';
+    h += '<p class="foot">' + (full ? 'About 50, 70 and 85 percent of the working weight. Keep them easy and rest about a minute between them.' : 'About 60 percent. After the first exercise you are warm, and this is only to feel the movement.') + ' Added warm-up sets go above set 1, marked W instead of a number. They are saved with the workout but do not count as sets, toward records or toward weight lifted.</p></div>';
     return h;
   }
   function helpSheet(u) {
@@ -2851,7 +2867,7 @@ var LIBRARY = (function () {
     h += '<section class="card"><div><h3>Days a week</h3><p class="sub">How often you plan to train. This becomes your weekly goal.</p></div><div class="seg" role="group" aria-label="Days a week">' + [2, 3, 4, 5, 6].map(function (n) { return '<button type="button" data-act="setup-days" data-v="' + n + '" aria-pressed="' + (su.days === n) + '">' + n + '</button>'; }).join('') + '</div></section>';
     h += '<section class="card"><div><h3>Starting plan</h3><p class="sub">Every session can be edited, reordered or replaced once you are in.</p></div><div class="tpls" role="radiogroup" aria-label="Starting plan">' + tplCards(su.tpl, su.days, 'setup-tpl') + '</div></section>';
     h += '<button class="btn primary block" type="button" data-act="setup-go">Start</button>';
-    h += '<p class="foot setup-foot">Used Hilo before? <label class="link">Restore from a backup file<input id="backup-file" type="file" accept=".json,application/json,text/plain" hidden></label></p>';
+    h += '<p class="foot setup-foot">Used Uphill before? <label class="link">Restore from a backup file<input id="backup-file" type="file" accept=".json,application/json,text/plain" hidden></label></p>';
     return h;
   }
   function loadingView() { return '<section class="card"><h3>Opening your log</h3><p class="sub">Checking for workouts saved from another device.</p></section>'; }
@@ -3135,8 +3151,8 @@ var LIBRARY = (function () {
   /* ================= backup ================= */
   function backupData() { return { app: 'workout-log', v: 2, exportedAt: new Date().toISOString(), sessions: state.sessions, body: state.body, routines: state.routines, custom: state.custom, settings: state.settings }; }
   function restore(text) {
-    var data; try { data = JSON.parse(text); } catch (e) { toast('That is not a Hilo backup. Nothing was changed.'); return; }
-    if (!data || !data.sessions || typeof data.sessions !== 'object') { toast('That is not a Hilo backup. Nothing was changed.'); return; }
+    var data; try { data = JSON.parse(text); } catch (e) { toast('That is not an Uphill backup. Nothing was changed.'); return; }
+    if (!data || !data.sessions || typeof data.sessions !== 'object') { toast('That is not an Uphill backup. Nothing was changed.'); return; }
     var n = 0, wasEmpty = emptyLog(), bu = data.settings && data.settings.unit === 'lb' ? 'lb' : 'kg';
     if (!wasEmpty && bu !== (isLb() ? 'lb' : 'kg')) { toast('That backup is in ' + (bu === 'lb' ? 'pounds' : 'kilograms') + ' and this log is not. Switch units in settings, then restore.'); return; }
     [['sessions', 'sessions', 'sessions/'], ['body', 'body', 'body/'], ['routines', 'routines', 'routines/'], ['custom', 'custom', 'exercises/']].forEach(function (c) {
@@ -3148,11 +3164,11 @@ var LIBRARY = (function () {
     toast('Backup restored. ' + plural(n, 'workout') + ' added.');
   }
   function saveBackupFile() {
-    var text = JSON.stringify(backupData()), name = 'hilo-backup-' + today() + '.json';
+    var text = JSON.stringify(backupData()), name = 'uphill-backup-' + today() + '.json';
     function done() { backupDone(); toast('Backup saved'); if (scrim.hidden) render(); else settingsSheet(); }
     try {
       var file = new File([text], name, { type: 'application/json' });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) { navigator.share({ files: [file], title: 'Hilo backup' }).then(done, function () {}); return; }
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { navigator.share({ files: [file], title: 'Uphill backup' }).then(done, function () {}); return; }
     } catch (e) {}
     try { var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); done(); } catch (e) { toast('Could not save a file here. Use the backup text instead.'); }
   }
@@ -3319,6 +3335,9 @@ var LIBRARY = (function () {
       case 'help-open': helpSheet(u); break;
       case 'help-step': if (help) { it = findItem(help.u); if (it) { e = exi(it.ex); var hs = wStep(e, help.w || 0); help.w = Math.max(0, roundTo((help.w || 0) + (+a.dataset.d) * hs, hs)); document.getElementById('help-w').value = fmt(help.w); document.getElementById('help-body').innerHTML = helpBody(); } } break;
       case 'help-bar': if (help) { it = findItem(help.u); if (it) { state.settings.bars = state.settings.bars || {}; state.settings.bars[it.ex] = +a.dataset.v; saveSettings(); document.getElementById('help-body').innerHTML = helpBody(); } } break;
+      case 'warm-add': if (help) { it = findItem(help.u); if (it && help.w > 0) { it.warm = warmups(help.w, exi(it.ex), help.full).map(function (x) { return { w: fmt(x.w), r: String(x.r), d: false }; }); touchDraft(); closeSheet(); render(); toast(it.warm.length > 1 ? 'Warm-up sets added above set 1.' : 'Warm-up set added above set 1.'); } } break;
+      case 'warm-clear': if (help) { it = findItem(help.u); if (it) { delete it.warm; touchDraft(); closeSheet(); render(); } } break;
+      case 'wtick': it = findItem(u); if (it && it.warm && it.warm[+a.dataset.i]) { var wr0 = it.warm[+a.dataset.i]; if (!wr0.d && !(num(wr0.r) > 0)) { toast('Type the reps first.'); break; } wr0.d = !wr0.d; if (wr0.d) { unlockAudio(); freshenDraft(true); } touchDraft(); render(); } break;
       case 'help-ramp': if (help) { help.full = !help.full; document.getElementById('help-body').innerHTML = helpBody(); } break;
       case 'swap-open': swapSheet(u); break;
       case 'swap-pick': { var sn = swapItem(u, a.dataset.ex); if (sn) { closeSheet(); render(); scrollToItem(sn.u); toast('Swapped in ' + exi(sn.ex).name); } break; }
@@ -3385,6 +3404,7 @@ var LIBRARY = (function () {
     if (editor && el.id === 'ed-focus') { editor.focus = el.value; return; }
     if (editor && el.dataset && el.dataset.ed && (el.dataset.ed === 'lo' || el.dataset.ed === 'hi')) { editor.items[+el.dataset.i][el.dataset.ed] = el.value; return; }
     if (!d) return;
+    if (el.dataset.wf) { var wit = findItem(el.dataset.u); if (wit && wit.warm && wit.warm[+el.dataset.i]) { wit.warm[+el.dataset.i][el.dataset.wf] = el.value; touchDraft(); } return; }
     if (el.id === 'draft-name') { d.name = el.value; document.getElementById('wbar-name').textContent = d.name || 'Workout'; touchDraft(); return; }
     if (!el.dataset || !el.dataset.f) return;
     var f = el.dataset.f;
