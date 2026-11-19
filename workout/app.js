@@ -2029,7 +2029,7 @@ var LIBRARY = (function () {
       var anyDone = it.rows.some(function (x) { return x.d; });
       if (!d.editing && !allDone) h += '<div class="tools">' + (e.log === 'wr' ? '<button class="tool" type="button" data-act="help-open" data-u="' + it.u + '">' + IC.bar + (isBar(e) ? 'Warm-up and plates' : 'Warm-up') + '</button>' : '') + (e.sport ? (function () { var open = 0; while (open < it.rows.length - 1 && it.rows[open].d) open++; var on = !!(d.timer && d.timer.u === it.u); return '<button class="tool' + (on ? ' on' : '') + '" type="button" data-act="timer" data-u="' + it.u + '" data-i="' + (on ? d.timer.i : open) + '">' + (on ? IC.stop + 'Stop the stopwatch' : IC.timer + 'Stopwatch') + '</button>'; })() : '') + (anyDone ? '' : '<button class="tool" type="button" data-act="swap-open" data-u="' + it.u + '">' + IC.swap + 'Swap</button>') + '</div>';
       h += '<div class="sets">';
-      if (it.warm && it.warm.length) { h += '<p class="warm-cap">Warm-up</p>'; it.warm.forEach(function (s, i) { h += warmRow(it, i, s); }); h += '<p class="warm-cap">Working sets</p>'; }
+      if (it.warm && it.warm.length) it.warm.forEach(function (s, i) { h += warmRow(it, i, s); });
       it.rows.forEach(function (s, i) { h += setRow(it, e, i, s, tg && tg.sets ? tg.sets : (last ? last.sets : null)); if (s.d && s.pr) anyPr = true; s.pop = false; });
       h += '</div>';
       var rc = itemRecords(it, d), chips = '', nw = it.recNew || {};
@@ -2822,7 +2822,7 @@ var LIBRARY = (function () {
       var has = it.warm && it.warm.length;
       h += '<div class="row"><button class="btn sm primary-sm" type="button" data-act="warm-add">' + (has ? 'Replace the warm-up sets' : (ws.length > 1 ? 'Add these to the workout' : 'Add this to the workout')) + '</button>' + (has ? '<button class="btn sm quiet danger" type="button" data-act="warm-clear">Remove them</button>' : '') + '</div>';
     }
-    h += '<p class="foot">' + (full ? 'About 50, 70 and 85 percent of the working weight. Keep them easy and rest about a minute between them.' : 'About 60 percent. After the first exercise you are warm, and this is only to feel the movement.') + ' Added warm-up sets go above set 1, marked W. They are saved with the workout but do not count as sets, toward records or toward weight lifted.</p></div>';
+    h += '<p class="foot">' + (full ? 'About 50, 70 and 85 percent of the working weight. Keep them easy and rest about a minute between them.' : 'About 60 percent. After the first exercise you are warm, and this is only to feel the movement.') + ' Added warm-up sets go above set 1, marked W instead of a number. They are saved with the workout but do not count as sets, toward records or toward weight lifted.</p></div>';
     return h;
   }
   function helpSheet(u) {
