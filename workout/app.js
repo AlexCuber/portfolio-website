@@ -666,11 +666,11 @@ var ILLO = (function () {
   'use strict';
   var EX = ILLO.EX, U = ILLO._, n1 = U.n1, G = U.G, TAU = Math.PI * 2, RAD = Math.PI / 180;
   function L(a, b, w, cls) { return '<line x1="' + n1(a[0]) + '" y1="' + n1(a[1]) + '" x2="' + n1(b[0]) + '" y2="' + n1(b[1]) + '" stroke-width="' + w + '" class="' + cls + '"/>'; }
-  function sky(low) { return '<circle class="sun" cx="97" cy="24" r="9"/><path class="hill" d="M0 ' + (low + 4) + 'C18 ' + (low - 12) + ' 34 ' + (low - 10) + ' 52 ' + (low - 2) + 'C68 ' + (low - 16) + ' 92 ' + (low - 20) + ' 120 ' + (low - 4) + 'V120H0Z"/>'; }
+  function sky(low) { return '<circle class="sun" cx="97" cy="24" r="9"/><path class="hill" d="M-24 ' + (low - 3) + 'C-14 ' + (low + 5) + ' -7 ' + (low + 9) + ' 0 ' + (low + 4) + 'C18 ' + (low - 12) + ' 34 ' + (low - 10) + ' 52 ' + (low - 2) + 'C68 ' + (low - 16) + ' 92 ' + (low - 20) + ' 120 ' + (low - 4) + 'C130 ' + (low + 2) + ' 137 ' + (low + 5) + ' 144 ' + (low + 5) + 'V120H-24Z"/>'; }
   /* the road: a ground line and lane dashes that slide back as the figure moves forward */
   function road(t, k) {
-    var s = '<line class="rd" x1="0" y1="' + (G + 0.5) + '" x2="120" y2="' + (G + 0.5) + '"/>', off = (t * 24 * k) % 24;
-    for (var x = -off; x < 120; x += 24) s += '<line class="dash" x1="' + n1(x) + '" y1="' + (G + 6) + '" x2="' + n1(x + 10) + '" y2="' + (G + 6) + '"/>';
+    var s = '<line class="rd" x1="-24" y1="' + (G + 0.5) + '" x2="144" y2="' + (G + 0.5) + '"/>', off = (t * 24 * k) % 24;
+    for (var x = -off - 24; x < 144; x += 24) s += '<line class="dash" x1="' + n1(x) + '" y1="' + (G + 6) + '" x2="' + n1(x + 10) + '" y2="' + (G + 6) + '"/>';
     return s;
   }
   function gait(t, amp, flex) {
@@ -698,9 +698,9 @@ var ILLO = (function () {
 
   /* front crawl: the arms turn over one after the other, the legs flutter, and the water line crosses the body */
   function water(t, y) {
-    var d = 'M0 ' + y, x;
-    for (x = 0; x <= 120; x += 6) d += 'L' + x + ' ' + n1(y + 1.4 * Math.sin(x / 120 * TAU * 3 - t * TAU));
-    return '<path class="wa" d="' + d + 'V120H0Z"/><path class="wl" d="' + d.replace('M0 ' + y + 'L', 'M') + '"/>';
+    var d = 'M-24 ' + y, x;
+    for (x = -24; x <= 144; x += 6) d += 'L' + x + ' ' + n1(y + 1.4 * Math.sin(x / 120 * TAU * 3 - t * TAU));
+    return '<path class="wa" d="' + d + 'V120H-24Z"/><path class="wl" d="' + d.replace('M-24 ' + y + 'L', 'M') + '"/>';
   }
   function crawl(d) { var s = Math.sin(d * RAD); return ['fk', d, d + (s > 0 ? 22 * s : 38 * s)]; }
   EX['out-swim'] = { v: 'side', hot: ['back', 'delts'], period: 1500, ground: false, still: 0.06,
@@ -917,6 +917,7 @@ var LIBRARY = (function () {
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
   function fmtClock(sec) { sec = Math.max(0, Math.floor(sec)); var h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60; return h ? h + ':' + pad(m) + ':' + pad(s) : m + ':' + pad(s); }
   function fmtDur(sec) { var m = Math.round(sec / 60); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + pad(m % 60) + ' min'; }
+  function shortNum(n) { n = Math.round(n); return n >= 1e5 && n < 999500 ? Math.round(n / 1000) + 'K' : compact(n); }
   function compact(n) { n = Math.round(n); if (n < 10000) return n.toLocaleString('en-GB'); if (n < 1e6) return (Math.round(n / 100) / 10) + 'K'; return (Math.round(n / 1e5) / 10) + 'M'; }
   function plural(n, w) { return n + ' ' + w + (n === 1 ? '' : 's'); }
 
@@ -1802,7 +1803,7 @@ var LIBRARY = (function () {
     swap: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h13l-3.2-3.2M19 16H6l3.2 3.2"/></svg>',
     bar: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9.5v5M6.5 7v10M17.5 7v10M21 9.5v5M6.5 12h11"/></svg>'
   };
-  function illoSvg(key, t, live) { return '<svg viewBox="0 0 120 120" aria-hidden="true"' + (key.indexOf('out-') === 0 ? ' class="out"' : '') + (live ? ' data-illo="' + esc(key) + '"' : '') + '>' + ILLO.render(key, t == null ? ILLO.restT(key) : t) + '</svg>'; }
+  function illoSvg(key, t, live, wide) { return '<svg viewBox="' + (wide ? '-20 0 160 120' : '0 0 120 120') + '" aria-hidden="true"' + (key.indexOf('out-') === 0 ? ' class="out"' : '') + (live ? ' data-illo="' + esc(key) + '"' : '') + '>' + ILLO.render(key, t == null ? ILLO.restT(key) : t) + '</svg>'; }
   function muscleNames(e, mainOnly) {
     var out = []; LIBRARY.MUSCLES.forEach(function (m) { var v = e.muscles[m.id]; if (v && (!mainOnly || v >= 1)) out.push(m.name); });
     return out;
@@ -2234,18 +2235,23 @@ var LIBRARY = (function () {
   }
   function overviewView(list, demo) {
     var h = '', ws = weekStart(today()), goal = state.settings.weeklyGoal || 4;
-    var thisWeek = list.filter(function (s) { return weekStart(s.date) === ws && isCore(s); }).length, vol = 0;
-    list.forEach(function (s) { vol += volOf(s); });
-    function cnt(v, f) { return '<em class="cnt" data-count="' + v + '"' + (f ? ' data-fmt="' + f + '"' : '') + '>' + (f === 'compact' ? compact(v) : v) + '</em>'; }
-    h += '<div class="tiles"><div class="tile"><span class="ico">' + IC.cal + '</span><b>' + cnt(list.length) + '</b><span>workouts logged</span></div>' +
-      '<div class="tile t-green"><span class="ico">' + IC.target + '</span><b>' + cnt(thisWeek) + '<small>of ' + goal + '</small></b><span>sessions this week</span></div>' +
-      '<div class="tile t-hot"><span class="ico">' + IC.flame + '</span><b>' + cnt(streakWeeks(list)) + '<small>wk</small></b><span>weeks in a row with a workout</span></div>' +
-      '<div class="tile t-violet"><span class="ico">' + IC.weight + '</span><b>' + cnt(Math.round(vol), 'compact') + '<small>' + UW() + '</small></b><span>lifted in total</span></div></div>';
+    var thisWeek = list.filter(function (s) { return weekStart(s.date) === ws && isCore(s); }).length, vol = 0, secs = 0, prs = 0;
+    list.forEach(function (s) { vol += volOf(s); secs += durOf(s) || 0; });
+    records(list).forEach(function (r) { prs += r.prs; });
+    var hrs = secs / 3600, hShow = hrs >= 10 ? Math.round(hrs) : Math.round(hrs * 10) / 10;
+    function cnt(v, f) { return '<em class="cnt" data-count="' + v + '"' + (f ? ' data-fmt="' + f + '"' : '') + '>' + (f === 'short' ? shortNum(v) : v) + '</em>'; }
+    function tile(cls, ic, num, label) { return '<div class="tile' + (cls ? ' ' + cls : '') + '"><span class="ico">' + ic + '</span><b>' + num + '</b><span>' + label + '</span></div>'; }
+    h += '<section class="card"><div class="spread"><h3>Consistency</h3><div class="legend"><span class="scale"><i></i><i class="l1"></i><i class="l2"></i><i class="l3"></i><i class="l4"></i> Sets</span></div></div>' + calendar(list) + '</section>';
+    h += '<div class="tiles six">' + tile('', IC.cal, cnt(list.length), 'workouts') +
+      tile('t-green', IC.target, cnt(thisWeek) + '<small>of ' + goal + '</small>', 'this week') +
+      tile('t-hot', IC.flame, cnt(streakWeeks(list)), 'weeks in a row') +
+      tile('t-teal', IC.timer, hrs >= 10 ? cnt(hShow) : fmt(hShow), (hShow === 1 ? 'hour' : 'hours') + ' trained') +
+      tile('t-violet', IC.weight, cnt(Math.round(vol), 'short'), UW() + ' lifted') +
+      tile('t-star', IC.star, cnt(prs), prs === 1 ? 'personal best' : 'personal bests') + '</div>';
     h += attentionCard(list);
     h += '<section class="card"><h3>Hard sets per muscle</h3>' +
       '<div class="seg" role="group" aria-label="Period"><button type="button" data-act="mus-win" data-v="week" aria-pressed="' + (state.ui.musWin !== 'four') + '">This week</button><button type="button" data-act="mus-win" data-v="four" aria-pressed="' + (state.ui.musWin === 'four') + '">Average of 4 weeks</button></div>' +
-      muscleFigure(list) + '<p class="sub">Each muscle fills toward the sets your plan gives it in a week, going from orange through yellow to green. Assisting work counts as half a set.</p>' + muscleBars(list) + '</section>';
-    h += '<section class="card"><div class="spread"><h3>Consistency</h3><div class="legend"><span class="scale">Less <i></i><i class="l1"></i><i class="l2"></i><i class="l3"></i><i class="l4"></i> More</span></div></div>' + calendar(list) + '<p class="foot">One square per day for the last 16 weeks. Greener means more sets that day.</p></section>';
+      muscleFigure(list) + muscleBars(list) + '</section>';
     var wk = lastWeeks(10), vw = lastWeeks(10);
     list.forEach(function (s) { var k = weekStart(s.date); wk.forEach(function (w) { if (w.start === k) { if (isCore(s)) w.a++; else w.b++; } }); vw.forEach(function (w) { if (w.start === k) w.a += volOf(s); }); });
     h += '<section class="card"><div class="spread"><h3>Sessions per week</h3><div class="legend"><span><i></i>Main</span><span><i class="x"></i>Extra</span></div></div><div class="chart" data-chart="wk">' +
@@ -2567,10 +2573,8 @@ var LIBRARY = (function () {
       if (done) side += '<p class="foot">' + done + ' of ' + rows.length + ' muscles have their sets.</p>';
     } else side += '<p class="sub">Every muscle in your plan has its sets' + (md.four ? ' on average.' : ' for the week.') + '</p>';
     side += '</div>';
-    var stops = [0, 0.25, 0.5, 0.75, 1].map(function (t) { return ramp('--ramp', t); }).join(',');
     return '<div class="mm"><svg viewBox="0 0 250 262" role="img" aria-label="Front and back of a body with each muscle coloured by how many of its planned sets are done' + (behind.length ? '. Furthest behind: ' + behind.map(function (x) { return x.m.name; }).join(', ') : '') + '">' +
-      half(FIG_FRONT, 0) + half(FIG_BACK, 130) + '<text x="60" y="259">Front</text><text x="190" y="259">Back</text></svg>' + side + '</div>' +
-      '<div class="mm-key"><span><i class="off"></i>No sets yet</span><span><i class="ramp" style="background:linear-gradient(90deg,' + stops + ')"></i>Some sets, up to all of them</span></div>';
+      half(FIG_FRONT, 0) + half(FIG_BACK, 130) + '<text x="60" y="259">Front</text><text x="190" y="259">Back</text></svg>' + side + '</div>';
   }
 
   /* ================= third tab: history and exercises ================= */
@@ -2618,8 +2622,8 @@ var LIBRARY = (function () {
     shown.forEach(function (s) {
       var open = sel ? histOpen[s.id] !== false : !!histOpen[s.id], du = durOf(s), vol = volOf(s), yr = toDate(s.date).getFullYear() !== new Date().getFullYear() ? ' ' + toDate(s.date).getFullYear() : '';
       var bits = [du ? fmtDur(du) : '', countSets(s) ? plural(countSets(s), 'set') : '', sessSports(s).filter(function (b) { return b.dist; }).map(function (b) { return distText({ sport: b.sport }, b.dist) + ' ' + sportWord(b.sport); }).join(', '), vol ? massText(vol) + ' lifted' : '', rec[s.id] ? plural(rec[s.id], 'new best') : ''].filter(Boolean);
-      h += '<section class="card hcard' + (open ? ' open' : '') + '" data-id="' + esc(s.id) + '"><button class="hc-head" type="button" data-act="hist-open" data-id="' + esc(s.id) + '" aria-expanded="' + open + '"><span class="avatar' + (tint[s.key] != null ? ' av' + tint[s.key] : ' avx') + '" aria-hidden="true">' + esc(ini[s.key] || initials(s.name || 'Workout')) + '</span>' +
-        '<span class="txt"><b>' + esc(s.name || 'Workout') + '</b><small>' + fmtDate(s.date) + yr + (bits.length ? ' · ' + esc(bits.join(' · ')) : '') + '</small></span><span class="hc-chev" aria-hidden="true">' + IC.down + '</span></button>';
+      h += '<section class="card hcard' + (open ? ' open' : '') + '" data-id="' + esc(s.id) + '"><button class="hc-head" type="button" data-act="hist-open" data-id="' + esc(s.id) + '" aria-expanded="' + open + '">' +
+        '<span class="txt"><b' + (tint[s.key] != null ? ' class="nm' + tint[s.key] + '"' : '') + '>' + esc(s.name || 'Workout') + '</b><small>' + fmtDate(s.date) + yr + (bits.length ? ' · ' + esc(bits.join(' · ')) : '') + '</small></span><span class="hc-chev" aria-hidden="true">' + IC.down + '</span></button>';
       if (open) {
         h += '<div>';
         (s.entries || []).forEach(function (en) { var e = exi(en.ex, en.name); h += '<div class="sess-entry"><b>' + esc(e.gone ? en.name : e.name) + '</b><span>' + esc(setsText(e, en.sets)) + '</span>' + rirLine(en.sets) + (en.note ? '<span>Note: ' + esc(en.note) + '</span>' : '') + '</div>'; });
@@ -2892,9 +2896,9 @@ var LIBRARY = (function () {
     if (!tiles.length) return h + '<p class="empty">Nothing here. Tap Edit to add a run, a ride, a swim or any other cardio.</p></section>';
     h += '<div class="out-tiles">';
     tiles.forEach(function (id) {
-      var e = exi(id), key = outKey(id), ld = lastDone(key), sub = 'not logged yet', nm = OUT_SHORT[id] || e.name;
+      var e = exi(id), key = outKey(id), ld = lastDone(key), sub = '', nm = OUT_SHORT[id] || e.name;
       if (ld) { var b = e.sport ? sessSports(ld).filter(function (x) { return x.sport === e.sport; })[0] : null; sub = 'last ' + (b && b.dist ? distText(e, b.dist) : fmtDate(ld.date, true)); }
-      h += '<button class="out-tile" type="button" data-act="start" data-key="' + esc(key) + '" aria-label="Start: ' + esc(e.name) + '"><span class="illo">' + illoSvg(e.illo, null, true) + '</span><b' + (nm.length > 8 ? ' class="long"' : '') + '>' + esc(nm) + '</b><small>' + esc(sub) + '</small></button>';
+      h += '<button class="out-tile" type="button" data-act="start" data-key="' + esc(key) + '" aria-label="Start: ' + esc(e.name) + '"><span class="illo">' + illoSvg(e.illo, null, true, true) + '</span><b' + (nm.length > 8 ? ' class="long"' : '') + '>' + esc(nm) + '</b>' + (sub ? '<small>' + esc(sub) + '</small>' : '') + '</button>';
     });
     return h + '</div></section>';
   }
@@ -3095,7 +3099,7 @@ var LIBRARY = (function () {
   function countUp() {
     if (reduceMotion) return;
     view.querySelectorAll('[data-count]').forEach(function (el) {
-      var to = +el.dataset.count, f = el.dataset.fmt === 'compact' ? compact : function (v) { return String(Math.round(v)); }, t0 = performance.now();
+      var to = +el.dataset.count, f = el.dataset.fmt === 'compact' ? compact : el.dataset.fmt === 'short' ? shortNum : function (v) { return String(Math.round(v)); }, t0 = performance.now();
       if (!(to > 0)) return;
       (function step(now) { var k = Math.min(1, (now - t0) / 800); el.textContent = f(k < 1 ? to * (1 - Math.pow(1 - k, 3)) : to); if (k < 1 && el.isConnected) requestAnimationFrame(step); })(t0);
     });
