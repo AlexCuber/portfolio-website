@@ -923,7 +923,8 @@ var LIBRARY = (function () {
 
   /* ================= state and storage ================= */
   var LS = 'workout-log-v1';
-  var DEF_SET = { theme: 'auto', sound: true, autoRest: true, awake: true, weeklyGoal: 4, goalWeight: null, goalRate: 0.25, unit: 'kg', rir: false, setupDone: false };
+  var PALETTES = [['', 'Default', '#008a9c'], ['graphite', 'Graphite', '#1b1e19'], ['violet', 'Violet', '#5b3fe0'], ['lime', 'Lime', '#47780a']];
+  var DEF_SET = { theme: 'auto', palette: '', sound: true, autoRest: true, awake: true, weeklyGoal: 4, goalWeight: null, goalRate: 0.25, unit: 'kg', rir: false, setupDone: false };
   var DEF_UI = { tab: 'log', ex: null, lib: 'all', prog: 'overview', measure: 'weight', musWin: 'week', lib3: 'history' };
   var state = { sessions: {}, body: {}, routines: {}, custom: {}, settings: Object.assign({}, DEF_SET), settingsAt: 0, draft: null, draftAt: 0, dirty: {}, ui: Object.assign({}, DEF_UI) };
   var draftWait = false, justWrote = {}, db = null, syncState = 'local', busy = {}, again = {}, draftTimer = null;
@@ -1020,11 +1021,16 @@ var LIBRARY = (function () {
   function saveSettings() { state.settingsAt = Date.now(); mark('state/settings'); }
 
   /* ================= theme ================= */
+  /* A workout in progress is either open (the Train tab is the workout and the tabs are hidden) or minimised (a bar above the tabs). */
+  function wLive() { var d = state.draft; return !!d && !d.editing; }
+  function wOpen() { var d = state.draft; return !!d && (d.editing || !state.ui.wmin); }
   function applyTheme() {
     var t = state.settings.theme, root = document.documentElement;
     if (t === 'light' || t === 'dark') root.setAttribute('data-app-theme', t); else root.removeAttribute('data-app-theme');
+    var p = state.settings.palette;
+    if (p && PALETTES.some(function (x) { return x[0] === p; })) root.setAttribute('data-palette', p); else root.removeAttribute('data-palette');
     var m = document.querySelector('meta[name="theme-color"]');
-    if (m) m.setAttribute('content', getComputedStyle(root).getPropertyValue(state.draft && !state.draft.editing ? '--board' : '--bg').trim());
+    if (m) m.setAttribute('content', getComputedStyle(root).getPropertyValue('--bg').trim());
   }
 
   /* ================= exercise catalogue ================= */
@@ -1283,7 +1289,7 @@ var LIBRARY = (function () {
       d.items.push(itemFrom({ ex: en.ex, n: en.n || 'x', sets: en.sets.length, lo: e.lo, hi: e.hi, restSec: e.restSec }, en.sets.map(function (x) { return rowFrom(e, x); }), en.note));
     });
     state.draft = d; touchDraft(true); stopRest(); summary = null; editor = null;
-    state.ui.tab = 'log'; applyTheme(); wake();
+    state.ui.tab = 'log'; state.ui.wmin = false; applyTheme(); wake();
     render(); window.scrollTo(0, 0);
   }
   function newItem(exId) { var e = exi(exId); return itemFrom({ ex: exId, n: 'x', sets: e.sets, lo: e.lo, hi: e.hi, restSec: e.restSec }, blankRows(e.log === 'cardio' ? 1 : e.sets), ''); }
@@ -1822,7 +1828,7 @@ var LIBRARY = (function () {
   var DAYS_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   var MONTHS_FULL = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   function chrome() {
-    var d = state.draft, live = d && !d.editing, bar = document.getElementById('bar'), wbar = document.getElementById('wbar'), tab = state.ui.tab, now = new Date();
+    var d = state.draft, live = wLive() && !state.ui.wmin && state.ui.tab === 'log' && !editor, bar = document.getElementById('bar'), wbar = document.getElementById('wbar'), tab = state.ui.tab, now = new Date();
     bar.hidden = !!live; wbar.hidden = !live;
     if (document.body.classList.contains('setup')) { document.getElementById('bar-title').textContent = 'Hilo'; document.getElementById('bar-date').textContent = 'Welcome'; return; }
     document.getElementById('bar-title').textContent = tab === 'progress' ? 'Progress' : tab === 'exercises' ? (state.ui.lib3 === 'exercises' ? 'Exercises' : 'History') : DAYS_FULL[now.getDay()];
@@ -1831,7 +1837,7 @@ var LIBRARY = (function () {
     var p = draftProgress(), h = '';
     d.items.forEach(function (it) { h += '<span>'; it.rows.forEach(function (r) { h += '<i class="' + (r.d ? (r.pr ? 'on pr' : 'on') : '') + '"></i>'; }); h += '</span>'; });
     document.getElementById('wbar-name').textContent = d.name || 'Workout';
-    document.getElementById('wbar-sub').textContent = state.ui.tab === 'log' ? p.done + ' of ' + p.all + ' sets done' : 'Tap to return to your workout';
+    document.getElementById('wbar-sub').textContent = p.done + ' of ' + p.all + ' sets done';
     document.getElementById('wbar-prog').innerHTML = h;
     var fin = document.getElementById('wbar-fin'); fin.disabled = !draftCount(); fin.textContent = armed === 'finish' ? 'Sure?' : 'Finish';
     tickClock();
@@ -1863,7 +1869,7 @@ var LIBRARY = (function () {
     var st = streakWeeks(f), C = 2 * Math.PI * 35, pct = Math.min(1, n / goal), left = goal - n;
     var note = st >= 2 ? '<span class="pill hot">' + IC.flame + st + ' weeks in a row</span>' : '<span class="sub">' + (left <= 0 ? 'Weekly goal reached.' : left + ' more to reach this week’s goal.') + '</span>';
     return '<section class="card"><div class="week"><div class="week-l"><div class="days" role="img" aria-label="' + n + ' of ' + goal + ' sessions done this week">' + h + '</div><div class="pills">' + note + '</div></div>' +
-      '<div class="ring"><svg viewBox="0 0 88 88" aria-hidden="true"><defs><linearGradient id="rg" gradientUnits="userSpaceOnUse" x1="44" y1="0" x2="44" y2="88"><stop offset="0" style="stop-color:var(--lime)"/><stop offset="0.55" style="stop-color:var(--teal)"/><stop offset="1" style="stop-color:var(--accent)"/></linearGradient></defs>' +
+      '<div class="ring"><svg viewBox="0 0 88 88" aria-hidden="true"><defs><linearGradient id="rg" gradientUnits="userSpaceOnUse" x1="44" y1="0" x2="44" y2="88"><stop offset="0" style="stop-color:var(--lime)"/><stop offset="0.55" style="stop-color:var(--ring-mid)"/><stop offset="1" style="stop-color:var(--ring-end)"/></linearGradient></defs>' +
       '<circle class="trk" cx="44" cy="44" r="35"/>' + (pct > 0 ? '<circle class="ring-arc" cx="44" cy="44" r="35" style="stroke:url(#rg);--c:' + C.toFixed(1) + '" stroke-dasharray="' + C.toFixed(1) + '" stroke-dashoffset="' + (C * (1 - pct)).toFixed(1) + '"/>' : '') + '</svg>' +
       '<div class="ring-n"><b>' + n + '/' + goal + '</b><span>this week</span></div></div></div></section>';
   }
@@ -1909,7 +1915,12 @@ var LIBRARY = (function () {
   }
   function homeView() {
     var key = nextKey(), r = key ? getRoutine(key) : null, f = finished(), h = weekCard(f) + (planEdit ? '' : recapCard(f));
-    if (r) {
+    if (wLive()) {
+      var dp = draftProgress();
+      h += '<section class="card next"><div class="spread"><span class="label">In progress</span><span class="next-last">' + dp.done + ' of ' + dp.all + ' sets done</span></div>' +
+        '<div><div class="next-title">' + esc(state.draft.name || 'Workout') + '</div></div>' +
+        '<button class="btn start block" type="button" data-act="go-workout">' + IC.play + 'Back to the workout</button></section>';
+    } else if (r) {
       var st = rStats(r), ld = lastDone(key), seen = {}, strip = '';
       r.items.forEach(function (it) { var k = exi(it.ex).illo; if (seen[k] || Object.keys(seen).length >= 5) return; seen[k] = 1; strip += '<div class="illo">' + illoSvg(k, null, true) + '</div>'; });
       h += '<section class="card next"><div class="spread"><span class="label">Next up</span><span class="next-last">' + (ld ? 'last done ' + fmtDate(ld.date) : 'not logged yet') + '</span></div>' +
@@ -2103,7 +2114,7 @@ var LIBRARY = (function () {
     return lch2hex(a.c[0] + (b.c[0] - a.c[0]) * f, a.c[1] + (b.c[1] - a.c[1]) * f, a.c[2] + (b.c[2] - a.c[2]) * f);
   }
   function gradDefs(id, W, H, m) {
-    return '<defs><linearGradient id="' + id + '-b" gradientUnits="userSpaceOnUse" x1="0" y1="' + m.t + '" x2="0" y2="' + (H - m.b) + '"><stop offset="0" style="stop-color:var(--teal)"/><stop offset="1" style="stop-color:var(--accent)"/></linearGradient></defs>';
+    return '<defs><linearGradient id="' + id + '-b" gradientUnits="userSpaceOnUse" x1="0" y1="' + m.t + '" x2="0" y2="' + (H - m.b) + '"><stop offset="0" style="stop-color:var(--series-1b)"/><stop offset="1" style="stop-color:var(--series-1)"/></linearGradient></defs>';
   }
   /* pts: [{x: date, y, tip}]; trend: optional parallel array of smoothed values drawn as the line while pts stay as dots.
      opt.scale [low, high]: the line is orange at or below low and green at or above high. opt.up: blue at the bottom of the chart, green at the top. Neither: one colour. */
@@ -2119,8 +2130,8 @@ var LIBRARY = (function () {
     opt = opt || {};
     if (opt.scale) { ga = Y(opt.scale[0]); gb = Y(opt.scale[1]); for (k = 0; k <= 6; k++) stops += '<stop offset="' + (k / 6).toFixed(3) + '" stop-color="' + ramp('--ramp-line', k / 6) + '"/>'; }
     else if (opt.out) stops = '<stop offset="0" style="stop-color:var(--out)"/><stop offset="1" style="stop-color:var(--out)"/>';
-    else if (opt.up) stops = '<stop offset="0" style="stop-color:var(--accent)"/><stop offset="0.55" style="stop-color:var(--teal)"/><stop offset="1" style="stop-color:var(--green)"/>';
-    else stops = '<stop offset="0" style="stop-color:var(--accent)"/><stop offset="1" style="stop-color:var(--accent)"/>';
+    else if (opt.up) stops = '<stop offset="0" style="stop-color:var(--line-lo)"/><stop offset="0.55" style="stop-color:var(--line-mid)"/><stop offset="1" style="stop-color:var(--line-top)"/>';
+    else stops = '<stop offset="0" style="stop-color:var(--line-lo)"/><stop offset="1" style="stop-color:var(--line-hi)"/>';
     var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Line chart with ' + pts.length + ' entries, latest ' + fmt(Math.round(last * 10) / 10) + '">' +
       '<defs><linearGradient id="' + id + '-l" gradientUnits="userSpaceOnUse" x1="0" y1="' + ga.toFixed(1) + '" x2="0" y2="' + gb.toFixed(1) + '">' + stops + '</linearGradient>' +
       '<linearGradient id="' + id + '-f" gradientUnits="userSpaceOnUse" x1="0" y1="' + m.t + '" x2="0" y2="' + (H - m.b) + '"><stop offset="0" stop-color="#fff" stop-opacity="0.3"/><stop offset="1" stop-color="#fff" stop-opacity="0.03"/></linearGradient>' +
@@ -2455,6 +2466,7 @@ var LIBRARY = (function () {
   function settingsSheet() {
     var s = state.settings, h = head('Settings');
     h += '<div class="setting stack"><div><b>Appearance</b><small>Automatic follows your phone.</small></div><div class="seg" role="group" aria-label="Appearance">' + [['auto', 'Automatic'], ['light', 'Light'], ['dark', 'Dark']].map(function (t) { return '<button type="button" data-act="theme" data-v="' + t[0] + '" aria-pressed="' + (s.theme === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div></div>';
+    h += '<div class="setting stack"><div><b>Colour theme</b><small>Lime stays the colour for actions and violet for endurance in all of them.</small></div><div class="pal" role="group" aria-label="Colour theme">' + PALETTES.map(function (p) { return '<button type="button" data-act="palette" data-v="' + p[0] + '" aria-pressed="' + ((s.palette || '') === p[0]) + '"><span class="pal-sw" style="--a:' + p[2] + ';--b:#b6ff1a" aria-hidden="true"></span>' + p[1] + '</button>'; }).join('') + '</div></div>';
     h += unitRow();
     h += '<div class="setting"><div><b>Sessions per week</b><small>Your weekly goal.</small></div><div class="stepper"><button type="button" data-act="goal" data-d="-1" aria-label="One fewer">−</button><b>' + s.weeklyGoal + '</b><button type="button" data-act="goal" data-d="1" aria-label="One more">+</button></div></div>';
     function sw(key, title, sub) { return '<div class="setting"><div><b>' + title + '</b><small>' + sub + '</small></div><button class="switch" type="button" role="switch" data-act="toggle" data-k="' + key + '" aria-checked="' + (s[key] ? 'true' : 'false') + '" aria-label="' + title + '"></button></div>'; }
@@ -2493,11 +2505,14 @@ var LIBRARY = (function () {
     document.querySelectorAll('.tab').forEach(function (b) { if (b.dataset.tab === tab) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
     var su = syncSettled && needSetup(), wait = !syncSettled && needSetup();
     document.body.classList.toggle('setup', !!(su || wait));
-    view.innerHTML = su ? setupView() : wait ? loadingView() : tab === 'progress' ? progressView() : tab === 'exercises' ? thirdView() : (editor ? editorView() : state.draft ? draftView() : homeView());
-    chrome(); observe();
+    view.innerHTML = su ? setupView() : wait ? loadingView() : tab === 'progress' ? progressView() : tab === 'exercises' ? thirdView() : (editor ? editorView() : wOpen() ? draftView() : homeView());
+    var full = wLive() && !state.ui.wmin && tab === 'log' && !editor && !su && !wait, mini = wLive() && !full && !su && !wait && !editor;
+    document.body.classList.toggle('in-workout', full); document.body.classList.toggle('has-mini', mini);
+    document.getElementById('wmini').hidden = !mini;
+    chrome(); observe(); if (mini) drawMini();
   }
   function go(tab, push) {
-    planEdit = false; outEdit = false; state.ui.tab = tab; saveLocal(); render(); enter(); window.scrollTo(0, 0);
+    planEdit = false; outEdit = false; if (wLive() && tab !== 'log') state.ui.wmin = true; state.ui.tab = tab; saveLocal(); render(); enter(); window.scrollTo(0, 0);
     if (push) { try { if (location.hash !== '#' + tab) location.hash = tab; } catch (e) {} }
   }
   function fromHash() { var h = (location.hash || '').replace('#', ''); if (h === 'log' || h === 'progress' || h === 'exercises') { if (h !== state.ui.tab) go(h, false); return true; } return false; }
@@ -3002,7 +3017,18 @@ var LIBRARY = (function () {
     restArc.setAttribute('stroke-dashoffset', (t.total ? RC * (1 - Math.max(0, Math.min(1, left / t.total))) : 0).toFixed(1));
     if (t.total && left <= 0) { beep(); timerStop(true); }
   }
-  function drawRest() {
+  /* the bar that stands in for a minimised workout: its name and clock, or the countdown that is running */
+  function drawMini() {
+    var d = state.draft, el = document.getElementById('wmini'); if (!el || el.hidden || !d || d.editing) return;
+    var busy = !restEl.hidden, p = draftProgress(), next = null;
+    d.items.some(function (it) { if (it.rows.some(function (r) { return !r.d; })) { next = it; return true; } return false; });
+    document.getElementById('wmini-dot').hidden = !busy;
+    document.getElementById('wmini-a').textContent = busy ? restL.textContent : (d.name || 'Workout');
+    document.getElementById('wmini-t').textContent = busy ? restT.textContent : fmtClock((Date.now() - d.startedAt) / 1000);
+    document.getElementById('wmini-s').textContent = (next ? exi(next.ex).name + ' · ' : '') + p.done + ' of ' + p.all + ' sets done';
+  }
+  function drawRest() { drawRestCore(); drawMini(); }
+  function drawRestCore() {
     var tm = state.draft && state.draft.timer;
     if (tm) { drawTimer(tm); return; }
     if (restEl.classList.contains('timing')) { restEl.classList.remove('timing'); restStep.hidden = false; restBy.textContent = '30 s'; restAdd.setAttribute('aria-label', '30 seconds more'); restSub.setAttribute('aria-label', '30 seconds less'); restSkip.textContent = 'Skip'; }
@@ -3175,8 +3201,10 @@ var LIBRARY = (function () {
     var act = a.dataset.act, d = state.draft, u = a.dataset.u, i = +a.dataset.i, it, e;
     if (['discard', 'delete-session', 'finish', 'ed-reset', 'plan-del', 'custom-del', 'unit'].indexOf(act) < 0) armed = null;
     switch (act) {
-      case 'start': if (!state.draft) startDraft(a.dataset.key); break;
-      case 'go-workout': if (state.ui.tab !== 'log') go('log', true); else window.scrollTo(0, 0); break;
+      case 'start': if (!state.draft) startDraft(a.dataset.key); else toast('Finish or discard the workout in progress first.'); break;
+      case 'go-workout': state.ui.wmin = false; if (state.ui.tab !== 'log') go('log', true); else { saveLocal(); render(); window.scrollTo(0, 0); } break;
+      case 'wmin': if (wLive()) { state.ui.wmin = true; saveLocal(); render(); window.scrollTo(0, 0); } break;
+      case 'palette': state.settings.palette = a.dataset.v; saveSettings(); applyTheme(); render(); settingsSheet(); break;
       case 'clock': clockSheet(); break;
       case 'clock-set': { var v = (document.getElementById('clock-t').value || '').split(':'); if (d && v.length === 2) { var st = new Date(); st.setHours(+v[0], +v[1], 0, 0); if (st.getTime() > Date.now()) st.setDate(st.getDate() - 1); d.startedAt = st.getTime(); touchDraft(true); } closeSheet(); chrome(); break; }
       case 'clock-now': if (d) { d.startedAt = Date.now(); touchDraft(true); } closeSheet(); chrome(); break;
