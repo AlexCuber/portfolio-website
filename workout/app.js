@@ -1053,7 +1053,7 @@ var LIBRARY = (function () {
   }
   /* a session by id, whether or not it is in the plan right now */
   function anyRoutine(id) {
-    if (OUT[id]) return outRoutine(id);
+    if (id && String(id).indexOf('out-') === 0) { var fixed = outRoutine(id); if (fixed) return fixed; }
     var o = state.routines[id];
     if (o && o.items) return o;
     if (!PLAN.sessions[id]) return null;
@@ -1725,8 +1725,15 @@ var LIBRARY = (function () {
   };
   var SPORTS = [['run', 'Run', 'out-run'], ['ride', 'Ride', 'out-ride'], ['swim', 'Swim', 'out-swim']];
   /* the fixed one-tap sessions behind the Endurance card; they are not part of the plan and cannot be edited */
+  var OUT_DEFAULT = ['outdoor-run', 'bike-ride', 'pool-swim'], OUT_KEY = { 'outdoor-run': 'out-run', 'bike-ride': 'out-ride', 'pool-swim': 'out-swim' }, OUT_SHORT = { 'bike-ride': 'Ride' };
+  /* the shortcuts on the Endurance card: exercise ids in the order shown, up to six */
+  function outList() { var t = state.settings.outTiles; return (Array.isArray(t) ? t : OUT_DEFAULT).filter(function (id, i, a) { return !exi(id).gone && a.indexOf(id) === i; }).slice(0, 6); }
+  function setOutTiles(list) { state.settings.outTiles = list.slice(0, 6); saveSettings(); }
+  function outKey(exId) { return OUT_KEY[exId] || 'out-' + exId; }
   function outRoutine(id) {
-    var o = OUT[id]; if (!o) return null;
+    var o = OUT[id];
+    if (!o && id.indexOf('out-') === 0) { var x = exi(id.slice(4)); if (!x.gone) o = { name: x.name, ex: [x.id] }; }
+    if (!o) return null;
     return { id: id, name: o.name, focus: o.focus || '', core: !!state.settings.outCore, warmup: '', fixed: true,
       items: o.ex.map(function (x, i) { var e = exi(x); return { ex: x, n: String(i + 1), sets: 1, lo: e.lo, hi: e.hi, restSec: 0, link: false }; }) };
   }
@@ -2245,9 +2252,11 @@ var LIBRARY = (function () {
       colChart('wk', wk, { int: true, min: Math.max(5, goal + 1), target: goal, label: 'Sessions per week for the last 10 weeks', tip: function (w) { return '<b>Week of ' + fmtDate(w.start, true) + '</b><br>' + plural(w.a, 'main session') + (w.b ? ' + ' + w.b + ' extra' : ''); } }) + '</div></section>';
     h += '<section class="card"><h3>Weight lifted per week</h3><p class="sub">Kilograms times reps, added up over every set.</p><div class="chart" data-chart="vol">' +
       colChart('vol', vw, { label: 'Kilograms lifted per week for the last 10 weeks', fmt: function (t) { return t >= 1000 ? (t / 1000) + 'K' : t; }, tip: function (w) { return '<b>Week of ' + fmtDate(w.start, true) + '</b><br>' + compact(w.a) + ' ' + UW() + ' lifted'; } }) + '</div></section>';
-    var durs = list.map(function (s) { return { s: s, d: durOf(s) }; }).filter(function (x) { return x.d; }).slice(-24);
+    var durs = [], dayIx = {};
+    list.forEach(function (s) { var dd = durOf(s); if (!dd) return; var o = dayIx[s.date]; if (!o) { o = dayIx[s.date] = { date: s.date, d: 0, names: [] }; durs.push(o); } o.d += dd; o.names.push(s.name || 'Workout'); });
+    durs = durs.slice(-24);
     h += '<section class="card"><div class="spread"><h3>Workout length</h3>' + (durs.length ? '<span class="pill">average ' + fmtDur(durs.reduce(function (a, x) { return a + x.d; }, 0) / durs.length) + '</span>' : '') + '</div>';
-    h += durs.length ? '<p class="sub">Minutes from start to finish. The line is orange for short workouts and turns green at 60 minutes.</p><div class="chart" data-chart="dur">' + lineChart('dur', durs.map(function (x) { return { x: x.s.date, y: Math.round(x.d / 60), tip: '<b>' + fmtDate(x.s.date) + '</b><br>' + esc(x.s.name || 'Workout') + ' · ' + fmtDur(x.d) }; }), null, { scale: [30, 60] }) + '</div>' : '<p class="sub">The clock at the top of a workout records how long it took. Your next finished workout shows up here.</p>';
+    h += durs.length ? '<p class="sub">Minutes from start to finish, added up when a day has more than one workout. The line is orange for short days and turns green at 60 minutes.</p><div class="chart" data-chart="dur">' + lineChart('dur', durs.map(function (x) { return { x: x.date, y: Math.round(x.d / 60), tip: '<b>' + fmtDate(x.date) + '</b><br>' + esc(x.names.join(' + ')) + ' · ' + fmtDur(x.d) }; }), null, { scale: [30, 60] }) + '</div>' : '<p class="sub">The clock at the top of a workout records how long it took. Your next finished workout shows up here.</p>';
     h += '</section>';
     h += '<section class="card"><div><h3>Milestones</h3><p class="sub">The colour is the level you have reached, the ring is how close the next one is. Tap one to see every level.</p></div>' + badgesHtml(list) + '</section>';
     return h;
@@ -2330,6 +2339,7 @@ var LIBRARY = (function () {
   function matchEx(e, q) { if (!q) return true; var hay = (e.name + ' ' + e.equip + ' ' + e.group + ' ' + muscleNames(e).join(' ')).toLowerCase(); return q.toLowerCase().split(/\s+/).every(function (t) { return hay.indexOf(t) >= 0; }); }
   function libRows(filter, q, mode) {
     var list = allEx().filter(function (e) { return matchEx(e, q) && (filter === 'all' || filter === 'logged' || e.group === filter); }), h = '';
+    if (mode === 'tile') { var have = outList(), keep = picker && picker.i >= 0 ? have[picker.i] : null; list = list.filter(function (e) { return e.log === 'cardio' && (have.indexOf(e.id) < 0 || e.id === keep); }); }
     if (filter === 'logged') { var has = {}; finished().forEach(function (s) { (s.entries || []).forEach(function (en) { has[en.ex] = 1; }); }); list = list.filter(function (e) { return has[e.id]; }); }
     if (!list.length) return '<p class="empty">' + (filter === 'logged' ? 'Nothing logged yet.' : 'No exercise matches that. You can create your own below.') + '</p>';
     GROUPS.forEach(function (g) {
@@ -2342,8 +2352,8 @@ var LIBRARY = (function () {
     });
     return h;
   }
-  function chipsHtml(cur, act, extra) {
-    return '<div class="chips" role="group" aria-label="Filter">' + (extra || []).concat([['all', 'All']], GROUPS.map(function (g) { return [g, g]; })).map(function (c) { return '<button class="chip" type="button" data-act="' + act + '" data-key="' + c[0] + '" aria-pressed="' + (cur === c[0]) + '">' + esc(c[1]) + '</button>'; }).join('') + '</div>';
+  function chipsHtml(cur, act, extra, groups) {
+    return '<div class="chips" role="group" aria-label="Filter">' + (extra || []).concat([['all', 'All']], (groups || GROUPS).map(function (g) { return [g, g]; })).map(function (c) { return '<button class="chip" type="button" data-act="' + act + '" data-key="' + c[0] + '" aria-pressed="' + (cur === c[0]) + '">' + esc(c[1]) + '</button>'; }).join('') + '</div>';
   }
   function searchBox(id, val) { return '<div class="search">' + IC.search + '<input id="' + id + '" type="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Search ' + allEx().length + ' exercises" value="' + esc(val) + '" aria-label="Search exercises"></div>'; }
   function libraryView() {
@@ -2422,7 +2432,7 @@ var LIBRARY = (function () {
       '<p class="foot">A workout is saved under the day of its first set unless you pick a date here. The clock keeps running if you close the app.</p>');
   }
   function pickerSheet() {
-    var p = picker, title = { draft: 'Add exercise', replace: 'Replace exercise', editor: 'Add exercise', lift: 'Choose exercise' }[p.mode], h = '';
+    var p = picker, title = { draft: 'Add exercise', replace: 'Replace exercise', editor: 'Add exercise', lift: 'Choose exercise', tile: 'Choose a workout' }[p.mode], h = '';
     if (p.creating) {
       h = head('Your own exercise') + '<label class="fld">Name<input id="cx-name" type="text" maxlength="50" autocomplete="off" value="' + esc(p.q || '') + '"></label>' +
         '<label class="fld">Muscle group<select id="cx-group">' + GROUPS.map(function (g) { return '<option' + (g === p.group ? ' selected' : '') + '>' + g + '</option>'; }).join('') + '</select></label>' +
@@ -2431,8 +2441,8 @@ var LIBRARY = (function () {
         '<div class="row"><button class="btn primary" type="button" data-act="cx-save">Save exercise</button><button class="btn quiet" type="button" data-act="cx-back">Back</button></div>';
       openSheet(h); return;
     }
-    h = head(title, p.mode === 'editor' ? 'Tap to add. You can add several.' : '') + searchBox('pick-q', p.q) + chipsHtml(p.group, 'pick-group', p.mode === 'lift' ? [['logged', 'Logged']] : null) +
-      '<div id="pick-list">' + libRows(p.group, p.q, p.mode) + '</div>' + (p.mode === 'lift' ? '' : '<button class="add-ex" type="button" data-act="cx-new">+ Create your own exercise</button>');
+    h = head(title, p.mode === 'editor' ? 'Tap to add. You can add several.' : '') + searchBox('pick-q', p.q) + chipsHtml(p.group, 'pick-group', p.mode === 'lift' ? [['logged', 'Logged']] : null, p.mode === 'tile' ? ['Endurance', 'Cardio'] : null) +
+      '<div id="pick-list">' + libRows(p.group, p.q, p.mode) + '</div>' + (p.mode === 'lift' || p.mode === 'tile' ? '' : '<button class="add-ex" type="button" data-act="cx-new">+ Create your own exercise</button>');
     openSheet(h, true);
   }
   function openPicker(mode, extra) { picker = Object.assign({ mode: mode, q: '', group: mode === 'lift' ? 'logged' : 'all', creating: false }, extra || {}); pickerSheet(); }
@@ -2481,7 +2491,7 @@ var LIBRARY = (function () {
     chrome(); observe();
   }
   function go(tab, push) {
-    planEdit = false; state.ui.tab = tab; saveLocal(); render(); enter(); window.scrollTo(0, 0);
+    planEdit = false; outEdit = false; state.ui.tab = tab; saveLocal(); render(); enter(); window.scrollTo(0, 0);
     if (push) { try { if (location.hash !== '#' + tab) location.hash = tab; } catch (e) {} }
   }
   function fromHash() { var h = (location.hash || '').replace('#', ''); if (h === 'log' || h === 'progress' || h === 'exercises') { if (h !== state.ui.tab) go(h, false); return true; } return false; }
@@ -2564,8 +2574,8 @@ var LIBRARY = (function () {
   }
 
   /* ================= third tab: history and exercises ================= */
-  var histMonth = null, histDay = null, histQ = '';
-  function sessTint() { var m = {}; routineList().forEach(function (r, i) { m[r.id] = i % 5; }); Object.keys(OUT).forEach(function (k) { m[k] = 'o'; }); return m; }
+  var histMonth = null, histDay = null, histQ = '', histSearch = false, histN = 10, histOpen = {};
+  function sessTint() { var m = {}; routineList().forEach(function (r, i) { m[r.id] = i % 5; }); Object.keys(OUT).forEach(function (k) { m[k] = 'o'; }); Object.keys(state.sessions).forEach(function (id) { var k = state.sessions[id].key; if (k && k.indexOf('out-') === 0) m[k] = 'o'; }); return m; }
   function histBody() {
     var f = finished(), h = '', i, t = today();
     if (!f.length) return '<section class="card"><h3>No workouts yet</h3><p class="sub">Every workout you finish lands here, on a calendar you can page through and search.</p></section>';
@@ -2591,7 +2601,7 @@ var LIBRARY = (function () {
     var mk = histMonth || t.slice(0, 7), y = +mk.slice(0, 4), mo = +mk.slice(5, 7) - 1, nDays = new Date(y, mo + 1, 0).getDate(), lead = (new Date(y, mo, 1).getDay() + 6) % 7;
     var by = {}, tint = sessTint(), ini = sessInitials(), seen = {}, legend = [], count = 0, cells = '', d;
     f.forEach(function (s) { if (s.date.slice(0, 7) !== mk) return; (by[s.date] = by[s.date] || []).push(s); count++; var k = s.key + '|' + (s.name || 'Workout'); if (!seen[k]) { seen[k] = 1; legend.push(s); } });
-    var days = Object.keys(by).sort(), sel = histDay && by[histDay] ? histDay : (days.length ? days[days.length - 1] : null);
+    var sel = histDay && by[histDay] ? histDay : null;
     for (i = 0; i < lead; i++) cells += '<span></span>';
     for (d = 1; d <= nDays; d++) {
       var dt = mk + '-' + pad(d), ss = by[dt];
@@ -2602,24 +2612,33 @@ var LIBRARY = (function () {
       '<button class="icon-btn" type="button" data-act="hist-next" aria-label="Next month"' + (mk >= t.slice(0, 7) ? ' disabled' : '') + '>' + IC.right + '</button></div>' +
       '<div class="hist-grid"><span class="hw">M</span><span class="hw">T</span><span class="hw">W</span><span class="hw">T</span><span class="hw">F</span><span class="hw">S</span><span class="hw">S</span>' + cells + '</div>';
     if (legend.length) h += '<div class="hist-key">' + legend.map(function (s) { return '<span><i class="hk' + (tint[s.key] != null ? ' av' + tint[s.key] : '') + '">' + esc(ini[s.key] || initials(s.name || 'Workout')) + '</i>' + esc(s.name || 'Workout') + '</span>'; }).join('') + '</div>';
-    h += '<p class="foot">' + (count ? plural(count, 'workout') + ' this month. Tap a day to see it.' : 'No workouts this month.') + '</p></section>';
-    if (sel) {
-      var rec = recordsBy(f);
-      by[sel].forEach(function (s) {
-        var du = durOf(s), vol = volOf(s), bits = [du ? fmtDur(du) : '', countSets(s) ? plural(countSets(s), 'set') : '', sessSports(s).filter(function (b) { return b.dist; }).map(function (b) { return distText({ sport: b.sport }, b.dist) + ' ' + sportWord(b.sport); }).join(', '), vol ? massText(vol) + ' lifted' : '', rec[s.id] ? plural(rec[s.id], 'new best') : ''].filter(Boolean);
-        h += '<section class="card" id="hist-day"><div><span class="label">' + fmtDate(s.date) + (toDate(s.date).getFullYear() !== new Date().getFullYear() ? ' ' + toDate(s.date).getFullYear() : '') + '</span><h2>' + esc(s.name || 'Workout') + '</h2><p class="sub">' + esc(bits.join(' · ')) + '</p></div><div>';
-        (s.entries || []).forEach(function (en) { var e = exi(en.ex, en.name); h += '<div class="sess-entry"><b>' + esc(e.gone ? en.name : e.name) + '</b><span>' + esc(setsText(e, en.sets)) + '</span>' + rirLine(en.sets) + '</div>'; });
+    h += '<p class="foot">' + (sel ? 'Showing ' + fmtDate(sel) + '. Tap the day again to see all workouts.' : count ? plural(count, 'workout') + ' this month. Tap a day to see only that day.' : 'No workouts this month.') + '</p></section>';
+    var rec = recordsBy(f), shown = sel ? by[sel] : f.slice(-histN).reverse();
+    h += '<div class="hist-list" id="hist-list"><h3 class="hist-h">' + (sel ? fmtDate(sel) : 'Latest workouts') + '</h3>';
+    shown.forEach(function (s) {
+      var open = sel ? histOpen[s.id] !== false : !!histOpen[s.id], du = durOf(s), vol = volOf(s), yr = toDate(s.date).getFullYear() !== new Date().getFullYear() ? ' ' + toDate(s.date).getFullYear() : '';
+      var bits = [du ? fmtDur(du) : '', countSets(s) ? plural(countSets(s), 'set') : '', sessSports(s).filter(function (b) { return b.dist; }).map(function (b) { return distText({ sport: b.sport }, b.dist) + ' ' + sportWord(b.sport); }).join(', '), vol ? massText(vol) + ' lifted' : '', rec[s.id] ? plural(rec[s.id], 'new best') : ''].filter(Boolean);
+      h += '<section class="card hcard' + (open ? ' open' : '') + '" data-id="' + esc(s.id) + '"><button class="hc-head" type="button" data-act="hist-open" data-id="' + esc(s.id) + '" aria-expanded="' + open + '"><span class="avatar' + (tint[s.key] != null ? ' av' + tint[s.key] : ' avx') + '" aria-hidden="true">' + esc(ini[s.key] || initials(s.name || 'Workout')) + '</span>' +
+        '<span class="txt"><b>' + esc(s.name || 'Workout') + '</b><small>' + fmtDate(s.date) + yr + (bits.length ? ' · ' + esc(bits.join(' · ')) : '') + '</small></span><span class="hc-chev" aria-hidden="true">' + IC.down + '</span></button>';
+      if (open) {
+        h += '<div>';
+        (s.entries || []).forEach(function (en) { var e = exi(en.ex, en.name); h += '<div class="sess-entry"><b>' + esc(e.gone ? en.name : e.name) + '</b><span>' + esc(setsText(e, en.sets)) + '</span>' + rirLine(en.sets) + (en.note ? '<span>Note: ' + esc(en.note) + '</span>' : '') + '</div>'; });
         h += '</div>' + (s.notes ? '<p class="sub">Notes: ' + esc(s.notes) + '</p>' : '') +
-          '<div class="row"><button class="btn sm primary-sm" type="button" data-act="again" data-id="' + esc(s.id) + '">Do this again</button><button class="btn sm" type="button" data-act="open-session" data-id="' + esc(s.id) + '">Edit or delete</button></div></section>';
-      });
-    }
+          '<div class="row"><button class="btn sm primary-sm" type="button" data-act="again" data-id="' + esc(s.id) + '">Do this again</button><button class="btn sm" type="button" data-act="open-session" data-id="' + esc(s.id) + '">Edit or delete</button></div>';
+      }
+      h += '</section>';
+    });
+    if (!sel && f.length > histN) h += '<button class="btn block" type="button" data-act="hist-more">Show ' + Math.min(10, f.length - histN) + ' more</button><p class="foot hist-count">Showing the latest ' + histN + ' of ' + f.length + '.</p>';
+    h += '</div>';
     return h;
   }
   function thirdView() {
     var ex = state.ui.lib3 === 'exercises';
     var h = '<div class="seg" role="group" aria-label="History or exercises"><button type="button" data-act="lib3" data-v="history" aria-pressed="' + !ex + '">History</button><button type="button" data-act="lib3" data-v="exercises" aria-pressed="' + ex + '">Exercises</button></div>';
     if (ex) return h + libraryView();
-    return h + '<div class="search">' + IC.search + '<input id="hist-q" type="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Search workouts by exercise" value="' + esc(histQ) + '" aria-label="Search workouts by exercise or session name"></div><div class="contents" id="hist-body">' + histBody() + '</div>';
+    h = '<div class="hist-top">' + h + '<button class="hist-sb' + (histSearch ? ' on' : '') + '" type="button" data-act="hist-search" aria-label="' + (histSearch ? 'Close search' : 'Search workouts') + '" aria-expanded="' + histSearch + '">' + (histSearch ? IC.x : IC.search) + '</button></div>';
+    if (histSearch) h += '<div class="search">' + IC.search + '<input id="hist-q" type="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Search workouts by exercise" value="' + esc(histQ) + '" aria-label="Search workouts by exercise or session name"></div>';
+    return h + '<div class="contents" id="hist-body">' + histBody() + '</div>';
   }
   function histShift(n) {
     var mk = histMonth || today().slice(0, 7), dt = new Date(+mk.slice(0, 4), +mk.slice(5, 7) - 1 + n, 1);
@@ -2848,17 +2867,36 @@ var LIBRARY = (function () {
   }
 
   /* ================= endurance: the card on Train ================= */
+  var outEdit = false;
   function outCard(f) {
-    var ws = weekStart(today()), wk = {}, bits = [], h = '';
+    var ws = weekStart(today()), wk = {}, bits = [], tiles = outList(), h = '';
+    if (outEdit) {
+      h += '<section class="card"><div class="plan-head"><div><h3>Endurance</h3><p class="sub">Each one starts a workout in one tap. Up to six fit here.</p></div><button class="btn quiet" type="button" data-act="out-edit" data-v="0">Done</button></div>';
+      if (tiles.length) {
+        h += '<ul class="list">';
+        tiles.forEach(function (id, i) {
+          var e = exi(id), nm = esc(e.name);
+          h += '<li class="plan-row out-row"><span class="thumb sm" aria-hidden="true">' + illoSvg(e.illo) + '</span><span class="txt"><b>' + nm + '</b><small>' + esc(e.equip) + '</small></span><span class="mini">' +
+            '<button class="icon-btn" type="button" data-act="out-move" data-i="' + i + '" data-d="-1" aria-label="Move ' + nm + ' earlier"' + (i ? '' : ' disabled') + '>' + IC.up + '</button>' +
+            '<button class="icon-btn" type="button" data-act="out-move" data-i="' + i + '" data-d="1" aria-label="Move ' + nm + ' later"' + (i < tiles.length - 1 ? '' : ' disabled') + '>' + IC.down + '</button>' +
+            '<button class="icon-btn" type="button" data-act="out-swap" data-i="' + i + '" aria-label="Replace ' + nm + ' with another">' + IC.swap + '</button>' +
+            '<button class="icon-btn" type="button" data-act="out-del" data-i="' + i + '" aria-label="Remove ' + nm + '">' + IC.x + '</button></span></li>';
+        });
+        h += '</ul>';
+      }
+      return h + (tiles.length < 6 ? '<button class="add-ex" type="button" data-act="out-add">+ Add one</button>' : '') + '</section>';
+    }
     f.forEach(function (s) { if (s.date < ws) return; sessSports(s).forEach(function (b) { wk[b.sport] = r2((wk[b.sport] || 0) + b.dist); }); });
     SPORTS.forEach(function (sp) { if (wk[sp[0]]) bits.push(distText({ sport: sp[0] }, wk[sp[0]]) + ' ' + sportWord(sp[0])); });
-    h += '<section class="card"><div class="spread"><h3>Endurance</h3><span class="next-last">' + (bits.length ? 'this week ' + esc(bits.join(', ')) : 'run, ride, swim') + '</span></div><div class="out-tiles">';
-    SPORTS.forEach(function (sp) {
-      var ld = lastDone(sp[2]), sub = 'not logged yet';
-      if (ld) { var b = sessSports(ld).filter(function (x) { return x.sport === sp[0]; })[0]; sub = b && b.dist ? distText({ sport: sp[0] }, b.dist) : fmtDate(ld.date, true); }
-      h += '<button class="out-tile" type="button" data-act="start" data-key="' + sp[2] + '" aria-label="Start a ' + sp[1].toLowerCase() + '"><span class="illo">' + illoSvg(sp[2], null, true) + '</span><b>' + sp[1] + '</b><small>' + esc(ld ? 'last ' + sub : sub) + '</small></button>';
+    h += '<section class="card"><div class="plan-head"><div><h3>Endurance</h3><p class="sub">' + (bits.length ? 'This week: ' + esc(bits.join(', ')) + '.' : 'Tap one to start it.') + '</p></div><button class="btn quiet" type="button" data-act="out-edit" data-v="1">Edit</button></div>';
+    if (!tiles.length) return h + '<p class="empty">Nothing here. Tap Edit to add a run, a ride, a swim or any other cardio.</p></section>';
+    h += '<div class="out-tiles">';
+    tiles.forEach(function (id) {
+      var e = exi(id), key = outKey(id), ld = lastDone(key), sub = 'not logged yet', nm = OUT_SHORT[id] || e.name;
+      if (ld) { var b = e.sport ? sessSports(ld).filter(function (x) { return x.sport === e.sport; })[0] : null; sub = 'last ' + (b && b.dist ? distText(e, b.dist) : fmtDate(ld.date, true)); }
+      h += '<button class="out-tile" type="button" data-act="start" data-key="' + esc(key) + '" aria-label="Start: ' + esc(e.name) + '"><span class="illo">' + illoSvg(e.illo, null, true) + '</span><b' + (nm.length > 8 ? ' class="long"' : '') + '>' + esc(nm) + '</b><small>' + esc(sub) + '</small></button>';
     });
-    return h + '</div><button class="btn quiet" type="button" data-act="start" data-key="out-brick">Brick: a ride, then a run straight after</button></section>';
+    return h + '</div></section>';
   }
 
   /* ================= endurance: the finish summary ================= */
@@ -3097,6 +3135,7 @@ var LIBRARY = (function () {
     else if (p.mode === 'replace' && d) { var ni = swapItem(p.u, exId); if (ni) { closeSheet(); render(); scrollToItem(ni.u); } }
     else if (p.mode === 'editor' && editor) { editor.items.push({ ex: exId, sets: e.log === 'cardio' ? 1 : e.sets, lo: e.lo, hi: e.hi, restSec: e.restSec, rir: e.rir, link: false }); render(); toast('Added ' + e.name); }
     else if (p.mode === 'lift') { state.ui.ex = exId; saveLocal(); closeSheet(); render(); enter(); }
+    else if (p.mode === 'tile') { var tl = outList().slice(); if (p.i >= 0 && p.i < tl.length) tl[p.i] = exId; else tl.push(exId); setOutTiles(tl); closeSheet(); render(); }
   }
   function openEditor(key) {
     if (!key) { editor = { id: 'r' + uid(), isNew: true, name: '', focus: '', core: true, warmup: '', items: [] }; }
@@ -3269,7 +3308,15 @@ var LIBRARY = (function () {
       case 'lib3': state.ui.lib3 = a.dataset.v; saveLocal(); render(); break;
       case 'hist-prev': histShift(-1); render(); break;
       case 'hist-next': histShift(1); render(); break;
-      case 'hist-day': { histDay = a.dataset.d; render(); var hc = document.getElementById('hist-day'); if (hc && hc.scrollIntoView) hc.scrollIntoView({ block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' }); break; }
+      case 'hist-day': { histDay = histDay === a.dataset.d ? null : a.dataset.d; histOpen = {}; render(); var hc = document.getElementById('hist-list'); if (histDay && hc && hc.scrollIntoView) hc.scrollIntoView({ block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' }); break; }
+      case 'hist-open': { var ho = a.getAttribute('aria-expanded') === 'true', hb2 = document.getElementById('hist-body'); histOpen[a.dataset.id] = !ho; if (hb2) hb2.innerHTML = histBody(); break; }
+      case 'hist-more': { histN += 10; var hb3 = document.getElementById('hist-body'); if (hb3) hb3.innerHTML = histBody(); break; }
+      case 'hist-search': { histSearch = !histSearch; if (!histSearch) histQ = ''; render(); if (histSearch) { var hq = document.getElementById('hist-q'); if (hq) hq.focus(); } break; }
+      case 'out-edit': outEdit = a.dataset.v === '1'; render(); break;
+      case 'out-move': { var ot = outList().slice(), oi = +a.dataset.i, oj = oi + (+a.dataset.d); if (oj >= 0 && oj < ot.length) { var ox = ot[oi]; ot[oi] = ot[oj]; ot[oj] = ox; setOutTiles(ot); render(); } break; }
+      case 'out-del': { var od = outList().slice(); od.splice(+a.dataset.i, 1); setOutTiles(od); render(); break; }
+      case 'out-swap': openPicker('tile', { i: +a.dataset.i }); break;
+      case 'out-add': openPicker('tile', { i: -1 }); break;
       case 'again': { var sa = state.sessions[a.dataset.id]; if (!sa) break; if (state.draft) { toast('Finish or discard the workout in progress first.'); break; } closeSheet(); repeatDraft(sa); break; }
       case 'recap-x': state.ui.recapSeen = weekStart(today()); saveLocal(); render(); break;
       case 'plan-edit': planEdit = true; render(); break;
