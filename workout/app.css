@@ -2113,3 +2113,16 @@ body.has-mini .rest { display: none; }
 @media (max-width: 350px) { .pal-sw { width: 38px; height: 38px; } .pal button { font-size: 0.7rem; } }
 /* ---- Graphite: the next-up card is black with light text in light mode ---- */
 :root[data-palette="graphite"] .next { --ink: var(--nx-ink); --ink-2: var(--nx-ink-2); --muted: var(--nx-muted); --accent-ink: var(--nx-label); --fig: var(--nx-fig); --fig-far: var(--nx-fig-far); --equip: var(--nx-equip); --pad: var(--nx-pad); --weight: var(--nx-weight); color: var(--ink); }
+
+/* ---- the line under an exercise's name stays on one line: it runs under the menu button, and narrow phones drop a word ---- */
+.exc-head > div { display: contents; }
+.exc-head > .thumb { grid-row: 1 / span 2; }
+.exc-name { grid-column: 2; align-self: end; }
+.exc-head > .icon-btn { grid-column: 3; grid-row: 1; }
+.exc-target { grid-column: 2 / -1; grid-row: 2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; align-self: start; margin-top: -8px; }
+@media (max-width: 370px) { .xs-hide { display: none; } .exc-target { font-size: 0.84rem; } }
+/* ---- the countdown bar and the minimised workout bar have fully round ends, and so do their buttons ---- */
+.rest { border-radius: 999px; padding: 8px 10px 8px 12px; }
+.rest button, .rest-step { border-radius: 999px; }
+.rest > button { padding: 0 16px; }
+.wmini { border-radius: 999px; }

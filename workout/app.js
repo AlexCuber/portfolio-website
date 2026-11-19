@@ -1818,8 +1818,10 @@ var LIBRARY = (function () {
   function targetOf(it, e) {
     if (e.log === 'cardio') return repsText(it, e);
     var rest = it.link ? 'then next' : (it.rest || restText(it.restSec));
-    return it.sets + ' × ' + repsText(it, e) + (it.rir && it.rir !== '—' ? ' · RIR ' + it.rir : '') + (rest && rest !== '—' ? (/^then/.test(rest) ? ' · ' : ' · rest ') + rest : '');
+    return (it.sets + ' × ' + repsText(it, e) + (it.rir && it.rir !== '—' ? ' · RIR ' + it.rir : '') + (rest && rest !== '—' ? (/^then/.test(rest) ? ' · ' : ' · rest ') + rest : '')).replace(/–/g, '-');
   }
+  /* the same line for the workout card, where it must stay on one line: on a narrow phone the word "rest" is dropped */
+  function targetHtml(it, e) { return esc(targetOf(it, e)).replace(' · rest ', ' · <span class="xs-hide">rest </span>'); }
   function toast(msg, rec) {
     var el = document.getElementById('toast'); el.textContent = msg; el.className = 'toast' + (rec ? ' rec' : ''); el.hidden = false;
     clearTimeout(toastTimer); toastTimer = setTimeout(function () { el.hidden = true; }, rec ? 3400 : 2600);
@@ -2005,7 +2007,7 @@ var LIBRARY = (function () {
       var allDone = it.rows.length && it.rows.every(function (x) { return x.d; });
       h += '<section class="card exc' + (grouped ? ' in-group' : '') + (allDone ? ' all-done' : '') + '" id="x-' + it.u + '"><div class="exc-head">' +
         '<button class="thumb" type="button" data-act="open-ex" data-ex="' + esc(it.ex) + '" data-u="' + it.u + '" aria-label="How to do ' + esc(e.name) + '">' + illoSvg(e.illo) + '</button>' +
-        '<div><div class="exc-name">' + (it.n && it.n.charAt(0) !== 'x' ? '<span class="exc-n">' + esc(it.n) + '</span>' : '') + esc(e.name) + '</div><div class="exc-target">' + esc(targetOf(it, e)) + '</div></div>' +
+        '<div><div class="exc-name">' + (it.n && it.n.charAt(0) !== 'x' ? '<span class="exc-n">' + esc(it.n) + '</span>' : '') + esc(e.name) + '</div><div class="exc-target">' + targetHtml(it, e) + '</div></div>' +
         '<button class="icon-btn" type="button" data-act="ex-menu" data-u="' + it.u + '" aria-label="More options for ' + esc(e.name) + '">' + IC.more + '</button></div>';
       if (showT) anyTarget = true;
       h += '<div class="last"><div class="last-row"><span class="label">' + (last ? 'Last time · ' + fmtDate(last.date) : 'Last time') + '</span>' +
