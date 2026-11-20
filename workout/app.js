@@ -1836,7 +1836,7 @@ var LIBRARY = (function () {
   function chrome() {
     var d = state.draft, live = wLive() && !state.ui.wmin && state.ui.tab === 'log' && !editor, bar = document.getElementById('bar'), wbar = document.getElementById('wbar'), tab = state.ui.tab, now = new Date();
     bar.hidden = !!live; wbar.hidden = !live;
-    if (document.body.classList.contains('setup')) { document.getElementById('bar-title').textContent = 'Uphill'; document.getElementById('bar-date').textContent = 'Welcome'; return; }
+    if (document.body.classList.contains('setup')) { document.getElementById('bar-title').textContent = 'Hitit'; document.getElementById('bar-date').textContent = 'Welcome'; return; }
     document.getElementById('bar-title').textContent = tab === 'progress' ? 'Progress' : tab === 'exercises' ? (state.ui.lib3 === 'exercises' ? 'Exercises' : 'History') : DAYS_FULL[now.getDay()];
     document.getElementById('bar-date').textContent = tab === 'progress' ? plural(Object.keys(state.sessions).length, 'workout') + ' logged' : tab === 'exercises' ? (state.ui.lib3 === 'exercises' ? allEx().length + ' exercises' : plural(Object.keys(state.sessions).length, 'workout')) : now.getDate() + ' ' + MONTHS_FULL[now.getMonth()];
     if (!live) return;
@@ -1978,12 +1978,15 @@ var LIBRARY = (function () {
   }
 
   /* ================= log tab: the workout ================= */
+  /* "Remove a set" turns the ticks of one exercise into crosses; tapping a cross removes that set */
+  var delMode = null;
+  function delBtn(u, i, warm, label) { return '<button class="tick del" type="button" data-act="del-row" data-u="' + u + '" data-i="' + i + '"' + (warm ? ' data-w="1"' : '') + ' aria-label="' + label + '">' + IC.x + '</button>'; }
   function warmRow(it, i, s) {
     var n = i + 1;
     return '<div class="set warm' + (s.d ? ' done' : '') + '"><span class="set-n" title="Warm-up set">W</span>' +
       '<div class="field"><input type="text" inputmode="decimal" autocomplete="off" data-wf="w" data-u="' + it.u + '" data-i="' + i + '" value="' + esc(s.w) + '" aria-label="Warm-up set ' + n + ' weight in ' + UW() + '"><span>' + UW() + '</span></div><span class="set-x">×</span>' +
       '<div class="field"><input type="text" inputmode="numeric" autocomplete="off" data-wf="r" data-u="' + it.u + '" data-i="' + i + '" value="' + esc(s.r) + '" aria-label="Warm-up set ' + n + ' reps"><span>reps</span></div>' +
-      '<button class="tick" type="button" data-act="wtick" data-u="' + it.u + '" data-i="' + i + '" aria-pressed="' + (s.d ? 'true' : 'false') + '" aria-label="Warm-up set ' + n + ' done">' + IC.check + '</button></div>';
+      (delMode === it.u ? delBtn(it.u, i, 1, 'Remove warm-up set ' + n) : '<button class="tick" type="button" data-act="wtick" data-u="' + it.u + '" data-i="' + i + '" aria-pressed="' + (s.d ? 'true' : 'false') + '" aria-label="Warm-up set ' + n + ' done">' + IC.check + '</button>') + '</div>';
   }
   function setRow(it, e, i, s, lastSets) {
     var d = state.draft, ls = lastSets ? (lastSets[i] || lastSets[lastSets.length - 1]) : null, one = e.log === 'cardio' || e.log === 'time';
@@ -1993,7 +1996,8 @@ var LIBRARY = (function () {
     if (!one) h += '<div class="field"><input id="w-' + it.u + '-' + i + '" type="text" inputmode="decimal" autocomplete="off" data-f="w" data-u="' + it.u + '" data-i="' + i + '" value="' + esc(s.w) + '" placeholder="' + (ls ? fmt(ls.w) : (e.log === 'bw' ? '0' : '')) + '" aria-label="Set ' + (i + 1) + ' weight in ' + UW() + '"><span>' + UW() + '</span></div><span class="set-x">×</span>';
     h += '<div class="field"><input id="r-' + it.u + '-' + i + '" type="text" inputmode="' + (one ? 'decimal' : 'numeric') + '" autocomplete="off" data-f="r" data-u="' + it.u + '" data-i="' + i + '" value="' + esc(s.r) + '" placeholder="' + (ls ? fmt(ls.r) : '') + '" aria-label="Set ' + (i + 1) + ' ' + e.unit + '"><span>' + e.unit + '</span></div>';
     if (tm) h += '<button class="tbtn' + (run ? ' on' : '') + '" type="button" data-act="timer" data-u="' + it.u + '" data-i="' + i + '" aria-label="' + (run ? 'Stop the countdown' : 'Start a countdown for set ' + (i + 1)) + '">' + (run ? IC.stop : IC.timer) + '</button>';
-    h += '<button class="tick' + (s.pop ? ' pop' : '') + '" type="button" data-act="tick" data-u="' + it.u + '" data-i="' + i + '" aria-pressed="' + (s.d ? 'true' : 'false') + '" aria-label="Set ' + (i + 1) + (s.d && s.pr ? ' done, new best' : ' done') + (left ? ', ' + (left === '3+' ? '3 or more' : left) + ' left in the tank' : '') + '">' + (s.d && s.pr ? IC.star : IC.check) + (left ? '<span class="rir-b" aria-hidden="true">' + left + '</span>' : '') + '</button></div>';
+    if (delMode === it.u && it.rows.length > 1) h += delBtn(it.u, i, 0, 'Remove set ' + (i + 1)) + '</div>';
+    else h += '<button class="tick' + (s.pop ? ' pop' : '') + '" type="button" data-act="tick" data-u="' + it.u + '" data-i="' + i + '" aria-pressed="' + (s.d ? 'true' : 'false') + '" aria-label="Set ' + (i + 1) + (s.d && s.pr ? ' done, new best' : ' done') + (left ? ', ' + (left === '3+' ? '3 or more' : left) + ' left in the tank' : '') + '">' + (s.d && s.pr ? IC.star : IC.check) + (left ? '<span class="rir-b" aria-hidden="true">' + left + '</span>' : '') + '</button></div>';
     if (state.settings.rir && !d.editing && (e.log === 'wr' || e.log === 'bw') && s.d && s.rir == null && !it.rows.slice(i + 1).some(function (x) { return x.d; }))
       h += '<div class="rir" role="group" aria-label="Reps left in the tank after set ' + (i + 1) + '"><span>Reps left in the tank</span>' + [0, 1, 2, 3].map(function (v) { return '<button type="button" data-act="rir" data-u="' + it.u + '" data-i="' + i + '" data-v="' + v + '">' + (v === 3 ? '3+' : v) + '</button>'; }).join('') + '</div>';
     return h;
@@ -2027,7 +2031,7 @@ var LIBRARY = (function () {
         (last && last.note ? '<span class="last-hint">Note: ' + esc(last.note) + '</span>' : '') +
         '<span class="last-hint' + (hi.up ? ' up' : '') + '">' + esc(hi.t) + '</span></div>';
       var anyDone = it.rows.some(function (x) { return x.d; });
-      if (!d.editing && !allDone) h += '<div class="tools">' + (e.log === 'wr' ? '<button class="tool" type="button" data-act="help-open" data-u="' + it.u + '">' + IC.bar + (isBar(e) ? 'Warm-up and plates' : 'Warm-up') + '</button>' : '') + (e.sport ? (function () { var open = 0; while (open < it.rows.length - 1 && it.rows[open].d) open++; var on = !!(d.timer && d.timer.u === it.u); return '<button class="tool' + (on ? ' on' : '') + '" type="button" data-act="timer" data-u="' + it.u + '" data-i="' + (on ? d.timer.i : open) + '">' + (on ? IC.stop + 'Stop the stopwatch' : IC.timer + 'Stopwatch') + '</button>'; })() : '') + (anyDone ? '' : '<button class="tool" type="button" data-act="swap-open" data-u="' + it.u + '">' + IC.swap + 'Swap</button>') + '</div>';
+      if (!d.editing && !allDone) h += '<div class="tools">' + (e.log === 'wr' ? '<button class="tool" type="button" data-act="warm-one" data-u="' + it.u + '" aria-label="Add a warm-up set">' + IC.bar + 'Warm-up</button>' : '') + (e.sport ? (function () { var open = 0; while (open < it.rows.length - 1 && it.rows[open].d) open++; var on = !!(d.timer && d.timer.u === it.u); return '<button class="tool' + (on ? ' on' : '') + '" type="button" data-act="timer" data-u="' + it.u + '" data-i="' + (on ? d.timer.i : open) + '">' + (on ? IC.stop + 'Stop the stopwatch' : IC.timer + 'Stopwatch') + '</button>'; })() : '') + (anyDone ? '' : '<button class="tool" type="button" data-act="swap-open" data-u="' + it.u + '">' + IC.swap + 'Swap</button>') + '</div>';
       h += '<div class="sets">';
       if (it.warm && it.warm.length) it.warm.forEach(function (s, i) { h += warmRow(it, i, s); });
       it.rows.forEach(function (s, i) { h += setRow(it, e, i, s, tg && tg.sets ? tg.sets : (last ? last.sets : null)); if (s.d && s.pr) anyPr = true; s.pop = false; });
@@ -2039,7 +2043,7 @@ var LIBRARY = (function () {
       if (chips) h += '<div class="recs">' + chips + '</div>';
       it.recNew = null;
       if (e.weightHint) h += '<span class="unit-hint">' + esc(e.weightHint) + '</span>';
-      if (e.log !== 'cardio') h += '<div class="row"><button class="btn quiet" type="button" data-act="add-set" data-u="' + it.u + '">+ Add set</button>' + (it.rows.length > 1 ? '<button class="btn quiet" type="button" data-act="del-set" data-u="' + it.u + '">Remove last set</button>' : '') + '</div>';
+      if (e.log !== 'cardio') h += '<div class="row"><button class="btn quiet" type="button" data-act="add-set" data-u="' + it.u + '">+ Add set</button>' + (it.rows.length > 1 || (it.warm && it.warm.length) ? '<button class="btn quiet" type="button" data-act="del-set" data-u="' + it.u + '" aria-pressed="' + (delMode === it.u) + '">' + (delMode === it.u ? 'Cancel' : 'Remove set') + '</button>' : '') + '</div>';
       h += '<input class="note-in" id="note-' + it.u + '" type="text" data-f="note" data-u="' + it.u + '" value="' + esc(it.note) + '" placeholder="Note (machine setting, swap used…)" aria-label="Note for ' + esc(e.name) + '"></section>';
     });
     h += '<button class="add-ex" type="button" data-act="add-ex">+ Add exercise</button>';
@@ -2449,7 +2453,7 @@ var LIBRARY = (function () {
     var d = state.draft, it = findItem(u); if (!it) return;
     var i = d.items.indexOf(it), e = exi(it.ex);
     openSheet(head(e.name) + '<div class="menu"><button type="button" data-act="open-ex" data-ex="' + esc(it.ex) + '" data-u="' + u + '">How to do it</button>' +
-      (e.log === 'wr' && !d.editing ? '<button type="button" data-act="help-open" data-u="' + u + '">' + (isBar(e) ? 'Warm-up and plates' : 'Warm-up sets') + '</button>' : '') +
+      (e.log === 'wr' && !d.editing ? '<button type="button" data-act="help-open" data-u="' + u + '">' + (isBar(e) ? 'Plates and warm-up weights' : 'Warm-up weights') + '</button>' : '') +
       '<button type="button" data-act="' + (d.editing ? 'ex-replace' : 'swap-open') + '" data-u="' + u + '">Swap for another exercise</button>' +
       '<button type="button" data-act="ex-up" data-u="' + u + '"' + (i ? '' : ' disabled') + '>Move up</button><button type="button" data-act="ex-down" data-u="' + u + '"' + (i < d.items.length - 1 ? '' : ' disabled') + '>Move down</button>' +
       '<button type="button" class="danger" data-act="ex-remove" data-u="' + u + '">Remove from this workout</button></div>');
@@ -2490,7 +2494,7 @@ var LIBRARY = (function () {
     h += '<div class="setting stack"><div><b>Backup</b><small>' + (STANDALONE ? 'Everything is stored on this phone only. ' + (function () { var b = backupState(); return b.at ? 'Last backup ' + fmtDate(iso(new Date(b.at))) + (b.fresh ? ', ' + plural(b.fresh, 'workout') + ' since then.' : ', nothing new since then.') : 'No backup made yet.'; })() + ' To bring a backup back, use Restore from file.' : 'Your log syncs through Claude. A backup lets you move it elsewhere.') + '</small></div>' +
       '<div class="row">' + (STANDALONE ? '<button class="btn sm" type="button" data-act="backup-save">Save backup file</button>' : '') + '<button class="btn sm" type="button" data-act="backup-show">Show backup text</button><label class="btn sm">Restore from file<input id="backup-file" type="file" accept=".json,application/json,text/plain" hidden></label></div>' +
       '<div id="backup-box" hidden><textarea class="backup" id="backup-text" spellcheck="false" aria-label="Backup text"></textarea><div class="row"><button class="btn sm" type="button" data-act="backup-copy">Copy</button><button class="btn sm" type="button" data-act="backup-restore">Restore from this text</button></div></div></div>';
-    h += '<p class="foot">Uphill · ' + allEx().length + ' exercises · ' + Object.keys(state.sessions).length + ' workouts saved</p>';
+    h += '<p class="foot">Hitit · ' + allEx().length + ' exercises · ' + Object.keys(state.sessions).length + ' workouts saved</p>';
     openSheet(h);
   }
   function openSummary() {
@@ -2526,7 +2530,7 @@ var LIBRARY = (function () {
     chrome(); observe(); if (mini) drawMini();
   }
   function go(tab, push) {
-    planEdit = false; outEdit = false; if (wLive() && tab !== 'log') state.ui.wmin = true; state.ui.tab = tab; saveLocal(); render(); enter(); window.scrollTo(0, 0);
+    planEdit = false; outEdit = false; delMode = null; if (wLive() && tab !== 'log') state.ui.wmin = true; state.ui.tab = tab; saveLocal(); render(); enter(); window.scrollTo(0, 0);
     if (push) { try { if (location.hash !== '#' + tab) location.hash = tab; } catch (e) {} }
   }
   function fromHash() { var h = (location.hash || '').replace('#', ''); if (h === 'log' || h === 'progress' || h === 'exercises') { if (h !== state.ui.tab) go(h, false); return true; } return false; }
@@ -2867,7 +2871,7 @@ var LIBRARY = (function () {
     h += '<section class="card"><div><h3>Days a week</h3><p class="sub">How often you plan to train. This becomes your weekly goal.</p></div><div class="seg" role="group" aria-label="Days a week">' + [2, 3, 4, 5, 6].map(function (n) { return '<button type="button" data-act="setup-days" data-v="' + n + '" aria-pressed="' + (su.days === n) + '">' + n + '</button>'; }).join('') + '</div></section>';
     h += '<section class="card"><div><h3>Starting plan</h3><p class="sub">Every session can be edited, reordered or replaced once you are in.</p></div><div class="tpls" role="radiogroup" aria-label="Starting plan">' + tplCards(su.tpl, su.days, 'setup-tpl') + '</div></section>';
     h += '<button class="btn primary block" type="button" data-act="setup-go">Start</button>';
-    h += '<p class="foot setup-foot">Used Uphill before? <label class="link">Restore from a backup file<input id="backup-file" type="file" accept=".json,application/json,text/plain" hidden></label></p>';
+    h += '<p class="foot setup-foot">Used Hitit before? <label class="link">Restore from a backup file<input id="backup-file" type="file" accept=".json,application/json,text/plain" hidden></label></p>';
     return h;
   }
   function loadingView() { return '<section class="card"><h3>Opening your log</h3><p class="sub">Checking for workouts saved from another device.</p></section>'; }
@@ -3151,8 +3155,8 @@ var LIBRARY = (function () {
   /* ================= backup ================= */
   function backupData() { return { app: 'workout-log', v: 2, exportedAt: new Date().toISOString(), sessions: state.sessions, body: state.body, routines: state.routines, custom: state.custom, settings: state.settings }; }
   function restore(text) {
-    var data; try { data = JSON.parse(text); } catch (e) { toast('That is not an Uphill backup. Nothing was changed.'); return; }
-    if (!data || !data.sessions || typeof data.sessions !== 'object') { toast('That is not an Uphill backup. Nothing was changed.'); return; }
+    var data; try { data = JSON.parse(text); } catch (e) { toast('That is not a Hitit backup. Nothing was changed.'); return; }
+    if (!data || !data.sessions || typeof data.sessions !== 'object') { toast('That is not a Hitit backup. Nothing was changed.'); return; }
     var n = 0, wasEmpty = emptyLog(), bu = data.settings && data.settings.unit === 'lb' ? 'lb' : 'kg';
     if (!wasEmpty && bu !== (isLb() ? 'lb' : 'kg')) { toast('That backup is in ' + (bu === 'lb' ? 'pounds' : 'kilograms') + ' and this log is not. Switch units in settings, then restore.'); return; }
     [['sessions', 'sessions', 'sessions/'], ['body', 'body', 'body/'], ['routines', 'routines', 'routines/'], ['custom', 'custom', 'exercises/']].forEach(function (c) {
@@ -3164,11 +3168,11 @@ var LIBRARY = (function () {
     toast('Backup restored. ' + plural(n, 'workout') + ' added.');
   }
   function saveBackupFile() {
-    var text = JSON.stringify(backupData()), name = 'uphill-backup-' + today() + '.json';
+    var text = JSON.stringify(backupData()), name = 'hitit-backup-' + today() + '.json';
     function done() { backupDone(); toast('Backup saved'); if (scrim.hidden) render(); else settingsSheet(); }
     try {
       var file = new File([text], name, { type: 'application/json' });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) { navigator.share({ files: [file], title: 'Uphill backup' }).then(done, function () {}); return; }
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { navigator.share({ files: [file], title: 'Hitit backup' }).then(done, function () {}); return; }
     } catch (e) {}
     try { var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); done(); } catch (e) { toast('Could not save a file here. Use the backup text instead.'); }
   }
@@ -3261,7 +3265,13 @@ var LIBRARY = (function () {
         } else { s.d = false; s.pr = false; delete s.rir; if (!d.editing) { var rc2 = itemRecords(it, d); it.rec = { w: rc2.w, v: rc2.v, b: rc2.b }; } }
         touchDraft(); render(); break;
       case 'add-set': it = findItem(u); if (it) { var lr = it.rows[it.rows.length - 1]; it.rows.push({ w: lr ? lr.w : '', r: '', d: false }); touchDraft(); render(); } break;
-      case 'del-set': it = findItem(u); if (it && it.rows.length > 1) { it.rows.pop(); touchDraft(); render(); } break;
+      case 'del-set': delMode = delMode === u ? null : u; render(); break;
+      case 'del-row': it = findItem(u); if (it) {
+        if (a.dataset.w) { if (it.warm) { it.warm.splice(i, 1); if (!it.warm.length) delete it.warm; } }
+        else if (it.rows.length > 1) { it.rows.splice(i, 1); if (d.timer && d.timer.u === u) d.timer = null; }
+        delMode = null; touchDraft(); render(); } break;
+      case 'warm-one': it = findItem(u); if (it) { e = exi(it.ex); var ww = workingWeight(it), sg = ww > 0 ? warmups(ww, e, !warmedUp(it)) : [], wn = (it.warm || []).length, s1 = sg[wn];
+        (it.warm = it.warm || []).push({ w: s1 ? fmt(s1.w) : '', r: s1 ? String(s1.r) : '', d: false }); delMode = null; touchDraft(); render(); } break;
       case 'add-ex': openPicker('draft'); break;
       case 'ex-menu': menuSheet(u); break;
       case 'ex-replace': openPicker('replace', { u: u }); break;
