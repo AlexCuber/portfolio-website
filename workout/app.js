@@ -1978,12 +1978,15 @@ var LIBRARY = (function () {
   }
 
   /* ================= log tab: the workout ================= */
+  /* "Remove a set" turns the ticks of one exercise into crosses; tapping a cross removes that set */
+  var delMode = null;
+  function delBtn(u, i, warm, label) { return '<button class="tick del" type="button" data-act="del-row" data-u="' + u + '" data-i="' + i + '"' + (warm ? ' data-w="1"' : '') + ' aria-label="' + label + '">' + IC.x + '</button>'; }
   function warmRow(it, i, s) {
     var n = i + 1;
     return '<div class="set warm' + (s.d ? ' done' : '') + '"><span class="set-n" title="Warm-up set">W</span>' +
       '<div class="field"><input type="text" inputmode="decimal" autocomplete="off" data-wf="w" data-u="' + it.u + '" data-i="' + i + '" value="' + esc(s.w) + '" aria-label="Warm-up set ' + n + ' weight in ' + UW() + '"><span>' + UW() + '</span></div><span class="set-x">×</span>' +
       '<div class="field"><input type="text" inputmode="numeric" autocomplete="off" data-wf="r" data-u="' + it.u + '" data-i="' + i + '" value="' + esc(s.r) + '" aria-label="Warm-up set ' + n + ' reps"><span>reps</span></div>' +
-      '<button class="tick" type="button" data-act="wtick" data-u="' + it.u + '" data-i="' + i + '" aria-pressed="' + (s.d ? 'true' : 'false') + '" aria-label="Warm-up set ' + n + ' done">' + IC.check + '</button></div>';
+      (delMode === it.u ? delBtn(it.u, i, 1, 'Remove warm-up set ' + n) : '<button class="tick" type="button" data-act="wtick" data-u="' + it.u + '" data-i="' + i + '" aria-pressed="' + (s.d ? 'true' : 'false') + '" aria-label="Warm-up set ' + n + ' done">' + IC.check + '</button>') + '</div>';
   }
   function setRow(it, e, i, s, lastSets) {
     var d = state.draft, ls = lastSets ? (lastSets[i] || lastSets[lastSets.length - 1]) : null, one = e.log === 'cardio' || e.log === 'time';
@@ -1993,7 +1996,8 @@ var LIBRARY = (function () {
     if (!one) h += '<div class="field"><input id="w-' + it.u + '-' + i + '" type="text" inputmode="decimal" autocomplete="off" data-f="w" data-u="' + it.u + '" data-i="' + i + '" value="' + esc(s.w) + '" placeholder="' + (ls ? fmt(ls.w) : (e.log === 'bw' ? '0' : '')) + '" aria-label="Set ' + (i + 1) + ' weight in ' + UW() + '"><span>' + UW() + '</span></div><span class="set-x">×</span>';
     h += '<div class="field"><input id="r-' + it.u + '-' + i + '" type="text" inputmode="' + (one ? 'decimal' : 'numeric') + '" autocomplete="off" data-f="r" data-u="' + it.u + '" data-i="' + i + '" value="' + esc(s.r) + '" placeholder="' + (ls ? fmt(ls.r) : '') + '" aria-label="Set ' + (i + 1) + ' ' + e.unit + '"><span>' + e.unit + '</span></div>';
     if (tm) h += '<button class="tbtn' + (run ? ' on' : '') + '" type="button" data-act="timer" data-u="' + it.u + '" data-i="' + i + '" aria-label="' + (run ? 'Stop the countdown' : 'Start a countdown for set ' + (i + 1)) + '">' + (run ? IC.stop : IC.timer) + '</button>';
-    h += '<button class="tick' + (s.pop ? ' pop' : '') + '" type="button" data-act="tick" data-u="' + it.u + '" data-i="' + i + '" aria-pressed="' + (s.d ? 'true' : 'false') + '" aria-label="Set ' + (i + 1) + (s.d && s.pr ? ' done, new best' : ' done') + (left ? ', ' + (left === '3+' ? '3 or more' : left) + ' left in the tank' : '') + '">' + (s.d && s.pr ? IC.star : IC.check) + (left ? '<span class="rir-b" aria-hidden="true">' + left + '</span>' : '') + '</button></div>';
+    if (delMode === it.u && it.rows.length > 1) h += delBtn(it.u, i, 0, 'Remove set ' + (i + 1)) + '</div>';
+    else h += '<button class="tick' + (s.pop ? ' pop' : '') + '" type="button" data-act="tick" data-u="' + it.u + '" data-i="' + i + '" aria-pressed="' + (s.d ? 'true' : 'false') + '" aria-label="Set ' + (i + 1) + (s.d && s.pr ? ' done, new best' : ' done') + (left ? ', ' + (left === '3+' ? '3 or more' : left) + ' left in the tank' : '') + '">' + (s.d && s.pr ? IC.star : IC.check) + (left ? '<span class="rir-b" aria-hidden="true">' + left + '</span>' : '') + '</button></div>';
     if (state.settings.rir && !d.editing && (e.log === 'wr' || e.log === 'bw') && s.d && s.rir == null && !it.rows.slice(i + 1).some(function (x) { return x.d; }))
       h += '<div class="rir" role="group" aria-label="Reps left in the tank after set ' + (i + 1) + '"><span>Reps left in the tank</span>' + [0, 1, 2, 3].map(function (v) { return '<button type="button" data-act="rir" data-u="' + it.u + '" data-i="' + i + '" data-v="' + v + '">' + (v === 3 ? '3+' : v) + '</button>'; }).join('') + '</div>';
     return h;
@@ -2027,7 +2031,7 @@ var LIBRARY = (function () {
         (last && last.note ? '<span class="last-hint">Note: ' + esc(last.note) + '</span>' : '') +
         '<span class="last-hint' + (hi.up ? ' up' : '') + '">' + esc(hi.t) + '</span></div>';
       var anyDone = it.rows.some(function (x) { return x.d; });
-      if (!d.editing && !allDone) h += '<div class="tools">' + (e.log === 'wr' ? '<button class="tool" type="button" data-act="help-open" data-u="' + it.u + '">' + IC.bar + (isBar(e) ? 'Warm-up and plates' : 'Warm-up') + '</button>' : '') + (e.sport ? (function () { var open = 0; while (open < it.rows.length - 1 && it.rows[open].d) open++; var on = !!(d.timer && d.timer.u === it.u); return '<button class="tool' + (on ? ' on' : '') + '" type="button" data-act="timer" data-u="' + it.u + '" data-i="' + (on ? d.timer.i : open) + '">' + (on ? IC.stop + 'Stop the stopwatch' : IC.timer + 'Stopwatch') + '</button>'; })() : '') + (anyDone ? '' : '<button class="tool" type="button" data-act="swap-open" data-u="' + it.u + '">' + IC.swap + 'Swap</button>') + '</div>';
+      if (!d.editing && !allDone) h += '<div class="tools">' + (e.log === 'wr' ? '<button class="tool" type="button" data-act="warm-one" data-u="' + it.u + '" aria-label="Add a warm-up set">' + IC.bar + 'Warm-up</button>' : '') + (e.sport ? (function () { var open = 0; while (open < it.rows.length - 1 && it.rows[open].d) open++; var on = !!(d.timer && d.timer.u === it.u); return '<button class="tool' + (on ? ' on' : '') + '" type="button" data-act="timer" data-u="' + it.u + '" data-i="' + (on ? d.timer.i : open) + '">' + (on ? IC.stop + 'Stop the stopwatch' : IC.timer + 'Stopwatch') + '</button>'; })() : '') + (anyDone ? '' : '<button class="tool" type="button" data-act="swap-open" data-u="' + it.u + '">' + IC.swap + 'Swap</button>') + '</div>';
       h += '<div class="sets">';
       if (it.warm && it.warm.length) it.warm.forEach(function (s, i) { h += warmRow(it, i, s); });
       it.rows.forEach(function (s, i) { h += setRow(it, e, i, s, tg && tg.sets ? tg.sets : (last ? last.sets : null)); if (s.d && s.pr) anyPr = true; s.pop = false; });
@@ -2039,7 +2043,7 @@ var LIBRARY = (function () {
       if (chips) h += '<div class="recs">' + chips + '</div>';
       it.recNew = null;
       if (e.weightHint) h += '<span class="unit-hint">' + esc(e.weightHint) + '</span>';
-      if (e.log !== 'cardio') h += '<div class="row"><button class="btn quiet" type="button" data-act="add-set" data-u="' + it.u + '">+ Add set</button>' + (it.rows.length > 1 ? '<button class="btn quiet" type="button" data-act="del-set" data-u="' + it.u + '">Remove last set</button>' : '') + '</div>';
+      if (e.log !== 'cardio') h += '<div class="row"><button class="btn quiet" type="button" data-act="add-set" data-u="' + it.u + '">+ Add set</button>' + (it.rows.length > 1 || (it.warm && it.warm.length) ? '<button class="btn quiet" type="button" data-act="del-set" data-u="' + it.u + '" aria-pressed="' + (delMode === it.u) + '">' + (delMode === it.u ? 'Cancel' : 'Remove a set') + '</button>' : '') + '</div>';
       h += '<input class="note-in" id="note-' + it.u + '" type="text" data-f="note" data-u="' + it.u + '" value="' + esc(it.note) + '" placeholder="Note (machine setting, swap used…)" aria-label="Note for ' + esc(e.name) + '"></section>';
     });
     h += '<button class="add-ex" type="button" data-act="add-ex">+ Add exercise</button>';
@@ -2449,7 +2453,7 @@ var LIBRARY = (function () {
     var d = state.draft, it = findItem(u); if (!it) return;
     var i = d.items.indexOf(it), e = exi(it.ex);
     openSheet(head(e.name) + '<div class="menu"><button type="button" data-act="open-ex" data-ex="' + esc(it.ex) + '" data-u="' + u + '">How to do it</button>' +
-      (e.log === 'wr' && !d.editing ? '<button type="button" data-act="help-open" data-u="' + u + '">' + (isBar(e) ? 'Warm-up and plates' : 'Warm-up sets') + '</button>' : '') +
+      (e.log === 'wr' && !d.editing ? '<button type="button" data-act="help-open" data-u="' + u + '">' + (isBar(e) ? 'Plates and warm-up weights' : 'Warm-up weights') + '</button>' : '') +
       '<button type="button" data-act="' + (d.editing ? 'ex-replace' : 'swap-open') + '" data-u="' + u + '">Swap for another exercise</button>' +
       '<button type="button" data-act="ex-up" data-u="' + u + '"' + (i ? '' : ' disabled') + '>Move up</button><button type="button" data-act="ex-down" data-u="' + u + '"' + (i < d.items.length - 1 ? '' : ' disabled') + '>Move down</button>' +
       '<button type="button" class="danger" data-act="ex-remove" data-u="' + u + '">Remove from this workout</button></div>');
@@ -2526,7 +2530,7 @@ var LIBRARY = (function () {
     chrome(); observe(); if (mini) drawMini();
   }
   function go(tab, push) {
-    planEdit = false; outEdit = false; if (wLive() && tab !== 'log') state.ui.wmin = true; state.ui.tab = tab; saveLocal(); render(); enter(); window.scrollTo(0, 0);
+    planEdit = false; outEdit = false; delMode = null; if (wLive() && tab !== 'log') state.ui.wmin = true; state.ui.tab = tab; saveLocal(); render(); enter(); window.scrollTo(0, 0);
     if (push) { try { if (location.hash !== '#' + tab) location.hash = tab; } catch (e) {} }
   }
   function fromHash() { var h = (location.hash || '').replace('#', ''); if (h === 'log' || h === 'progress' || h === 'exercises') { if (h !== state.ui.tab) go(h, false); return true; } return false; }
@@ -3261,7 +3265,13 @@ var LIBRARY = (function () {
         } else { s.d = false; s.pr = false; delete s.rir; if (!d.editing) { var rc2 = itemRecords(it, d); it.rec = { w: rc2.w, v: rc2.v, b: rc2.b }; } }
         touchDraft(); render(); break;
       case 'add-set': it = findItem(u); if (it) { var lr = it.rows[it.rows.length - 1]; it.rows.push({ w: lr ? lr.w : '', r: '', d: false }); touchDraft(); render(); } break;
-      case 'del-set': it = findItem(u); if (it && it.rows.length > 1) { it.rows.pop(); touchDraft(); render(); } break;
+      case 'del-set': delMode = delMode === u ? null : u; render(); break;
+      case 'del-row': it = findItem(u); if (it) {
+        if (a.dataset.w) { if (it.warm) { it.warm.splice(i, 1); if (!it.warm.length) delete it.warm; } }
+        else if (it.rows.length > 1) { it.rows.splice(i, 1); if (d.timer && d.timer.u === u) d.timer = null; }
+        delMode = null; touchDraft(); render(); } break;
+      case 'warm-one': it = findItem(u); if (it) { e = exi(it.ex); var ww = workingWeight(it), sg = ww > 0 ? warmups(ww, e, !warmedUp(it)) : [], wn = (it.warm || []).length, s1 = sg[wn];
+        (it.warm = it.warm || []).push({ w: s1 ? fmt(s1.w) : '', r: s1 ? String(s1.r) : '', d: false }); delMode = null; touchDraft(); render(); } break;
       case 'add-ex': openPicker('draft'); break;
       case 'ex-menu': menuSheet(u); break;
       case 'ex-replace': openPicker('replace', { u: u }); break;
