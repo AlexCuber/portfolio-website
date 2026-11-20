@@ -1836,7 +1836,7 @@ var LIBRARY = (function () {
   function chrome() {
     var d = state.draft, live = wLive() && !state.ui.wmin && state.ui.tab === 'log' && !editor, bar = document.getElementById('bar'), wbar = document.getElementById('wbar'), tab = state.ui.tab, now = new Date();
     bar.hidden = !!live; wbar.hidden = !live;
-    if (document.body.classList.contains('setup')) { document.getElementById('bar-title').textContent = 'Uphill'; document.getElementById('bar-date').textContent = 'Welcome'; return; }
+    if (document.body.classList.contains('setup')) { document.getElementById('bar-title').textContent = 'Hitit'; document.getElementById('bar-date').textContent = 'Welcome'; return; }
     document.getElementById('bar-title').textContent = tab === 'progress' ? 'Progress' : tab === 'exercises' ? (state.ui.lib3 === 'exercises' ? 'Exercises' : 'History') : DAYS_FULL[now.getDay()];
     document.getElementById('bar-date').textContent = tab === 'progress' ? plural(Object.keys(state.sessions).length, 'workout') + ' logged' : tab === 'exercises' ? (state.ui.lib3 === 'exercises' ? allEx().length + ' exercises' : plural(Object.keys(state.sessions).length, 'workout')) : now.getDate() + ' ' + MONTHS_FULL[now.getMonth()];
     if (!live) return;
@@ -2043,7 +2043,7 @@ var LIBRARY = (function () {
       if (chips) h += '<div class="recs">' + chips + '</div>';
       it.recNew = null;
       if (e.weightHint) h += '<span class="unit-hint">' + esc(e.weightHint) + '</span>';
-      if (e.log !== 'cardio') h += '<div class="row"><button class="btn quiet" type="button" data-act="add-set" data-u="' + it.u + '">+ Add set</button>' + (it.rows.length > 1 || (it.warm && it.warm.length) ? '<button class="btn quiet" type="button" data-act="del-set" data-u="' + it.u + '" aria-pressed="' + (delMode === it.u) + '">' + (delMode === it.u ? 'Cancel' : 'Remove a set') + '</button>' : '') + '</div>';
+      if (e.log !== 'cardio') h += '<div class="row"><button class="btn quiet" type="button" data-act="add-set" data-u="' + it.u + '">+ Add set</button>' + (it.rows.length > 1 || (it.warm && it.warm.length) ? '<button class="btn quiet" type="button" data-act="del-set" data-u="' + it.u + '" aria-pressed="' + (delMode === it.u) + '">' + (delMode === it.u ? 'Cancel' : 'Remove set') + '</button>' : '') + '</div>';
       h += '<input class="note-in" id="note-' + it.u + '" type="text" data-f="note" data-u="' + it.u + '" value="' + esc(it.note) + '" placeholder="Note (machine setting, swap used…)" aria-label="Note for ' + esc(e.name) + '"></section>';
     });
     h += '<button class="add-ex" type="button" data-act="add-ex">+ Add exercise</button>';
@@ -2494,7 +2494,7 @@ var LIBRARY = (function () {
     h += '<div class="setting stack"><div><b>Backup</b><small>' + (STANDALONE ? 'Everything is stored on this phone only. ' + (function () { var b = backupState(); return b.at ? 'Last backup ' + fmtDate(iso(new Date(b.at))) + (b.fresh ? ', ' + plural(b.fresh, 'workout') + ' since then.' : ', nothing new since then.') : 'No backup made yet.'; })() + ' To bring a backup back, use Restore from file.' : 'Your log syncs through Claude. A backup lets you move it elsewhere.') + '</small></div>' +
       '<div class="row">' + (STANDALONE ? '<button class="btn sm" type="button" data-act="backup-save">Save backup file</button>' : '') + '<button class="btn sm" type="button" data-act="backup-show">Show backup text</button><label class="btn sm">Restore from file<input id="backup-file" type="file" accept=".json,application/json,text/plain" hidden></label></div>' +
       '<div id="backup-box" hidden><textarea class="backup" id="backup-text" spellcheck="false" aria-label="Backup text"></textarea><div class="row"><button class="btn sm" type="button" data-act="backup-copy">Copy</button><button class="btn sm" type="button" data-act="backup-restore">Restore from this text</button></div></div></div>';
-    h += '<p class="foot">Uphill · ' + allEx().length + ' exercises · ' + Object.keys(state.sessions).length + ' workouts saved</p>';
+    h += '<p class="foot">Hitit · ' + allEx().length + ' exercises · ' + Object.keys(state.sessions).length + ' workouts saved</p>';
     openSheet(h);
   }
   function openSummary() {
@@ -2871,7 +2871,7 @@ var LIBRARY = (function () {
     h += '<section class="card"><div><h3>Days a week</h3><p class="sub">How often you plan to train. This becomes your weekly goal.</p></div><div class="seg" role="group" aria-label="Days a week">' + [2, 3, 4, 5, 6].map(function (n) { return '<button type="button" data-act="setup-days" data-v="' + n + '" aria-pressed="' + (su.days === n) + '">' + n + '</button>'; }).join('') + '</div></section>';
     h += '<section class="card"><div><h3>Starting plan</h3><p class="sub">Every session can be edited, reordered or replaced once you are in.</p></div><div class="tpls" role="radiogroup" aria-label="Starting plan">' + tplCards(su.tpl, su.days, 'setup-tpl') + '</div></section>';
     h += '<button class="btn primary block" type="button" data-act="setup-go">Start</button>';
-    h += '<p class="foot setup-foot">Used Uphill before? <label class="link">Restore from a backup file<input id="backup-file" type="file" accept=".json,application/json,text/plain" hidden></label></p>';
+    h += '<p class="foot setup-foot">Used Hitit before? <label class="link">Restore from a backup file<input id="backup-file" type="file" accept=".json,application/json,text/plain" hidden></label></p>';
     return h;
   }
   function loadingView() { return '<section class="card"><h3>Opening your log</h3><p class="sub">Checking for workouts saved from another device.</p></section>'; }
@@ -3155,8 +3155,8 @@ var LIBRARY = (function () {
   /* ================= backup ================= */
   function backupData() { return { app: 'workout-log', v: 2, exportedAt: new Date().toISOString(), sessions: state.sessions, body: state.body, routines: state.routines, custom: state.custom, settings: state.settings }; }
   function restore(text) {
-    var data; try { data = JSON.parse(text); } catch (e) { toast('That is not an Uphill backup. Nothing was changed.'); return; }
-    if (!data || !data.sessions || typeof data.sessions !== 'object') { toast('That is not an Uphill backup. Nothing was changed.'); return; }
+    var data; try { data = JSON.parse(text); } catch (e) { toast('That is not a Hitit backup. Nothing was changed.'); return; }
+    if (!data || !data.sessions || typeof data.sessions !== 'object') { toast('That is not a Hitit backup. Nothing was changed.'); return; }
     var n = 0, wasEmpty = emptyLog(), bu = data.settings && data.settings.unit === 'lb' ? 'lb' : 'kg';
     if (!wasEmpty && bu !== (isLb() ? 'lb' : 'kg')) { toast('That backup is in ' + (bu === 'lb' ? 'pounds' : 'kilograms') + ' and this log is not. Switch units in settings, then restore.'); return; }
     [['sessions', 'sessions', 'sessions/'], ['body', 'body', 'body/'], ['routines', 'routines', 'routines/'], ['custom', 'custom', 'exercises/']].forEach(function (c) {
@@ -3168,11 +3168,11 @@ var LIBRARY = (function () {
     toast('Backup restored. ' + plural(n, 'workout') + ' added.');
   }
   function saveBackupFile() {
-    var text = JSON.stringify(backupData()), name = 'uphill-backup-' + today() + '.json';
+    var text = JSON.stringify(backupData()), name = 'hitit-backup-' + today() + '.json';
     function done() { backupDone(); toast('Backup saved'); if (scrim.hidden) render(); else settingsSheet(); }
     try {
       var file = new File([text], name, { type: 'application/json' });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) { navigator.share({ files: [file], title: 'Uphill backup' }).then(done, function () {}); return; }
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { navigator.share({ files: [file], title: 'Hitit backup' }).then(done, function () {}); return; }
     } catch (e) {}
     try { var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); done(); } catch (e) { toast('Could not save a file here. Use the backup text instead.'); }
   }

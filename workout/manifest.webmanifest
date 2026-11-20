@@ -1,6 +1,6 @@
 {
-  "name": "Uphill",
-  "short_name": "Uphill",
+  "name": "Hitit",
+  "short_name": "Hitit",
   "description": "A gym logbook that works offline.",
   "start_url": "./",
   "scope": "./",
