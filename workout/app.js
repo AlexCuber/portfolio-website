@@ -670,7 +670,7 @@ var ILLO = (function () {
      moves and recolours the sun, or swaps it for the moon and stars. Everything is drawn; CSS picks what shows. */
   var STARS = [[-12, 14, 0.9], [4, 34, 0.7], [16, 9, 1.1], [31, 24, 0.7], [44, 12, 0.9], [63, 7, 0.7], [76, 18, 1], [88, 42, 0.7], [112, 11, 0.9], [118, 38, 0.8], [130, 22, 1.1], [136, 46, 0.7], [22, 46, 0.8], [124, 6, 0.7]];
   var NIGHT = '<g class="stars">' + STARS.map(function (p) { return '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="' + p[2] + '"/>'; }).join('') + '</g><path class="moon" d="M100 16.3A8 8 0 1 0 104.7 26.5A6.4 6.4 0 0 1 100 16.3Z"/>';
-  function sky(low) { return NIGHT + '<circle class="sun-h" cx="97" cy="24" r="15"/><circle class="sun" cx="97" cy="24" r="9"/><path class="hill" d="M-24 ' + (low - 3) + 'C-14 ' + (low + 5) + ' -7 ' + (low + 9) + ' 0 ' + (low + 4) + 'C18 ' + (low - 12) + ' 34 ' + (low - 10) + ' 52 ' + (low - 2) + 'C68 ' + (low - 16) + ' 92 ' + (low - 20) + ' 120 ' + (low - 4) + 'C130 ' + (low + 2) + ' 137 ' + (low + 5) + ' 144 ' + (low + 5) + 'V120H-24Z"/>'; }
+  function sky(low) { return NIGHT + '<g style="--sd:' + (low - 74) + 'px"><circle class="sun-h" cx="97" cy="24" r="15"/><circle class="sun" cx="97" cy="24" r="9"/></g>' + '<path class="hill" d="M-24 ' + (low - 3) + 'C-14 ' + (low + 5) + ' -7 ' + (low + 9) + ' 0 ' + (low + 4) + 'C18 ' + (low - 12) + ' 34 ' + (low - 10) + ' 52 ' + (low - 2) + 'C68 ' + (low - 16) + ' 92 ' + (low - 20) + ' 120 ' + (low - 4) + 'C130 ' + (low + 2) + ' 137 ' + (low + 5) + ' 144 ' + (low + 5) + 'V120H-24Z"/>'; }
   /* the road: a ground line and lane dashes that slide back as the figure moves forward */
   function road(t, k) {
     var s = '<line class="rd" x1="-24" y1="' + (G + 0.5) + '" x2="144" y2="' + (G + 0.5) + '"/>', off = (t * 24 * k) % 24;
@@ -1896,8 +1896,7 @@ var LIBRARY = (function () {
       h += '<ul class="list">';
       list.forEach(function (x, i) {
         var l = lastDone(x.id), s = rStats(x);
-        h += '<li><button class="item" type="button" data-act="start" data-key="' + esc(x.id) + '"><span class="avatar av' + (i % 5) + '" aria-hidden="true">' + esc(ini[x.id] || initials(x.name)) + '</span><span class="txt"><b>' + esc(x.name) + '</b><small>' + plural(s.n, 'exercise') + ' · ' + (l ? 'last done ' + fmtDate(l.date) : 'not logged yet') + '</small></span></button>' +
-          '<button class="icon-btn" type="button" data-act="ed-open" data-key="' + esc(x.id) + '" aria-label="Edit ' + esc(x.name) + '">' + IC.edit + '</button></li>';
+        h += '<li><button class="item" type="button" data-act="start" data-key="' + esc(x.id) + '"><span class="avatar av' + (i % 5) + '" aria-hidden="true">' + esc(ini[x.id] || initials(x.name)) + '</span><span class="txt"><b>' + esc(x.name) + '</b><small>' + plural(s.n, 'exercise') + ' · ' + (l ? 'last done ' + fmtDate(l.date) : 'not logged yet') + '</small></span></button></li>';
       });
       return h + '</ul></section>';
     }
@@ -1908,6 +1907,7 @@ var LIBRARY = (function () {
       list.forEach(function (x, i) {
         var k = esc(x.id), nm = esc(x.name);
         h += '<li class="plan-row"><span class="plan-n" aria-hidden="true">' + (i + 1) + '</span><span class="txt"><b>' + nm + '</b><small>' + plural(rStats(x).n, 'exercise') + (x.core === false ? ' · extra' : '') + '</small></span><span class="mini">' +
+          '<button class="icon-btn" type="button" data-act="ed-open" data-key="' + k + '" aria-label="Edit ' + nm + '">' + IC.edit + '</button>' +
           '<button class="icon-btn" type="button" data-act="plan-up" data-key="' + k + '" aria-label="Move ' + nm + ' up"' + (i ? '' : ' disabled') + '>' + IC.up + '</button>' +
           '<button class="icon-btn" type="button" data-act="plan-down" data-key="' + k + '" aria-label="Move ' + nm + ' down"' + (i < list.length - 1 ? '' : ' disabled') + '>' + IC.down + '</button>' +
           '<button class="icon-btn" type="button" data-act="plan-off" data-key="' + k + '" aria-label="Remove ' + nm + ' from the plan">' + IC.x + '</button></span></li>';
