@@ -1896,8 +1896,7 @@ var LIBRARY = (function () {
       h += '<ul class="list">';
       list.forEach(function (x, i) {
         var l = lastDone(x.id), s = rStats(x);
-        h += '<li><button class="item" type="button" data-act="start" data-key="' + esc(x.id) + '"><span class="avatar av' + (i % 5) + '" aria-hidden="true">' + esc(ini[x.id] || initials(x.name)) + '</span><span class="txt"><b>' + esc(x.name) + '</b><small>' + plural(s.n, 'exercise') + ' · ' + (l ? 'last done ' + fmtDate(l.date) : 'not logged yet') + '</small></span></button>' +
-          '<button class="icon-btn" type="button" data-act="ed-open" data-key="' + esc(x.id) + '" aria-label="Edit ' + esc(x.name) + '">' + IC.edit + '</button></li>';
+        h += '<li><button class="item" type="button" data-act="start" data-key="' + esc(x.id) + '"><span class="avatar av' + (i % 5) + '" aria-hidden="true">' + esc(ini[x.id] || initials(x.name)) + '</span><span class="txt"><b>' + esc(x.name) + '</b><small>' + plural(s.n, 'exercise') + ' · ' + (l ? 'last done ' + fmtDate(l.date) : 'not logged yet') + '</small></span></button></li>';
       });
       return h + '</ul></section>';
     }
@@ -1908,6 +1907,7 @@ var LIBRARY = (function () {
       list.forEach(function (x, i) {
         var k = esc(x.id), nm = esc(x.name);
         h += '<li class="plan-row"><span class="plan-n" aria-hidden="true">' + (i + 1) + '</span><span class="txt"><b>' + nm + '</b><small>' + plural(rStats(x).n, 'exercise') + (x.core === false ? ' · extra' : '') + '</small></span><span class="mini">' +
+          '<button class="icon-btn" type="button" data-act="ed-open" data-key="' + k + '" aria-label="Edit ' + nm + '">' + IC.edit + '</button>' +
           '<button class="icon-btn" type="button" data-act="plan-up" data-key="' + k + '" aria-label="Move ' + nm + ' up"' + (i ? '' : ' disabled') + '>' + IC.up + '</button>' +
           '<button class="icon-btn" type="button" data-act="plan-down" data-key="' + k + '" aria-label="Move ' + nm + ' down"' + (i < list.length - 1 ? '' : ' disabled') + '>' + IC.down + '</button>' +
           '<button class="icon-btn" type="button" data-act="plan-off" data-key="' + k + '" aria-label="Remove ' + nm + ' from the plan">' + IC.x + '</button></span></li>';
