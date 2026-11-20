@@ -666,7 +666,11 @@ var ILLO = (function () {
   'use strict';
   var EX = ILLO.EX, U = ILLO._, n1 = U.n1, G = U.G, TAU = Math.PI * 2, RAD = Math.PI / 180;
   function L(a, b, w, cls) { return '<line x1="' + n1(a[0]) + '" y1="' + n1(a[1]) + '" x2="' + n1(b[0]) + '" y2="' + n1(b[1]) + '" stroke-width="' + w + '" class="' + cls + '"/>'; }
-  function sky(low) { return '<circle class="sun" cx="97" cy="24" r="9"/><path class="hill" d="M-24 ' + (low - 3) + 'C-14 ' + (low + 5) + ' -7 ' + (low + 9) + ' 0 ' + (low + 4) + 'C18 ' + (low - 12) + ' 34 ' + (low - 10) + ' 52 ' + (low - 2) + 'C68 ' + (low - 16) + ' 92 ' + (low - 20) + ' 120 ' + (low - 4) + 'C130 ' + (low + 2) + ' 137 ' + (low + 5) + ' 144 ' + (low + 5) + 'V120H-24Z"/>'; }
+  /* The sky follows the clock: the app sets data-tod (morning, day, evening, night) on the page and the stylesheet
+     moves and recolours the sun, or swaps it for the moon and stars. Everything is drawn; CSS picks what shows. */
+  var STARS = [[-12, 14, 0.9], [4, 34, 0.7], [16, 9, 1.1], [31, 24, 0.7], [44, 12, 0.9], [63, 7, 0.7], [76, 18, 1], [88, 42, 0.7], [112, 11, 0.9], [118, 38, 0.8], [130, 22, 1.1], [136, 46, 0.7], [22, 46, 0.8], [124, 6, 0.7]];
+  var NIGHT = '<g class="stars">' + STARS.map(function (p) { return '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="' + p[2] + '"/>'; }).join('') + '</g><path class="moon" d="M100 16.3A8 8 0 1 0 104.7 26.5A6.4 6.4 0 0 1 100 16.3Z"/>';
+  function sky(low) { return NIGHT + '<circle class="sun-h" cx="97" cy="24" r="15"/><circle class="sun" cx="97" cy="24" r="9"/><path class="hill" d="M-24 ' + (low - 3) + 'C-14 ' + (low + 5) + ' -7 ' + (low + 9) + ' 0 ' + (low + 4) + 'C18 ' + (low - 12) + ' 34 ' + (low - 10) + ' 52 ' + (low - 2) + 'C68 ' + (low - 16) + ' 92 ' + (low - 20) + ' 120 ' + (low - 4) + 'C130 ' + (low + 2) + ' 137 ' + (low + 5) + ' 144 ' + (low + 5) + 'V120H-24Z"/>'; }
   /* the road: a ground line and lane dashes that slide back as the figure moves forward */
   function road(t, k) {
     var s = '<line class="rd" x1="-24" y1="' + (G + 0.5) + '" x2="144" y2="' + (G + 0.5) + '"/>', off = (t * 24 * k) % 24;
@@ -1024,7 +1028,11 @@ var LIBRARY = (function () {
   /* A workout in progress is either open (the Train tab is the workout and the tabs are hidden) or minimised (a bar above the tabs). */
   function wLive() { var d = state.draft; return !!d && !d.editing; }
   function wOpen() { var d = state.draft; return !!d && (d.editing || !state.ui.wmin); }
+  /* Time of day for the outdoor figures' sky. Only an attribute changes; the stylesheet does the rest. */
+  function todNow() { var h = new Date().getHours(); return h >= 5 && h < 10 ? 'morning' : h >= 10 && h < 17 ? 'day' : h >= 17 && h < 21 ? 'evening' : 'night'; }
+  function applyTod() { var r = document.documentElement, v = todNow(); if (r.getAttribute('data-tod') !== v) r.setAttribute('data-tod', v); }
   function applyTheme() {
+    applyTod();
     var t = state.settings.theme, root = document.documentElement;
     if (t === 'light' || t === 'dark') root.setAttribute('data-app-theme', t); else root.removeAttribute('data-app-theme');
     var p = state.settings.palette;
@@ -3449,6 +3457,7 @@ var LIBRARY = (function () {
   var lastPull = Date.now();
   document.addEventListener('visibilitychange', function () {
     if (!document.hidden && db && Date.now() - lastPull > 5 * 60000) { lastPull = Date.now(); pullRemote(); }
+    if (!document.hidden) applyTod();
     if (!document.hidden) { if (freshenDraft() && !isTyping()) render(); flushDirty(); tickClock(); drawRest(); }
     wake();
   });
@@ -3460,6 +3469,7 @@ var LIBRARY = (function () {
   if (h0 === 'log' || h0 === 'progress' || h0 === 'exercises') state.ui.tab = h0;
   else if (state.draft) state.ui.tab = 'log';
   applyTheme();
+  setInterval(applyTod, 60000);
   freshenDraft();
   render();
   enter();
