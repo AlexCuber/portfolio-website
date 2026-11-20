@@ -1416,11 +1416,19 @@ p { margin: 0; }
 .wbar-clock { appearance: none; border: 0; background: none; color: inherit; font-family: var(--font-display); font-weight: 800; font-size: 2.3rem; line-height: 1; font-variant-numeric: tabular-nums; padding: 2px 4px; min-width: 96px; text-align: right; letter-spacing: 0.02em; }
 .wbar-fin { appearance: none; border: 0; background: var(--lime); color: var(--lime-ink); font-family: var(--font-display); font-weight: 700; font-size: 1.1rem; text-transform: uppercase; letter-spacing: 0.04em; border-radius: 12px; padding: 0 14px; min-height: 40px; }
 .wbar-fin:disabled { opacity: 0.4; }
-.wbar-prog { grid-column: 1 / -1; display: flex; gap: 5px; padding: 8px 0 9px; margin-right: 4px; }
-.wbar-prog span { display: flex; gap: 2px; flex: 1 1 0; min-width: 0; }
-.wbar-prog i { flex: 1 1 0; height: 5px; border-radius: 3px; background: var(--line-strong); min-width: 2px; transition: background 0.25s; }
-.wbar-prog i.on { background: var(--mark); }
-.wbar-prog i.pr { background: var(--hot); }
+.wbar-prog { grid-column: 1 / -1; padding: 8px 0 9px; margin-right: 4px; --prog-a: var(--green); --prog-b: var(--lime); }
+.wp-track { display: block; height: 5px; border-radius: 999px; background: var(--line-strong); overflow: hidden; }
+/* green and lime drifting through the fill like a liquid: two colour periods in a double-width background, moved by one period */
+.wp-fill { display: block; position: relative; height: 100%; width: 0; min-width: 0; border-radius: 999px; overflow: hidden; transition: width 0.7s cubic-bezier(0.2, 0.9, 0.25, 1);
+  background: linear-gradient(90deg, var(--prog-a), var(--prog-b) 25%, var(--prog-a) 50%, var(--prog-b) 75%, var(--prog-a)) 0 0 / 200% 100%; animation: wp-flow 9s linear infinite; }
+.wp-fill::before, .wp-fill::after { content: ""; position: absolute; top: 0; bottom: 0; pointer-events: none; }
+.wp-fill::after { width: 70px; left: -70px; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.85), transparent); }
+.wp-fill.sweep::after, .wp-fill.rec::after { animation: wp-sweep 1.1s ease-out 0.15s 1; }
+.wp-fill::before { left: 0; right: 0; background: var(--hot); opacity: 0; }
+.wp-fill.rec::before { animation: wp-rec 1.6s ease-out 1; }
+@keyframes wp-flow { to { background-position: 100% 0; } }
+@keyframes wp-sweep { from { left: -70px; } to { left: 100%; } }
+@keyframes wp-rec { 0% { opacity: 0; } 15%, 55% { opacity: 1; } 100% { opacity: 0; } }
 
 main { flex: 1; padding: 8px 16px 28px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .tabs { position: sticky; bottom: 0; z-index: 20; padding: 10px 14px var(--tab-b); pointer-events: none; }
@@ -2170,3 +2178,5 @@ svg.out { background-image: linear-gradient(var(--sky-a, var(--out-sky)), var(--
 :root[data-tod="morning"][data-theme="dark"]:not([data-app-theme="light"]) svg.out, :root[data-tod="morning"][data-app-theme="dark"] svg.out { --sky-a:#221c50; --sky-b:#5c3150; --illo-bg:#3f2650; --sun:#f0a04a; --sun-x:-72px; --sun-y:20px; --halo:0.2; }
 :root[data-tod="evening"][data-theme="dark"]:not([data-app-theme="light"]) svg.out, :root[data-tod="evening"][data-app-theme="dark"] svg.out { --sky-a:#261a48; --sky-b:#81401f; --illo-bg:#532d34; --sun:#f58a36; --sun-x:8px; --sun-y:30px; --sun-k:0.6; --halo:0.22; }
 :root[data-tod="night"][data-theme="dark"]:not([data-app-theme="light"]) svg.out, :root[data-tod="night"][data-app-theme="dark"] svg.out { --sky-a:#0a081c; --sky-b:#1a1640; --illo-bg:#12102e; --hill-o:0.2; }
+/* Blossom's progress bar flows between two pinks; green into pink goes muddy halfway */
+:root[data-palette="blossom"] .wbar-prog { --prog-a: #f0508f; --prog-b: #ffb1d2; }

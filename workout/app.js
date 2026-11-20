@@ -1841,6 +1841,23 @@ var LIBRARY = (function () {
   /* ================= top bars ================= */
   var DAYS_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   var MONTHS_FULL = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  /* The workout's progress: one thin bar, sets done out of all sets. The fill is kept between draws so its width
+     can ease and its colours keep flowing. A light sweeps across when it grows, and it flashes orange once when
+     the set just ticked is a record. Nothing plays on the first draw of a workout or after a reload. */
+  var progSeen = null;
+  function replay(el, cls) { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); }
+  function drawProg(d, p) {
+    var box = document.getElementById('wbar-prog'), f = box.querySelector('.wp-fill'), prs = 0, key = d.id || d.startedAt || d.key || 'w';
+    d.items.forEach(function (it) { it.rows.forEach(function (r) { if (r.d && r.pr) prs++; }); });
+    if (!f) { box.innerHTML = '<b class="wp-track"><i class="wp-fill"></i></b>'; f = box.querySelector('.wp-fill'); progSeen = null; }
+    var pct = p.all ? Math.round(p.done / p.all * 1000) / 10 : 0, old = progSeen && progSeen.key === key ? progSeen : null;
+    if (!old) { f.classList.remove('sweep', 'rec'); f.style.transition = 'none'; f.style.width = pct + '%'; void f.offsetWidth; f.style.transition = ''; }
+    else {
+      f.style.width = pct + '%';
+      if (prs > old.prs) replay(f, 'rec'); else if (p.done > old.done) replay(f, 'sweep');
+    }
+    progSeen = { key: key, done: p.done, prs: prs };
+  }
   function chrome() {
     var d = state.draft, live = wLive() && !state.ui.wmin && state.ui.tab === 'log' && !editor, bar = document.getElementById('bar'), wbar = document.getElementById('wbar'), tab = state.ui.tab, now = new Date();
     bar.hidden = !!live; wbar.hidden = !live;
@@ -1848,11 +1865,10 @@ var LIBRARY = (function () {
     document.getElementById('bar-title').textContent = tab === 'progress' ? 'Progress' : tab === 'exercises' ? (state.ui.lib3 === 'exercises' ? 'Exercises' : 'History') : DAYS_FULL[now.getDay()];
     document.getElementById('bar-date').textContent = tab === 'progress' ? plural(Object.keys(state.sessions).length, 'workout') + ' logged' : tab === 'exercises' ? (state.ui.lib3 === 'exercises' ? allEx().length + ' exercises' : plural(Object.keys(state.sessions).length, 'workout')) : now.getDate() + ' ' + MONTHS_FULL[now.getMonth()];
     if (!live) return;
-    var p = draftProgress(), h = '';
-    d.items.forEach(function (it) { h += '<span>'; it.rows.forEach(function (r) { h += '<i class="' + (r.d ? (r.pr ? 'on pr' : 'on') : '') + '"></i>'; }); h += '</span>'; });
+    var p = draftProgress();
     document.getElementById('wbar-name').textContent = d.name || 'Workout';
     document.getElementById('wbar-sub').textContent = p.done + ' of ' + p.all + ' sets done';
-    document.getElementById('wbar-prog').innerHTML = h;
+    drawProg(d, p);
     var fin = document.getElementById('wbar-fin'); fin.disabled = !draftCount(); fin.textContent = armed === 'finish' ? 'Sure?' : 'Finish';
     tickClock();
   }
