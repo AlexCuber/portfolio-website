@@ -927,7 +927,7 @@ var LIBRARY = (function () {
 
   /* ================= state and storage ================= */
   var LS = 'workout-log-v1';
-  var PALETTES = [['', 'Default', '#008a9c, #2fb5a0 45%, #b6ff1a'], ['graphite', 'Graphite', '#1b1e19, #4b5140 50%, #b6ff1a'], ['violet', 'Violet', '#4a30c4, #9a7df5 55%, #b6ff1a'], ['lime', 'Lime', '#2f5204, #5f9612 50%, #b6ff1a'], ['blossom', 'Blossom', '#d6336c, #ff8ab8 50%, #b596ff']];
+  var PALETTES = [['', 'Default', '#008a9c, #2fb5a0 45%, #b6ff1a'], ['graphite', 'Graphite', '#111310, #5c6255 55%, #c5cabd'], ['violet', 'Violet', '#4a30c4, #8a72f8 55%, #5aa2ff'], ['lime', 'Lime', '#2f5204, #5f9612 50%, #b6ff1a'], ['blossom', 'Blossom', '#d6336c, #ff8ab8 50%, #b596ff']];
   var DEF_SET = { theme: 'auto', palette: '', sound: true, autoRest: true, awake: true, weeklyGoal: 4, goalWeight: null, goalRate: 0.25, unit: 'kg', rir: false, setupDone: false };
   var DEF_UI = { tab: 'log', ex: null, lib: 'all', prog: 'overview', measure: 'weight', musWin: 'week', lib3: 'history' };
   var state = { sessions: {}, body: {}, routines: {}, custom: {}, settings: Object.assign({}, DEF_SET), settingsAt: 0, draft: null, draftAt: 0, dirty: {}, ui: Object.assign({}, DEF_UI) };
