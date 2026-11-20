@@ -1504,25 +1504,30 @@ p { margin: 0; }
 .wbar-clock { appearance: none; border: 0; background: none; color: inherit; font-family: var(--font-display); font-weight: 800; font-size: 2.3rem; line-height: 1; font-variant-numeric: tabular-nums; padding: 2px 4px; min-width: 96px; text-align: right; letter-spacing: 0.02em; }
 .wbar-fin { appearance: none; border: 0; background: var(--lime); color: var(--lime-ink); font-family: var(--font-display); font-weight: 700; font-size: 1.1rem; text-transform: uppercase; letter-spacing: 0.04em; border-radius: 12px; padding: 0 14px; min-height: 40px; }
 .wbar-fin:disabled { opacity: 0.4; }
-.wbar-prog { grid-column: 1 / -1; padding: 8px 0 9px; margin-right: 4px; }
+.wbar-prog { grid-column: 1 / -1; padding: 8px 0 9px; margin-right: 4px; --pg-lo: 10%; --pg-hi: 26%; --pg-white: 0.28; --pg-b: color-mix(in srgb, var(--lime) 42%, var(--green)); }
+/* the default theme's lime is loud, so its bar rests on a softer lime with a faint glow; the other themes keep theirs */
+:root[data-palette] .wbar-prog { --pg-lo: 45%; --pg-hi: 75%; --pg-white: 0.6; --pg-b: var(--prog-b, var(--lime)); }
 .wp-track { display: block; height: 5px; border-radius: 999px; background: var(--line-strong); overflow: hidden; }
 /* A glowing liquid: soft blobs of the two colours (--prog-a, --prog-b, set per theme) and a pale one drift over each other
    at different speeds and in both directions, so the colours keep mixing instead of sliding one way. Each layer is a
    repeating tile and moves by a whole number of its own tiles in the loop, so the loop has no seam. */
 .wp-track { overflow: visible; }
 .wp-fill { display: block; position: relative; height: 100%; width: 0; min-width: 0; border-radius: 999px; overflow: hidden; transition: width 0.7s cubic-bezier(0.2, 0.9, 0.25, 1);
-  background-color: color-mix(in srgb, var(--prog-a, var(--green)) 62%, var(--prog-b, var(--lime)));
-  background-image: radial-gradient(closest-side, var(--prog-b, var(--lime)) 15%, transparent), radial-gradient(closest-side, var(--prog-a, var(--green)) 20%, transparent), radial-gradient(closest-side, rgba(255, 255, 255, 0.6), transparent), radial-gradient(closest-side, var(--prog-b, var(--lime)), transparent);
+  background-color: color-mix(in srgb, var(--prog-a, var(--green)) 62%, var(--pg-b));
+  background-image: radial-gradient(closest-side, var(--pg-b) 15%, transparent), radial-gradient(closest-side, var(--prog-a, var(--green)) 20%, transparent), radial-gradient(closest-side, rgba(255, 255, 255, var(--pg-white)), transparent), radial-gradient(closest-side, var(--pg-b), transparent);
   background-size: 150px 500%, 110px 500%, 64px 400%, 230px 600%; background-repeat: repeat-x; background-position: 0 50%, 40px 50%, 20px 50%, 90px 50%;
   animation: wp-flow 46s linear infinite, wp-glow 5s ease-in-out infinite; }
 .wp-fill[style*="width: 0%"] { animation-name: wp-flow; box-shadow: none; }
 .wp-fill::before, .wp-fill::after { content: ""; position: absolute; top: 0; bottom: 0; pointer-events: none; }
 .wp-fill::after { width: 70px; left: -70px; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.85), transparent); }
-.wp-fill.sweep::after, .wp-fill.rec::after { animation: wp-sweep 1.1s ease-out 0.15s 1; }
+.wp-fill.wp-sweep::after, .wp-fill.wp-rec::after { animation: wp-sweep 1.1s ease-out 0.15s 1; }
 .wp-fill::before { left: 0; right: 0; background: var(--hot); opacity: 0; }
-.wp-fill.rec::before { animation: wp-rec 1.6s ease-out 1; }
+.wp-fill.wp-rec::before { animation: wp-rec 1.6s ease-out 1; }
 @keyframes wp-flow { to { background-position: 300px 50%, -290px 50%, 212px 50%, -140px 50%; } }
-@keyframes wp-glow { 0%, 100% { box-shadow: 0 0 5px 0 color-mix(in srgb, var(--prog-b, var(--lime)) 45%, transparent); } 50% { box-shadow: 0 0 10px 1px color-mix(in srgb, var(--prog-b, var(--lime)) 75%, transparent); } }
+@keyframes wp-glow { 0%, 100% { box-shadow: 0 0 5px 0 color-mix(in srgb, var(--pg-b) var(--pg-lo), transparent); } 50% { box-shadow: 0 0 10px 1px color-mix(in srgb, var(--pg-b) var(--pg-hi), transparent); } }
+/* when the bar grows it lights up for a moment in the theme's full colour, then settles */
+.wp-fill.wp-sweep, .wp-fill.wp-rec { animation: wp-flow 46s linear infinite, wp-glow 5s ease-in-out infinite, wp-burst 1.6s ease-out 1; }
+@keyframes wp-burst { 0% { filter: none; } 18% { filter: brightness(1.3) saturate(1.25) drop-shadow(0 0 7px var(--prog-b, var(--lime))); } 100% { filter: none; } }
 @keyframes wp-sweep { from { left: -70px; } to { left: 100%; } }
 @keyframes wp-rec { 0% { opacity: 0; } 15%, 55% { opacity: 1; } 100% { opacity: 0; } }
 

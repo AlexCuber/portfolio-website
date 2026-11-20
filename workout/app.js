@@ -1851,10 +1851,10 @@ var LIBRARY = (function () {
     d.items.forEach(function (it) { it.rows.forEach(function (r) { if (r.d && r.pr) prs++; }); });
     if (!f) { box.innerHTML = '<b class="wp-track"><i class="wp-fill"></i></b>'; f = box.querySelector('.wp-fill'); progSeen = null; }
     var pct = p.all ? Math.round(p.done / p.all * 1000) / 10 : 0, old = progSeen && progSeen.key === key ? progSeen : null;
-    if (!old) { f.classList.remove('sweep', 'rec'); f.style.transition = 'none'; f.style.width = pct + '%'; void f.offsetWidth; f.style.transition = ''; }
+    if (!old) { f.classList.remove('wp-sweep', 'wp-rec'); f.style.transition = 'none'; f.style.width = pct + '%'; void f.offsetWidth; f.style.transition = ''; }
     else {
       f.style.width = pct + '%';
-      if (prs > old.prs) replay(f, 'rec'); else if (p.done > old.done) replay(f, 'sweep');
+      if (prs > old.prs) replay(f, 'wp-rec'); else if (p.done > old.done) replay(f, 'wp-sweep');
     }
     progSeen = { key: key, done: p.done, prs: prs };
   }
