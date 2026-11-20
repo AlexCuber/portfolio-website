@@ -2148,10 +2148,10 @@ body.has-mini .rest { display: none; }
 
 /* ---------- the outdoor sky follows the clock ---------- */
 /* data-tod on the page is morning (5 to 10), day (10 to 17), evening (17 to 21) or night. Day is the plain sky above.
-   Morning has a low sun on the left over a peach horizon, evening a low red sun on the right, night a moon and stars.
+   Morning has a low sun on the left over a peach horizon, evening an orange sky with the sun setting low on the right (--sd, set per figure, lowers it further where the horizon is lower), night a moon and stars.
    At night in light mode the figure takes the dark-mode body colours so it reads on the dark sky. */
 svg.out { background-image: linear-gradient(var(--sky-a, var(--out-sky)), var(--sky-b, var(--out-sky))); }
-.sun, .sun-h { transform: translate(var(--sun-x, 0px), var(--sun-y, 0px)); }
+.sun, .sun-h { transform: translate(var(--sun-x, 0px), calc(var(--sun-y, 0px) + var(--sd, 0px) * var(--sun-k, 0))); }
 .sun-h { fill: var(--sun); opacity: var(--halo, 0); }
 .hill { opacity: var(--hill-o, 0.13); }
 .moon, .stars { display: none; }
@@ -2160,13 +2160,13 @@ svg.out { background-image: linear-gradient(var(--sky-a, var(--out-sky)), var(--
 :root[data-tod="night"] svg.out .moon, :root[data-tod="night"] svg.out .stars { display: inline; }
 :root[data-tod="night"] svg.out .sun, :root[data-tod="night"] svg.out .sun-h { display: none; }
 :root[data-tod="morning"] svg.out { --sky-a:#dcdcff; --sky-b:#ffd9c6; --illo-bg:#eedbe4; --sun:#ffad3d; --sun-x:-72px; --sun-y:20px; --halo:0.28; }
-:root[data-tod="evening"] svg.out { --sky-a:#cdc2ff; --sky-b:#ffb596; --illo-bg:#e6bccb; --sun:#ff7340; --sun-x:8px; --sun-y:20px; --halo:0.3; }
+:root[data-tod="evening"] svg.out { --sky-a:#e6c8ea; --sky-b:#ffa86e; --illo-bg:#f3b8a8; --sun:#ff8526; --sun-x:8px; --sun-y:30px; --sun-k:0.6; --halo:0.3; }
 :root[data-tod="night"] svg.out { --sky-a:#120e30; --sky-b:#2c2366; --illo-bg:#1f1a4b; --out:#8f78f5; --out-ink:#b9a9ff; --fig:#e8f1f1; --fig-far:#68807f; --equip:#4a6063; --pad:#32484b; --weight:#a7babc; --hill-o:0.22; }
 @media (prefers-color-scheme: dark) {
   :root[data-tod="morning"]:not([data-theme="light"]):not([data-app-theme="light"]) svg.out { --sky-a:#221c50; --sky-b:#5c3150; --illo-bg:#3f2650; --sun:#f0a04a; --sun-x:-72px; --sun-y:20px; --halo:0.2; }
-  :root[data-tod="evening"]:not([data-theme="light"]):not([data-app-theme="light"]) svg.out { --sky-a:#211a4c; --sky-b:#6b2e3c; --illo-bg:#462444; --sun:#ef6a3c; --sun-x:8px; --sun-y:20px; --halo:0.22; }
+  :root[data-tod="evening"]:not([data-theme="light"]):not([data-app-theme="light"]) svg.out { --sky-a:#261a48; --sky-b:#81401f; --illo-bg:#532d34; --sun:#f58a36; --sun-x:8px; --sun-y:30px; --sun-k:0.6; --halo:0.22; }
   :root[data-tod="night"]:not([data-theme="light"]):not([data-app-theme="light"]) svg.out { --sky-a:#0a081c; --sky-b:#1a1640; --illo-bg:#12102e; --hill-o:0.2; }
 }
 :root[data-tod="morning"][data-theme="dark"]:not([data-app-theme="light"]) svg.out, :root[data-tod="morning"][data-app-theme="dark"] svg.out { --sky-a:#221c50; --sky-b:#5c3150; --illo-bg:#3f2650; --sun:#f0a04a; --sun-x:-72px; --sun-y:20px; --halo:0.2; }
-:root[data-tod="evening"][data-theme="dark"]:not([data-app-theme="light"]) svg.out, :root[data-tod="evening"][data-app-theme="dark"] svg.out { --sky-a:#211a4c; --sky-b:#6b2e3c; --illo-bg:#462444; --sun:#ef6a3c; --sun-x:8px; --sun-y:20px; --halo:0.22; }
+:root[data-tod="evening"][data-theme="dark"]:not([data-app-theme="light"]) svg.out, :root[data-tod="evening"][data-app-theme="dark"] svg.out { --sky-a:#261a48; --sky-b:#81401f; --illo-bg:#532d34; --sun:#f58a36; --sun-x:8px; --sun-y:30px; --sun-k:0.6; --halo:0.22; }
 :root[data-tod="night"][data-theme="dark"]:not([data-app-theme="light"]) svg.out, :root[data-tod="night"][data-app-theme="dark"] svg.out { --sky-a:#0a081c; --sky-b:#1a1640; --illo-bg:#12102e; --hill-o:0.2; }
