@@ -2279,3 +2279,31 @@ svg.out { background-image: linear-gradient(var(--sky-a, var(--out-sky)), var(--
 :root[data-tod="morning"][data-theme="dark"]:not([data-app-theme="light"]) svg.out, :root[data-tod="morning"][data-app-theme="dark"] svg.out { --sky-a:#221c50; --sky-b:#5c3150; --illo-bg:#3f2650; --sun:#f0a04a; --sun-x:-72px; --sun-y:20px; --halo:0.2; }
 :root[data-tod="evening"][data-theme="dark"]:not([data-app-theme="light"]) svg.out, :root[data-tod="evening"][data-app-theme="dark"] svg.out { --sky-a:#261a48; --sky-b:#81401f; --illo-bg:#532d34; --sun:#f58a36; --sun-x:8px; --sun-y:30px; --sun-k:0.6; --halo:0.22; }
 :root[data-tod="night"][data-theme="dark"]:not([data-app-theme="light"]) svg.out, :root[data-tod="night"][data-app-theme="dark"] svg.out { --sky-a:#0a081c; --sky-b:#1a1640; --illo-bg:#12102e; --hill-o:0.2; }
+
+/* ---------- Lifts: stepping through exercises, and one muscle group on one graph ---------- */
+/* four line colours, checked for colour-blind separation on the light and dark surfaces; the same in every theme */
+:root { --cat-1: #5a32c8; --cat-2: #2b9ac4; --cat-3: #c77a12; --cat-4: #a82a6e; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]):not([data-app-theme="light"]) { --cat-1: #7a5ce6; --cat-2: #38a2be; --cat-3: #b8862a; --cat-4: #c44a8a; } }
+:root[data-theme="dark"]:not([data-app-theme="light"]), :root[data-app-theme="dark"] { --cat-1: #7a5ce6; --cat-2: #38a2be; --cat-3: #b8862a; --cat-4: #c44a8a; }
+.lift-nav { display: flex; align-items: center; gap: 8px; }
+.lift-nav .icon-btn { flex: none; width: 44px; height: 44px; background: var(--surface-2); }
+.lift-nav .icon-btn svg { width: 20px; height: 20px; }
+.lift-name { flex: 1; min-width: 0; flex-direction: column; gap: 0; padding: 6px 12px; min-height: 48px; line-height: 1.2; }
+.lift-name span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lift-name small { font-size: 0.75rem; font-weight: 500; color: var(--muted); }
+.chart[data-chart="exc"] { touch-action: pan-y; }
+.chart.from-r svg { animation: lift-in-r 0.28s ease-out; }
+.chart.from-l svg { animation: lift-in-l 0.28s ease-out; }
+@keyframes lift-in-r { from { transform: translateX(28px); opacity: 0; } }
+@keyframes lift-in-l { from { transform: translateX(-28px); opacity: 0; } }
+.lchips { display: flex; flex-wrap: wrap; gap: 6px; }
+.lchip { appearance: none; display: inline-flex; align-items: center; gap: 7px; max-width: 100%; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 6px 12px 6px 10px; min-height: 36px; font-size: 0.86rem; font-weight: 500; }
+.lchip i { flex: none; width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--muted); }
+.lchip[aria-pressed="true"] i { border: 0; }
+.lchip span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lchip b { flex: none; font-weight: 700; font-variant-numeric: tabular-nums; }
+.lchip[aria-pressed="false"] { color: var(--muted); border-style: dashed; }
+.mdot { stroke: var(--surface); stroke-width: 2; }
+.grid.zero { stroke: var(--line-strong); }
+.tip .trow { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.tip .trow i { flex: none; width: 8px; height: 8px; border-radius: 50%; }
