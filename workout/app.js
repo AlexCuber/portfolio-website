@@ -2356,18 +2356,17 @@ var LIBRARY = (function () {
     });
     var h = '<div class="chips" role="group" aria-label="Muscle group">' + groups.map(function (x) { return '<button class="chip" type="button" data-act="lift-grp" data-v="' + esc(x) + '" aria-pressed="' + (x === g) + '">' + esc(x) + '</button>'; }).join('') + '</div>';
     h += '<div class="lchips" role="group" aria-label="Exercises on the graph">' + rs.map(function (r) {
-      var on = show[r.id] != null, se = sers.filter(function (x) { return x.id === r.id; })[0], last = se && se.pts.length ? se.pts[se.pts.length - 1] : null;
-      return '<button class="lchip" type="button" data-act="lift-line" data-g="' + esc(g) + '" data-ex="' + esc(r.id) + '" aria-pressed="' + on + '"><i' + (on ? ' style="background:var(--cat-' + (show[r.id] + 1) + ')"' : '') + '></i><span>' + esc(r.name) + '</span>' +
-        (last ? '<b>' + (pct ? (last.y > 0 ? '+' : last.y < 0 ? '−' : '') + fmt(Math.abs(Math.round(last.y))) + '%' : fmt(Math.round(last.y * 10) / 10) + ' ' + metricUnit(r.e)) + '</b>' : '') + '</button>';
+      var on = show[r.id] != null;
+      return '<button class="lchip" type="button" data-act="lift-line" data-g="' + esc(g) + '" data-ex="' + esc(r.id) + '" aria-pressed="' + on + '"><i' + (on ? ' style="background:var(--cat-' + (show[r.id] + 1) + ')"' : '') + '></i><span>' + esc(r.name) + '</span></button>';
     }).join('') + '</div>';
     if (liftInfo) h += '<p class="note">One line per exercise, up to ' + LIFT_MAX + ' at a time. Tap a name to hide or show its line.' + (pct ? ' The change is measured from each exercise\'s first logged workout, so light and heavy lifts can be compared.' : '') + (mixed ? ' These exercises are measured in different units, so only the change can be shown.' : '') + ' Tap the graph to see a day.</p>';
     h += sers.length ? '<div class="chart" data-chart="mus">' + multiChart('mus', sers, { pct: pct, unit: unit }) + '</div>' : '<p class="sub" style="padding:36px 0;text-align:center">Tap a name to show its line.</p>';
-    if (anyWr) h += modeSeg();
-    if (!mixed) h += '<button class="toggle" type="button" data-act="lift-pct" aria-pressed="' + pct + '"><i>' + IC.check + '</i>Show as change since the start, %</button>';
+    h += '<div class="opt-row">' + (anyWr ? modePills() : '') +
+      (mixed ? '<span class="opt-note">Change since the start, %</span>' : '<div class="mseg" role="group" aria-label="Scale"><button class="opt" type="button" data-act="lift-pct" data-v="0" aria-pressed="' + !pct + '" aria-label="Show the ' + (rs[0].e.log === 'wr' ? 'weight' : 'value') + ' in ' + esc(metricUnit(rs[0].e)) + '">' + esc(metricUnit(rs[0].e)) + '</button><button class="opt" type="button" data-act="lift-pct" data-v="1" aria-pressed="' + pct + '" aria-label="Show the change since the start in percent">%</button></div>') + '</div>';
     return h;
   }
   function multiChart(id, sers, opt) {
-    var W = chartW(), H = 200, m = { l: 38, r: 14, t: 14, b: 24 }, all = [], ts = [], dates = {};
+    var W = chartW(), H = 200, m = { l: 38, r: 46, t: 14, b: 24 }, all = [], ts = [], dates = {}, ends = [];
     sers.forEach(function (se) { se.pts.forEach(function (p) { all.push(p.y); p.t = toDate(p.x).getTime(); ts.push(p.t); dates[p.x] = 1; }); });
     if (opt.pct) all.push(0);
     var x0 = Math.min.apply(null, ts), x1 = Math.max.apply(null, ts), ticks = niceTicks(Math.min.apply(null, all), Math.max.apply(null, all), 3), y0 = ticks[0], y1 = ticks[ticks.length - 1];
@@ -2381,7 +2380,14 @@ var LIBRARY = (function () {
       var P = se.pts.map(function (p) { return [X(p.t), Y(p.y)]; }), c = 'var(--cat-' + (se.slot + 1) + ')', e = P[P.length - 1];
       if (P.length > 1) s += '<path class="ln draw" pathLength="1" style="stroke:' + c + '" d="' + smoothPath(P) + '"/>';
       s += '<circle class="mdot" r="4.5" style="fill:' + c + '" cx="' + e[0].toFixed(1) + '" cy="' + e[1].toFixed(1) + '"/>';
+      var lp = se.pts[se.pts.length - 1]; ends.push({ x: e[0], y: e[1], t: opt.pct ? (lp.y > 0 ? '+' : lp.y < 0 ? '−' : '') + fmt(Math.abs(Math.round(lp.y))) + '%' : fmt(Math.round(lp.y * 10) / 10) });
     });
+    /* one number at the end of each line, no unit; numbers that would sit on top of each other are spread apart */
+    ends.sort(function (a, b) { return a.y - b.y; });
+    var gap = 14, i;
+    for (i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < gap) ends[i].y = ends[i - 1].y + gap;
+    if (ends.length && ends[ends.length - 1].y > H - m.b) { ends[ends.length - 1].y = H - m.b; for (i = ends.length - 2; i >= 0; i--) if (ends[i + 1].y - ends[i].y < gap) ends[i].y = ends[i + 1].y - gap; }
+    ends.forEach(function (q) { s += '<text class="val" x="' + (q.x + 9).toFixed(1) + '" y="' + (q.y + 4).toFixed(1) + '">' + q.t + '</text>'; });
     var ds = Object.keys(dates).sort();
     s += '<text x="' + X(x0) + '" y="' + (H - 6) + '" text-anchor="' + (x1 === x0 ? 'middle' : 'start') + '">' + fmtDate(ds[0], true) + '</text>';
     if (x1 !== x0) s += '<text x="' + X(x1) + '" y="' + (H - 6) + '" text-anchor="end">' + fmtDate(ds[ds.length - 1], true) + '</text>';
@@ -2391,6 +2397,11 @@ var LIBRARY = (function () {
       return { x: X(toDate(d).getTime()), html: '<b>' + fmtDate(d) + '</b>' + rows.join('') };
     }) };
     return s;
+  }
+  /* the small options under the Exercise progress graph: the same place in both views, metric on the left */
+  function modePills() {
+    var mode = state.ui.liftMode === 'e1rm' ? 'e1rm' : 'max';
+    return '<div class="mseg" role="group" aria-label="What to show for weighted lifts"><button class="opt" type="button" data-act="lift-mode" data-v="max" aria-pressed="' + (mode === 'max') + '">Top weight</button><button class="opt" type="button" data-act="lift-mode" data-v="e1rm" aria-pressed="' + (mode === 'e1rm') + '">Est. 1-rep max</button></div>';
   }
   function liftsView(list) {
     var h = '', mode = state.ui.liftMode === 'e1rm' ? 'e1rm' : 'max', recs = records(list, mode);
@@ -2413,11 +2424,10 @@ var LIBRARY = (function () {
       '<button class="btn lift-name" type="button" data-act="pick-lift" aria-label="' + esc(e.name) + ', choose another exercise"><span>' + esc(e.name) + '</span>' + (order.length > 1 ? '<small>' + (at + 1) + ' of ' + order.length + '</small>' : '') + '</button>' +
       (order.length > 1 ? '<button class="icon-btn" type="button" data-act="lift" data-ex="' + esc(order[(at + 1) % order.length]) + '" data-step="1" aria-label="Next exercise">' + IC.right + '</button>' : '') + '</div>';
     h += '' +
-      (wr ? modeSeg() : '') +
       (liftInfo ? '<p class="note">' + (wr ? (mode === 'max' ? 'Top weight is the heaviest weight you used in each workout, in ' + UW() + '.' : 'Estimated 1-rep max (' + UW() + '), from the best set of each workout: weight × (1 + reps ÷ 30). It lets sets with different weights and reps be compared.') : esc(metricLabel(e)) + ' in each workout.') + ' Tap a point to see the sets.' + (onGraph ? ' Grey dots are the sets below the top one.' : '') + '</p>' : '') +
       '<div class="chart" data-chart="exc">' + lineChart('exc', hist.map(function (x) { return { x: x.date, y: liftVal(e, x.sets, mode), tip: '<b>' + fmtDate(x.date) + '</b><br>' + esc(setsText(e, onGraph ? [bestSet(e, x.sets, mode)] : x.sets)) }; }), null, { up: true, extra: extra }) + '</div>';
     if (rec) h += '<div class="pills"><span class="pill hot">Best set: ' + esc(setsText(e, [bestSet(e, rec.sets, mode)])) + ' · ' + fmtDate(rec.date, true) + '</span>' + (rec.n > 1 && rec.first > 0 && rec.last !== rec.first ? '<span class="pill' + (rec.last >= rec.first ? ' good' : '') + '">' + (rec.last >= rec.first ? '+' : '') + Math.round((rec.last - rec.first) / rec.first * 100) + '% since you started</span>' : '') + '</div>';
-    h += '<button class="toggle" type="button" data-act="lift-sets" data-v="' + (onGraph ? 'off' : 'graph') + '" aria-pressed="' + onGraph + '"><i>' + IC.check + '</i>All sets</button>';
+    h += '<div class="opt-row">' + (wr ? modePills() : '') + '<button class="opt solo" type="button" data-act="lift-sets" data-v="' + (onGraph ? 'off' : 'graph') + '" aria-pressed="' + onGraph + '">All sets</button></div>';
     h += '</section>';
     }
     var gains = recs.filter(function (r) { return r.n >= 2 && r.first > 0 && r.last > r.first; }).map(function (r) { return { r: r, pct: (r.last - r.first) / r.first }; }).sort(function (a, b) { return b.pct - a.pct; }).slice(0, 5);
@@ -3466,7 +3476,7 @@ var LIBRARY = (function () {
       case 'lift-sets': state.ui.liftSets = a.dataset.v; saveLocal(); render(); enter(); break;
       case 'lift-view': state.ui.liftView = a.dataset.v; saveLocal(); render(); enter(); break;
       case 'lift-grp': state.ui.liftGrp = a.dataset.v; saveLocal(); render(); enter(); break;
-      case 'lift-pct': state.ui.liftPct = !state.ui.liftPct; saveLocal(); render(); enter(); break;
+      case 'lift-pct': state.ui.liftPct = a.dataset.v === '1'; saveLocal(); render(); enter(); break;
       case 'lift-line': liftLine(a.dataset.g, a.dataset.ex); break;
       case 'lift-info': liftInfo = !liftInfo; render(); break;
       case 'ms-open': msSheet(+a.dataset.i); break;

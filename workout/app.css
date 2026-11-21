@@ -2296,13 +2296,21 @@ svg.out { background-image: linear-gradient(var(--sky-a, var(--out-sky)), var(--
 .chart.from-l svg { animation: lift-in-l 0.28s ease-out; }
 @keyframes lift-in-r { from { transform: translateX(28px); opacity: 0; } }
 @keyframes lift-in-l { from { transform: translateX(-28px); opacity: 0; } }
-.lchips { display: flex; flex-wrap: wrap; gap: 6px; }
-.lchip { appearance: none; display: inline-flex; align-items: center; gap: 7px; max-width: 100%; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 6px 12px 6px 10px; min-height: 36px; font-size: 0.86rem; font-weight: 500; }
+.lchips { display: flex; flex-wrap: wrap; gap: 0 16px; }
+.lchip { appearance: none; display: inline-flex; align-items: center; gap: 7px; max-width: 100%; border: 0; background: none; color: var(--ink-2); padding: 6px 0; min-height: 32px; font-size: 0.84rem; font-weight: 500; }
 .lchip i { flex: none; width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--muted); }
 .lchip[aria-pressed="true"] i { border: 0; }
 .lchip span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lchip b { flex: none; font-weight: 700; font-variant-numeric: tabular-nums; }
-.lchip[aria-pressed="false"] { color: var(--muted); border-style: dashed; }
+.lchip[aria-pressed="false"] { color: var(--muted); }
+/* small options under the graph: joined pairs for either-or choices, a single pill for a switch */
+.opt-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.mseg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 999px; padding: 2px; }
+.opt { appearance: none; border: 0; background: none; color: var(--ink-2); border-radius: 999px; padding: 4px 11px; min-height: 30px; font-size: 0.8rem; font-weight: 600; white-space: nowrap; }
+.opt[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.opt.solo { border: 1px solid var(--line-strong); min-height: 36px; padding: 4px 13px; }
+.opt.solo[aria-pressed="true"] { border-color: var(--ink); }
+.opt-row .mseg + .mseg, .opt-row .mseg + .opt.solo { margin-left: auto; }
+.opt-note { font-size: 0.8rem; color: var(--muted); margin-left: auto; }
 .mdot { stroke: var(--surface); stroke-width: 2; }
 .grid.zero { stroke: var(--line-strong); }
 .tip .trow { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
