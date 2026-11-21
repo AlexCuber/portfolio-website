@@ -2325,6 +2325,73 @@ var LIBRARY = (function () {
     var mode = state.ui.liftMode === 'e1rm' ? 'e1rm' : 'max';
     return '<div class="seg" role="group" aria-label="What to show for weighted lifts"><button type="button" data-act="lift-mode" data-v="max" aria-pressed="' + (mode === 'max') + '">Top weight</button><button type="button" data-act="lift-mode" data-v="e1rm" aria-pressed="' + (mode === 'e1rm') + '">Est. 1-rep max</button></div>';
   }
+  /* The order the arrows and a sideways swipe step through: exercises in plan order, then any others by name.
+     Only exercises that have something logged, and none of the endurance ones. */
+  function liftOrder(list, recs) {
+    var ok = {}, seen = {}, out = [], rest = [];
+    recs.forEach(function (r) { ok[r.id] = r; });
+    routineList().forEach(function (r) { r.items.forEach(function (it) { if (ok[it.ex] && !seen[it.ex]) { seen[it.ex] = 1; out.push(it.ex); } }); });
+    recs.forEach(function (r) { if (!seen[r.id]) rest.push(r); });
+    rest.sort(function (a, b) { return a.name < b.name ? -1 : 1; });
+    return out.concat(rest.map(function (r) { return r.id; }));
+  }
+  /* By muscle: every exercise of one group as a line on the same graph, four at most. Each exercise keeps the colour
+     it was given while it stays on the graph. Exercises measured in different units can only be compared as a change. */
+  var liftShow = {}, LIFT_MAX = 4;
+  function muscleLifts(list, recs, mode, cur) {
+    var groups = [], by = {}, order = liftOrder(list, recs), rk = {};
+    recs.forEach(function (r) { rk[r.id] = r; });
+    order.forEach(function (id) { var r = rk[id], g = r.e.group || 'Other'; if (r.e.log === 'cardio') return; if (!by[g]) { by[g] = []; groups.push(g); } by[g].push(r); });
+    if (!groups.length) return '<p class="sub">Log a strength exercise and it appears here.</p>';
+    var g = by[state.ui.liftGrp] ? state.ui.liftGrp : (by[cur.group] ? cur.group : groups[0]), rs = by[g], show = liftShow[g];
+    if (!show) { show = liftShow[g] = {}; rs.slice().sort(function (a, b) { return a.lastDate < b.lastDate ? 1 : -1; }).slice(0, LIFT_MAX).sort(function (a, b) { return rs.indexOf(a) - rs.indexOf(b); }).forEach(function (r, i) { show[r.id] = i; }); }
+    Object.keys(show).forEach(function (id) { if (!rk[id]) delete show[id]; });
+    var units = {}; rs.forEach(function (r) { units[metricUnit(r.e)] = 1; });
+    var mixed = Object.keys(units).length > 1, pct = mixed || !!state.ui.liftPct, anyWr = rs.some(function (r) { return r.e.log === 'wr'; }), unit = pct ? '%' : metricUnit(rs[0].e);
+    var sers = [];
+    rs.forEach(function (r) {
+      if (show[r.id] == null) return;
+      var first = null, pts = historyOf(r.id, list).map(function (x) { var v = liftVal(r.e, x.sets, mode); if (first == null && v > 0) first = v; return { x: x.date, raw: v, y: pct ? (first ? Math.round((v / first - 1) * 1000) / 10 : 0) : v }; });
+      sers.push({ id: r.id, name: r.name, slot: show[r.id], e: r.e, pts: pts });
+    });
+    var h = '<div class="chips" role="group" aria-label="Muscle group">' + groups.map(function (x) { return '<button class="chip" type="button" data-act="lift-grp" data-v="' + esc(x) + '" aria-pressed="' + (x === g) + '">' + esc(x) + '</button>'; }).join('') + '</div>';
+    h += '<div class="lchips" role="group" aria-label="Exercises on the graph">' + rs.map(function (r) {
+      var on = show[r.id] != null, se = sers.filter(function (x) { return x.id === r.id; })[0], last = se && se.pts.length ? se.pts[se.pts.length - 1] : null;
+      return '<button class="lchip" type="button" data-act="lift-line" data-g="' + esc(g) + '" data-ex="' + esc(r.id) + '" aria-pressed="' + on + '"><i' + (on ? ' style="background:var(--cat-' + (show[r.id] + 1) + ')"' : '') + '></i><span>' + esc(r.name) + '</span>' +
+        (last ? '<b>' + (pct ? (last.y > 0 ? '+' : last.y < 0 ? '−' : '') + fmt(Math.abs(Math.round(last.y))) + '%' : fmt(Math.round(last.y * 10) / 10) + ' ' + metricUnit(r.e)) + '</b>' : '') + '</button>';
+    }).join('') + '</div>';
+    if (liftInfo) h += '<p class="note">One line per exercise, up to ' + LIFT_MAX + ' at a time. Tap a name to hide or show its line.' + (pct ? ' The change is measured from each exercise\'s first logged workout, so light and heavy lifts can be compared.' : '') + (mixed ? ' These exercises are measured in different units, so only the change can be shown.' : '') + ' Tap the graph to see a day.</p>';
+    h += sers.length ? '<div class="chart" data-chart="mus">' + multiChart('mus', sers, { pct: pct, unit: unit }) + '</div>' : '<p class="sub" style="padding:36px 0;text-align:center">Tap a name to show its line.</p>';
+    if (anyWr) h += modeSeg();
+    if (!mixed) h += '<button class="toggle" type="button" data-act="lift-pct" aria-pressed="' + pct + '"><i>' + IC.check + '</i>Show as change since the start, %</button>';
+    return h;
+  }
+  function multiChart(id, sers, opt) {
+    var W = chartW(), H = 200, m = { l: 38, r: 14, t: 14, b: 24 }, all = [], ts = [], dates = {};
+    sers.forEach(function (se) { se.pts.forEach(function (p) { all.push(p.y); p.t = toDate(p.x).getTime(); ts.push(p.t); dates[p.x] = 1; }); });
+    if (opt.pct) all.push(0);
+    var x0 = Math.min.apply(null, ts), x1 = Math.max.apply(null, ts), ticks = niceTicks(Math.min.apply(null, all), Math.max.apply(null, all), 3), y0 = ticks[0], y1 = ticks[ticks.length - 1];
+    function X(v) { return x1 === x0 ? m.l + (W - m.l - m.r) / 2 : m.l + (v - x0) / (x1 - x0) * (W - m.l - m.r); }
+    function Y(v) { return H - m.b - (v - y0) / (y1 - y0) * (H - m.t - m.b); }
+    function val(p, e) { return opt.pct ? (p.y > 0 ? '+' : p.y < 0 ? '−' : '') + fmt(Math.abs(p.y)) + '% (' + fmt(Math.round(p.raw * 10) / 10) + ' ' + metricUnit(e) + ')' : fmt(Math.round(p.y * 10) / 10) + ' ' + metricUnit(e); }
+    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Line chart comparing ' + sers.map(function (x) { return x.name; }).join(', ') + '">';
+    ticks.forEach(function (t) { s += '<line class="grid' + (opt.pct && t === 0 ? ' zero' : '') + '" x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + Y(t) + '" y2="' + Y(t) + '"/><text x="' + (m.l - 6) + '" y="' + (Y(t) + 4) + '" text-anchor="end">' + fmt(t) + (opt.pct ? '%' : '') + '</text>'; });
+    s += '<line class="cross" id="' + id + '-x" y1="' + m.t + '" y2="' + (H - m.b) + '" x1="0" x2="0" visibility="hidden"/>';
+    sers.forEach(function (se) {
+      var P = se.pts.map(function (p) { return [X(p.t), Y(p.y)]; }), c = 'var(--cat-' + (se.slot + 1) + ')', e = P[P.length - 1];
+      if (P.length > 1) s += '<path class="ln draw" pathLength="1" style="stroke:' + c + '" d="' + smoothPath(P) + '"/>';
+      s += '<circle class="mdot" r="4.5" style="fill:' + c + '" cx="' + e[0].toFixed(1) + '" cy="' + e[1].toFixed(1) + '"/>';
+    });
+    var ds = Object.keys(dates).sort();
+    s += '<text x="' + X(x0) + '" y="' + (H - 6) + '" text-anchor="' + (x1 === x0 ? 'middle' : 'start') + '">' + fmtDate(ds[0], true) + '</text>';
+    if (x1 !== x0) s += '<text x="' + X(x1) + '" y="' + (H - 6) + '" text-anchor="end">' + fmtDate(ds[ds.length - 1], true) + '</text>';
+    s += '</svg><div class="tip" id="' + id + '-t" hidden></div>';
+    charts[id] = { type: 'multi', W: W, top: m.t, cols: ds.map(function (d) {
+      var rows = []; sers.forEach(function (se) { se.pts.forEach(function (p) { if (p.x === d) rows.push('<span class="trow"><i style="background:var(--cat-' + (se.slot + 1) + ')"></i>' + esc(se.name) + ' · ' + val(p, se.e) + '</span>'); }); });
+      return { x: X(toDate(d).getTime()), html: '<b>' + fmtDate(d) + '</b>' + rows.join('') };
+    }) };
+    return s;
+  }
   function liftsView(list) {
     var h = '', mode = state.ui.liftMode === 'e1rm' ? 'e1rm' : 'max', recs = records(list, mode);
     var exId = state.ui.ex && historyOf(state.ui.ex, list).length ? state.ui.ex : null;
@@ -2336,14 +2403,23 @@ var LIBRARY = (function () {
       x.sets.forEach(function (st) { var v = liftVal(e, [st], mode), k = String(Math.round(v * 100) / 100); (by[k] = by[k] || { v: v, sets: [] }).sets.push(st); });
       Object.keys(by).forEach(function (k) { extra.push({ x: x.date, y: by[k].v, tip: '<b>' + fmtDate(x.date) + '</b><br>' + esc(setsText(e, by[k].sets)) }); });
     });
+    var order = liftOrder(list, recs), at = order.indexOf(exId), byMus = state.ui.liftView === 'mus';
     h += '<section class="card"><div class="spread" style="align-items:center"><h3>Exercise progress</h3><button class="info-btn" type="button" data-act="lift-info" aria-expanded="' + liftInfo + '" aria-label="What this chart shows">i</button></div>' +
-      '<button class="btn block" type="button" data-act="pick-lift" style="justify-content:space-between"><span>' + esc(e.name) + '</span><span class="chev" aria-hidden="true">›</span></button>' +
+      '<div class="seg" role="group" aria-label="What to compare"><button type="button" data-act="lift-view" data-v="one" aria-pressed="' + !byMus + '">One exercise</button><button type="button" data-act="lift-view" data-v="mus" aria-pressed="' + byMus + '">By muscle</button></div>';
+    if (byMus) h += muscleLifts(list, recs, mode, e) + '</section>';
+    else {
+    h += '<div class="lift-nav">' +
+      (order.length > 1 ? '<button class="icon-btn" type="button" data-act="lift" data-ex="' + esc(order[(at - 1 + order.length) % order.length]) + '" data-step="-1" aria-label="Previous exercise">' + IC.left + '</button>' : '') +
+      '<button class="btn lift-name" type="button" data-act="pick-lift" aria-label="' + esc(e.name) + ', choose another exercise"><span>' + esc(e.name) + '</span>' + (order.length > 1 ? '<small>' + (at + 1) + ' of ' + order.length + '</small>' : '') + '</button>' +
+      (order.length > 1 ? '<button class="icon-btn" type="button" data-act="lift" data-ex="' + esc(order[(at + 1) % order.length]) + '" data-step="1" aria-label="Next exercise">' + IC.right + '</button>' : '') + '</div>';
+    h += '' +
       (wr ? modeSeg() : '') +
       (liftInfo ? '<p class="note">' + (wr ? (mode === 'max' ? 'Top weight is the heaviest weight you used in each workout, in ' + UW() + '.' : 'Estimated 1-rep max (' + UW() + '), from the best set of each workout: weight × (1 + reps ÷ 30). It lets sets with different weights and reps be compared.') : esc(metricLabel(e)) + ' in each workout.') + ' Tap a point to see the sets.' + (onGraph ? ' Grey dots are the sets below the top one.' : '') + '</p>' : '') +
       '<div class="chart" data-chart="exc">' + lineChart('exc', hist.map(function (x) { return { x: x.date, y: liftVal(e, x.sets, mode), tip: '<b>' + fmtDate(x.date) + '</b><br>' + esc(setsText(e, onGraph ? [bestSet(e, x.sets, mode)] : x.sets)) }; }), null, { up: true, extra: extra }) + '</div>';
     if (rec) h += '<div class="pills"><span class="pill hot">Best set: ' + esc(setsText(e, [bestSet(e, rec.sets, mode)])) + ' · ' + fmtDate(rec.date, true) + '</span>' + (rec.n > 1 && rec.first > 0 && rec.last !== rec.first ? '<span class="pill' + (rec.last >= rec.first ? ' good' : '') + '">' + (rec.last >= rec.first ? '+' : '') + Math.round((rec.last - rec.first) / rec.first * 100) + '% since you started</span>' : '') + '</div>';
     h += '<button class="toggle" type="button" data-act="lift-sets" data-v="' + (onGraph ? 'off' : 'graph') + '" aria-pressed="' + onGraph + '"><i>' + IC.check + '</i>All sets</button>';
     h += '</section>';
+    }
     var gains = recs.filter(function (r) { return r.n >= 2 && r.first > 0 && r.last > r.first; }).map(function (r) { return { r: r, pct: (r.last - r.first) / r.first }; }).sort(function (a, b) { return b.pct - a.pct; }).slice(0, 5);
     if (gains.length) {
       h += '<section class="card"><h3>Biggest gains</h3><p class="sub">First logged workout compared with the latest.</p><div>';
@@ -3126,7 +3202,11 @@ var LIBRARY = (function () {
     clearTimeout(tipTimer);
     var id = box.dataset.chart, c = charts[id], svg = box.querySelector('svg'), tip = document.getElementById(id + '-t'); if (!c || !svg || !tip) return;
     var r = svg.getBoundingClientRect(), x = (ev.clientX - r.left) / r.width * c.W, html = '', px = 0, py = 0;
-    if (c.type === 'line') {
+    if (c.type === 'multi') {
+      var bc = c.cols[0]; c.cols.forEach(function (q) { if (Math.abs(q.x - x) < Math.abs(bc.x - x)) bc = q; });
+      html = bc.html; px = bc.x; py = c.top + 26;
+      var mx = document.getElementById(id + '-x'); mx.setAttribute('x1', bc.x); mx.setAttribute('x2', bc.x); mx.setAttribute('visibility', 'visible');
+    } else if (c.type === 'line') {
       var best = 0, p; c.P.forEach(function (q, i) { if (Math.abs(q[0] - x) < Math.abs(c.P[best][0] - x)) best = i; });
       p = c.P[best]; html = c.pts[best].tip;
       if (c.XP && c.XP.length) {
@@ -3157,6 +3237,27 @@ var LIBRARY = (function () {
     if (ev.type === 'pointerout' && ev.relatedTarget && box.contains(ev.relatedTarget)) return;
     var id = box.dataset.chart; clearTimeout(tipTimer);
     if (ev.pointerType === 'mouse') chartHide(id); else tipTimer = setTimeout(function () { chartHide(id); }, 2000);
+  }
+  /* a sideways swipe on the single-exercise graph steps to the next or previous exercise, like the arrows */
+  var swipe = null;
+  view.addEventListener('pointerdown', function (ev) { var b = ev.target.closest && ev.target.closest('.chart[data-chart="exc"]'); swipe = b ? { x: ev.clientX, y: ev.clientY } : null; });
+  view.addEventListener('pointerup', function (ev) {
+    if (!swipe) return; var dx = ev.clientX - swipe.x, dy = ev.clientY - swipe.y; swipe = null;
+    if (Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    var b = view.querySelector('.lift-nav [data-step="' + (dx < 0 ? 1 : -1) + '"]'); if (!b) return;
+    state.ui.ex = b.dataset.ex; saveLocal(); render(); enter();
+    var card = view.querySelector('.chart[data-chart="exc"]'); if (card) { card.classList.remove('from-l', 'from-r'); void card.offsetWidth; card.classList.add(dx < 0 ? 'from-r' : 'from-l'); }
+  });
+  view.addEventListener('pointercancel', function () { swipe = null; });
+  function liftLine(g, id) {
+    var show = liftShow[g] || (liftShow[g] = {});
+    if (show[id] != null) delete show[id];
+    else {
+      var used = {}, n = 0, k; Object.keys(show).forEach(function (x) { used[show[x]] = 1; n++; });
+      if (n >= LIFT_MAX) { toast('The graph holds ' + LIFT_MAX + ' lines. Hide one first.'); return; }
+      for (k = 0; k < LIFT_MAX; k++) if (!used[k]) { show[id] = k; break; }
+    }
+    render();
   }
   view.addEventListener('pointermove', chartPointer);
   view.addEventListener('pointerdown', chartPointer);
@@ -3330,7 +3431,9 @@ var LIBRARY = (function () {
       case 'mus-win': state.ui.musWin = a.dataset.v; saveLocal(); render(); enter(); break;
       case 'measure': state.ui.measure = a.dataset.v; saveLocal(); render(); enter(); break;
       case 'pick-lift': openPicker('lift'); break;
-      case 'lift': state.ui.ex = a.dataset.ex; state.ui.prog = 'lifts'; closeSheet(); go('progress', true); break;
+      case 'lift':
+        if (a.dataset.step) { state.ui.ex = a.dataset.ex; saveLocal(); render(); enter(); var nb = view.querySelector('.lift-nav [data-step="' + a.dataset.step + '"]'); if (nb) nb.focus({ preventScroll: true }); break; }
+        state.ui.ex = a.dataset.ex; state.ui.prog = 'lifts'; state.ui.liftView = 'one'; closeSheet(); go('progress', true); break;
       case 'body-del': delete state.body[a.dataset.id]; mark('body/' + a.dataset.id); render(); break;
       case 'lib': state.ui.lib = a.dataset.key; saveLocal(); render(); break;
       case 'pick-group': if (picker) { picker.group = a.dataset.key; pickerSheet(); } break;
@@ -3361,6 +3464,10 @@ var LIBRARY = (function () {
       case 'ed-remove': planRemove(editor.id); editor = null; planEdit = true; render(); window.scrollTo(0, 0); toast('Removed from your plan'); break;
       case 'lift-mode': state.ui.liftMode = a.dataset.v; saveLocal(); render(); enter(); break;
       case 'lift-sets': state.ui.liftSets = a.dataset.v; saveLocal(); render(); enter(); break;
+      case 'lift-view': state.ui.liftView = a.dataset.v; saveLocal(); render(); enter(); break;
+      case 'lift-grp': state.ui.liftGrp = a.dataset.v; saveLocal(); render(); enter(); break;
+      case 'lift-pct': state.ui.liftPct = !state.ui.liftPct; saveLocal(); render(); enter(); break;
+      case 'lift-line': liftLine(a.dataset.g, a.dataset.ex); break;
       case 'lift-info': liftInfo = !liftInfo; render(); break;
       case 'ms-open': msSheet(+a.dataset.i); break;
       case 'sport': state.ui.sport = a.dataset.v; saveLocal(); render(); enter(); break;

@@ -1,6 +1,6 @@
 /* Offline cache for Hitit. The version below changes whenever any app file changes,
    which makes the phone fetch the new files the next time the app is opened online. */
-const VERSION = 'workout-log-60ba1dbbc1';
+const VERSION = 'workout-log-45c1e85daa';
 const FILES = ["./", "app.css", "app.js", "manifest.webmanifest", "fonts/big-shoulders.woff2", "fonts/figtree.woff2", "icons/icon-32.png", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png"];
 
 self.addEventListener('install', (event) => {
