@@ -313,7 +313,7 @@
   }
   function historyOf(exId, list) {
     var out = [];
-    (list || finished()).forEach(function (s) { (s.entries || []).forEach(function (en) { if (en.ex === exId && en.sets && en.sets.length) out.push({ date: s.date, key: s.key, id: s.id, sets: en.sets, note: en.note, warm: en.warm }); }); });
+    (list || finished()).forEach(function (s) { (s.entries || []).forEach(function (en) { if (en.ex === exId && en.sets && en.sets.length) out.push({ date: s.date, key: s.key, id: s.id, sets: en.sets, note: en.note, warm: en.warm, easy: s.easy }); }); });
     return out;
   }
   function lastEntry(key, exId, excludeId) {
@@ -429,24 +429,45 @@
   }
   function itemFrom(it, rows, note) {
     var e = exi(it.ex);
-    return { u: uid(), ex: it.ex, n: it.n || '', group: it.group || '', link: !!it.link, sets: it.sets, lo: it.lo, hi: it.hi, reps: it.reps || '', rir: it.rir || e.rir, rest: it.rest || '', restSec: it.link ? 10 : it.restSec, cue: it.cue || '', note: note || '', rows: rows };
+    return { u: uid(), ex: it.ex, n: it.n || '', group: it.group || '', link: !!it.link, sets: it.sets, lo: it.lo, hi: it.hi, reps: it.reps || '', rir: it.rir || e.rir, rest: it.rest || '', restSec: it.link ? 10 : it.restSec, cue: it.cue || '', note: note || '', rows: rows, plus: it.plus ? 1 : undefined };
   }
   /* Warm-up sets: kept in it.warm (and entry.warm once saved), apart from the working sets, so targets, records,
      set counts and weight lifted never see them. */
   function warmRows(sets) { return (sets || []).map(function (x) { return { w: fmt(x.w), r: fmt(x.r), d: true }; }); }
   function warmSets(it) { var out = []; (it.warm || []).forEach(function (x) { var r = num(x.r), w = num(x.w); if (x.d && r != null && r > 0) out.push({ w: w == null || w < 0 ? 0 : w, r: r }); }); return out; }
   function blankRows(n) { var r = []; for (var i = 0; i < n; i++) r.push({ w: '', r: '', d: false }); return r; }
+  /* ---- the training block (N1): 12 weeks in four phases, then the next block. Settings keep only where it starts
+     (block.start, a Monday; the week of the first workout when not set), an easy week taken early (block.easy, the Monday
+     of that week, which ends its block) and whether the push weeks add a set (block.plus). ---- */
+  var BLOCK_WEEKS = 12, PHASES = [['settle', 'Settle in', 1, 2, 'Sets as written. Stop the big lifts with 2 or 3 reps left while you find weights and positions.'], ['build', 'Build', 3, 6, 'Add reps, then weight.'], ['push', 'Push', 7, 11, 'If you are recovering well, one more set on up to four exercises. Take the last set of small exercises to failure.'], ['easy', 'Easy week', 12, 12, 'Half the sets, the same weights, 3 or 4 reps left. Then the next block starts.']];
+  var PLUS_EX = ['cable-lateral-raise', 'standing-calf-raise', 'pec-deck', 'triceps-pushdown'];
+  function blockInfo(day) {
+    var s = state.settings, b = s.block || {}; if (s.blockOff) return null;
+    var f = finished(), td = day || today(), ws = weekStart(td), start = b.start || (f.length ? weekStart(f[0].date) : ws), num = 1, guard = 0, early = false;
+    if (start > ws) start = ws;
+    while (guard++ < 400) {
+      var cut = b.easy && b.easy >= start && b.easy < addDays(start, 7 * BLOCK_WEEKS), end = cut ? addDays(b.easy, 7) : addDays(start, 7 * BLOCK_WEEKS);
+      if (ws < end) { early = !!cut && b.easy === ws; break; }
+      start = end; num++;
+    }
+    var wk = Math.round((toDate(ws) - toDate(start)) / 6048e5) + 1, easy = early || wk >= BLOCK_WEEKS, ph = easy ? PHASES[3] : PHASES.filter(function (p) { return wk >= p[2] && wk <= p[3]; })[0] || PHASES[1];
+    return { start: start, week: wk, weeks: BLOCK_WEEKS, num: num, easy: easy, early: early, phase: ph[0], name: ph[1], plus: !!b.plus && ph[0] === 'push' };
+  }
   function startDraft(key, from) {
     histMemo = null;
+    var blk = from || key === 'free' ? null : blockInfo();
     var r = key === 'free' ? null : getRoutine(key);
     var d = { v: 2, id: from ? from.id : uid(), key: key, name: from ? (from.name || (r ? shortName(r.name) : 'Workout')) : (r ? shortName(r.name) : 'Workout'), date: from ? from.date : today(),
       startedAt: from ? from.startedAt : Date.now(), notes: from ? (from.notes || '') : '', editing: !!from, dur: from ? durOf(from) : null, items: [] };
     var used = {};
     (r ? r.items : []).forEach(function (it, i) {
       var src = Object.assign({}, it, { n: it.n || String(i + 1) });
+      /* an easy week does half the sets; the push weeks add one to four chosen exercises when that is switched on */
+      if (blk && blk.easy && exi(it.ex).log !== 'cardio') src.sets = Math.max(1, Math.ceil(it.sets / 2));
+      else if (blk && blk.plus && PLUS_EX.indexOf(it.ex) >= 0) { src.sets = it.sets + 1; src.plus = 1; }
       var prev = from ? (from.entries || []).filter(function (en, j) { if (used[j]) return false; if (en.n === src.n && en.ex === it.ex) { used[j] = 1; return true; } return false; })[0] : null;
       /* as many rows as today's target has: the planned sets, plus any extra working sets done last time (two at most) */
-      var last = lastEntry(key, it.ex, d.id), tgN = !prev && last && last.key === key ? targetFor(it, exi(it.ex), last, exHist(it.ex)) : null, count = prev ? Math.max(prev.sets.length, it.sets) : Math.max(it.sets, tgN && tgN.sets ? Math.min(tgN.sets.length, it.sets + 2) : 0), rows = [];
+      var last = lastEntry(key, it.ex, d.id), tgN = !prev && last && last.key === key && !(blk && blk.easy) ? targetFor(src, exi(it.ex), last, exHist(it.ex)) : null, count = prev ? Math.max(prev.sets.length, it.sets) : Math.max(src.sets, tgN && tgN.sets ? Math.min(tgN.sets.length, src.sets + 2) : 0), rows = [];
       for (var k = 0; k < count; k++) { var ps = prev && prev.sets[k]; rows.push(ps ? rowFrom(exi(it.ex), ps) : { w: '', r: '', d: false }); }
       var ni = itemFrom(src, rows, prev ? prev.note : ''); if (prev && prev.warm) ni.warm = warmRows(prev.warm); d.items.push(ni);
     });
@@ -454,6 +475,7 @@
       if (used[j]) return; var e = exi(en.ex, en.name);
       var xi = itemFrom({ ex: en.ex, n: en.n || 'x', sets: en.sets.length, lo: e.lo, hi: e.hi, restSec: e.restSec }, en.sets.map(function (x) { return rowFrom(e, x); }), en.note); if (en.warm) xi.warm = warmRows(en.warm); d.items.push(xi);
     });
+    if (blk && blk.easy) d.easy = true;
     state.draft = d; touchDraft(true); stopRest(); summary = null; editor = null;
     state.ui.tab = 'log'; state.ui.wmin = false; applyTheme(); wake();
     render(); window.scrollTo(0, 0);
@@ -511,6 +533,7 @@
     if (!d.editing && entries.every(function (en) { return exi(en.ex).sport; })) { var mins = 0; entries.forEach(function (en) { en.sets.forEach(function (x) { mins += x.r; }); }); dur = Math.round(mins * 60); }
     var doc = { v: 2, id: d.id, key: d.key, name: d.name || (r ? shortName(r.name) : 'Workout'), date: d.date, startedAt: d.startedAt, finishedAt: d.editing ? (state.sessions[d.id] || {}).finishedAt || now : now,
       dur: dur, core: r ? r.core !== false : true, notes: d.notes || '', entries: entries, updatedAt: now };
+    if (d.easy || (d.editing && (state.sessions[d.id] || {}).easy)) doc.easy = true;
     var sameKey = before.filter(function (x) { return x.key === d.key; }), volRec = !d.editing && d.key !== 'free' && sameKey.length > 0 && volOf(doc) > Math.max.apply(null, sameKey.map(volOf)) + 1e-9;
     var wasFirst = !before.length, msBefore = milestones(before).filter(function (m) { return m.got; }).map(function (m) { return m.label + m.show; });
     state.sessions[d.id] = doc;

@@ -342,6 +342,12 @@
       case 'delete-session': { var id = a.dataset.id; if (arm('del' + id, function () { if (!scrim.hidden) sessionSheet(id); })) { delete state.sessions[id]; mark('sessions/' + id); closeSheet(); render(); } break; }
       case 'settings': settingsSheet(); break;
       case 'theme': state.settings.theme = a.dataset.v; saveSettings(); applyTheme(); render(); settingsSheet(); break;
+      case 'block-open': blockSheet(); break;
+      case 'block-toggle': state.settings.blockOff = !state.settings.blockOff; saveSettings(); settingsSheet(); render(); break;
+      case 'block-plus': { var bp = blockInfo(); state.settings.block = Object.assign({}, state.settings.block, { start: bp.start, plus: !(state.settings.block || {}).plus }); saveSettings(); blockSheet(); break; }
+      case 'block-easy': {
+        if (wLive() && !state.draft.editing) { toast('Finish or discard the workout in progress first.'); break; }
+        var be = blockInfo(); state.settings.block = Object.assign({}, state.settings.block, { start: be.start, easy: a.dataset.v === '1' ? weekStart(today()) : null }); saveSettings(); render(); blockSheet(); break; }
       case 'goal': state.settings.weeklyGoal = Math.max(1, Math.min(7, (state.settings.weeklyGoal || 4) + (+a.dataset.d))); saveSettings(); settingsSheet(); render(); break;
       case 'toggle': state.settings[a.dataset.k] = !state.settings[a.dataset.k]; saveSettings(); if (a.dataset.k === 'sound' && state.settings.sound) { unlockAudio(); beep(); } wake(); if (a.dataset.k === 'rir' || a.dataset.k === 'outCore') render(); settingsSheet(); break;
       case 'backup-save': saveBackupFile(); break;
@@ -512,6 +518,7 @@
   });
   document.addEventListener('change', function (ev) {
     var el = ev.target;
+    if (el.id === 'block-start' && el.value && el.value <= today()) { state.settings.block = Object.assign({}, state.settings.block, { start: weekStart(el.value), easy: null }); saveSettings(); render(); blockSheet(); return; }
     if (el.id === 'draft-date' && state.draft && el.value) { state.draft.date = el.value; state.draft.dateSet = true; touchDraft(); }
     if (el.id === 'draft-dur' && state.draft && state.draft.editing) { var mins = num(el.value); state.draft.dur = mins > 0 ? Math.round(Math.min(600, mins) * 60) : null; touchDraft(); }
     if (editor && el.id === 'ed-core') editor.core = el.checked;

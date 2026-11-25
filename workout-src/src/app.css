@@ -1088,3 +1088,24 @@ body.in-workout .toast { bottom: calc(92px + var(--safe-b)); }
 .att-more p { margin: 0; font-size: var(--t-label); color: var(--ink-2); line-height: 1.45; }
 .act.more { align-self: center; }
 .hist-nav h3 small { display: block; font-family: var(--font-body); font-size: var(--t-cap); font-weight: 600; color: var(--ink-2); letter-spacing: 0; text-transform: none; margin-top: 2px; }
+
+/* ---- the training block (N1) ---- */
+.pill.blk { appearance: none; border: 0; font: inherit; font-size: var(--t-label); font-weight: 600; background: var(--accent-soft); color: var(--accent-ink); position: relative; }
+.pill.blk::before { content: ''; position: absolute; inset: -11px 0; }
+.pill.blk.easy { background: var(--green-soft); color: var(--green-ink); }
+.bweeks { display: grid; grid-template-columns: repeat(12, 1fr); gap: 3px; }
+.bw { font-style: normal; text-align: center; font-size: var(--t-cap); font-weight: 700; padding: 9px 0; border-radius: 8px; background: var(--surface-2); color: var(--ink-2); }
+.bw.settle, .bphases .settle i { --bc: var(--s1-soft, var(--surface-2)); --bi: var(--s1-ink, var(--ink)); }
+.bw.build, .bphases .build i { --bc: var(--accent-soft); --bi: var(--accent-ink); }
+.bw.push, .bphases .push i { --bc: var(--hot-soft); --bi: var(--hot-ink); }
+.bw.easy, .bphases .easy i { --bc: var(--green-soft); --bi: var(--green-ink); }
+.bw { background: var(--bc); color: var(--bi); }
+.bw.past { opacity: 0.55; }
+.bw.off { opacity: 0.25; }
+.bw.now { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink); opacity: 1; }
+.bphases { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.bphases li { display: grid; grid-template-columns: 14px minmax(0, 1fr); gap: 10px; align-items: start; }
+.bphases i { width: 14px; height: 14px; border-radius: 5px; background: var(--bi); margin-top: 3px; }
+.bphases b { display: block; font-size: var(--t-body); }
+.bphases small { display: block; font-size: var(--t-label); color: var(--ink-2); line-height: 1.4; }
+.bphases li:not(.now) b { font-weight: 600; color: var(--ink-2); }

@@ -96,10 +96,10 @@
       n += day.filter(isCore).length;
       h += '<div class="day' + (day.length ? ' done' : '') + (day.length && day.every(allSport) ? ' out' : '') + (dt === today() ? ' today' : '') + '"><i>' + (day.length ? IC.check : '') + '</i>' + letters[i] + '</div>';
     }
-    var st = streakWeeks(f);
+    var st = streakWeeks(f), bi = routineList().length ? blockInfo() : null;
     return '<section class="card"><div class="week"><div class="days" role="img" aria-label="' + n + ' of ' + goal + ' sessions done this week">' + h + '</div>' +
       '<div class="week-n' + (n >= goal ? ' hit' : '') + '" aria-hidden="true"><b>' + n + '<i>/' + goal + '</i></b><span>this week</span></div></div>' +
-      (st >= 2 ? '<div class="pills"><span class="pill hot">' + IC.flame + st + ' weeks in a row</span></div>' : '') + '</section>';
+      (st >= 2 || bi ? '<div class="pills">' + (bi ? '<button class="pill blk' + (bi.easy ? ' easy' : '') + '" type="button" data-act="block-open">Week ' + bi.week + ' of ' + bi.weeks + ' · ' + bi.name + '</button>' : '') + (st >= 2 ? '<span class="pill hot">' + IC.flame + st + ' weeks in a row</span>' : '') + '</div>' : '') + '</section>';
   }
   /* Train: a slim strip for the weigh-in (T3, N4). It appears once a weight or a goal weight exists, goes when today is
      logged, and says so when the last weigh-in is four days old or the waist two weeks old (the plan's own rhythm). */
@@ -263,7 +263,7 @@
     else if (lead) h += '<p class="sub">' + esc(lead) + '</p>';
     h +=
       (d.editing ? '<label class="dur-row">How long it took<span><input class="text-in" id="draft-dur" type="number" inputmode="numeric" min="0" max="600" step="1" placeholder="–" value="' + (d.dur ? Math.round(d.dur / 60) : '') + '">minutes</span></label>' : '') + '</section>';
-    if (!d.editing && d.items.length) h += '<div class="wtop">' + (r && r.warmup ? '<button class="act" type="button" data-act="warm-plan">Warm-up plan</button>' : '') + '<button class="act" type="button" data-act="notes-go">Workout notes</button></div>';
+    if (!d.editing && d.items.length) h += '<div class="wtop">' + (d.easy ? '<span class="pill blk easy">Easy week · half the sets</span>' : '') + (r && r.warmup ? '<button class="act" type="button" data-act="warm-plan">Warm-up plan</button>' : '') + '<button class="act" type="button" data-act="notes-go">Workout notes</button></div>';
     h += '<!--T-->';
     var anyPr = false, anyTarget = false, hintTip = '', cur = curItem(d), open = cur ? mates(d, cur) : [];
     histMemo = null;
@@ -290,7 +290,7 @@
         '<button class="thumb" type="button" data-act="open-ex" data-ex="' + esc(it.ex) + '" data-u="' + it.u + '" aria-label="How to do ' + esc(e.name) + '">' + illoSvg(e.illo) + '</button>' +
         '<div><div class="exc-name">' + (it.n && it.n.charAt(0) !== 'x' ? '<span class="exc-n">' + esc(it.n) + '</span>' : '') + esc(e.name) + '</div><div class="exc-target">' + targetHtml(it, e) + '</div></div>' +
         '<button class="icon-btn" type="button" data-act="ex-menu" data-u="' + it.u + '" aria-label="More options for ' + esc(e.name) + '">' + IC.more + '</button></div>';
-      if (!d.editing && (hi.s || hi.t)) h += '<p class="why' + (hi.up ? ' up' : '') + '">' + esc(hi.s || hi.t) + '</p>';
+      if (!d.editing && (hi.s || hi.t)) h += '<p class="why' + (hi.up ? ' up' : '') + '">' + esc(hi.s || hi.t) + (it.plus ? ' · +1 set, push weeks' : '') + '</p>';
       if (last && last.note) h += '<p class="last-note">Last note: ' + esc(last.note) + '</p>';
       var prev = last && !e.sport && e.log !== 'cardio' ? (tg && tg.shown ? tg.shown : last.sets) : null;
       if (tg && tg.light && !d.editing) h += '<p class="last-note">Lighter last time, counted as warm-up: ' + esc(setsText(e, tg.light)) + '</p>';
@@ -935,12 +935,28 @@
     openSheet(h, true);
   }
   function openPicker(mode, extra) { picker = Object.assign({ mode: mode, q: '', group: mode === 'lift' ? 'logged' : 'all', creating: false }, extra || {}); pickerSheet(); }
+  /* the training block: twelve weeks as a strip, the four phases, and the two things you can do with it */
+  function blockSheet() {
+    var bi = blockInfo(), b = state.settings.block || {}; if (!bi) { closeSheet(); return; }
+    var h = head('Training block', (bi.num > 1 ? 'Block ' + bi.num + ' · ' : '') + 'started ' + fmtDate(bi.start)), cells = '', i;
+    for (i = 1; i <= bi.weeks; i++) { var ph = bi.early && i === bi.week ? PHASES[3] : PHASES.filter(function (p) { return i >= p[2] && i <= p[3]; })[0]; cells += '<i class="bw ' + ph[0] + (i === bi.week ? ' now' : i < bi.week ? ' past' : '') + (bi.early && i > bi.week ? ' off' : '') + '">' + i + '</i>'; }
+    h += '<div class="bweeks" role="img" aria-label="Week ' + bi.week + ' of ' + bi.weeks + ', ' + bi.name + '">' + cells + '</div><ul class="bphases">';
+    PHASES.forEach(function (p) { h += '<li class="' + p[0] + (p[0] === bi.phase ? ' now' : '') + '"><i></i><span><b>' + p[1] + '</b><small>' + (p[2] === p[3] ? 'Week ' + p[2] : 'Weeks ' + p[2] + ' to ' + p[3]) + ' · ' + p[4] + '</small></span></li>'; });
+    h += '</ul>';
+    if (bi.phase === 'push' && routineList().some(function (r) { return r.items.some(function (it) { return PLUS_EX.indexOf(it.ex) >= 0; }); }))
+      h += '<div class="setting"><div><b>One more set in the push weeks</b><small>On lateral raises, calf raises, pec deck and pushdowns.</small></div><button class="switch" type="button" role="switch" data-act="block-plus" aria-checked="' + (b.plus ? 'true' : 'false') + '" aria-label="One more set in the push weeks"></button></div>';
+    h += bi.early ? '<button class="btn block" type="button" data-act="block-easy" data-v="0">Back to a normal week</button>' : bi.easy ? '' : '<button class="btn block" type="button" data-act="block-easy" data-v="1">Start the easy week now</button>';
+    if (!bi.easy) h += '<p class="foot">Take it early when two of these show up together: two sessions in a row go worse, a joint keeps aching, sleep or motivation drops. The next block starts the week after.</p>';
+    h += '<label class="fld">This block started in the week of<input id="block-start" type="date" value="' + bi.start + '" max="' + today() + '"></label>';
+    openSheet(h);
+  }
   function settingsSheet() {
     var s = state.settings, h = head('Settings');
     h += '<div class="setting stack"><div><b>Appearance</b><small>Automatic follows your phone.</small></div><div class="seg" role="group" aria-label="Appearance">' + [['auto', 'Automatic'], ['light', 'Light'], ['dark', 'Dark']].map(function (t) { return '<button type="button" data-act="theme" data-v="' + t[0] + '" aria-pressed="' + (s.theme === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div></div>';
     h += '<div class="setting stack"><div><b>Theme</b></div><div class="pal" role="group" aria-label="Theme">' + PALETTES.map(function (p) { return '<button type="button" data-act="palette" data-v="' + p[0] + '" aria-pressed="' + ((s.palette || '') === p[0]) + '"><span class="pal-sw" style="background-image:linear-gradient(135deg, ' + p[2] + ')" aria-hidden="true"></span><span>' + p[1] + '</span></button>'; }).join('') + '</div></div>';
     h += unitRow();
     h += '<div class="setting"><div><b>Sessions per week</b><small>Your weekly goal.</small></div><div class="stepper"><button type="button" data-act="goal" data-d="-1" aria-label="One fewer">−</button><b>' + s.weeklyGoal + '</b><button type="button" data-act="goal" data-d="1" aria-label="One more">+</button></div></div>';
+    h += '<div class="setting"><div><b>Training block</b><small>Twelve weeks that end in an easy week.</small></div><button class="switch" type="button" role="switch" data-act="block-toggle" aria-checked="' + (s.blockOff ? 'false' : 'true') + '" aria-label="Training block"></button></div>';
     function sw(key, title, sub) { return '<div class="setting"><div><b>' + title + '</b><small>' + sub + '</small></div><button class="switch" type="button" role="switch" data-act="toggle" data-k="' + key + '" aria-checked="' + (s[key] ? 'true' : 'false') + '" aria-label="' + title + '"></button></div>'; }
     h += sw('autoRest', 'Start the rest timer', 'When you tick a set.') + sw('sound', 'Sound when rest ends', 'A short beep. Your phone must not be on silent.') + sw('awake', 'Keep the screen on', 'During a workout, where the phone allows it.') + sw('outCore', 'Count runs, rides and swims toward the weekly goal', 'Off, they still show in the week and in History, in their own colour.') + sw('rir', 'Ask for reps left in the tank', 'After each set, tap how many more reps you had in you. Three or more on every set raises the next target.');
     h += '<div class="setting"><div><b>Goal body weight</b><small>Shown on the Body page. Leave empty for none.</small></div><div class="fld" style="width:96px"><input id="set-goalw" type="text" inputmode="decimal" autocomplete="off" value="' + (s.goalWeight != null ? fmt(s.goalWeight) : '') + '" placeholder="' + UW() + '" aria-label="Goal body weight in ' + UW() + '"></div></div>';

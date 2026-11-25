@@ -52,10 +52,19 @@
      not normal: a break (C3), two sessions under the range (C2) and one bad day (C1).
      Returns { sets, text, short, up, step }; sets is null the first time. */
   function targetFor(it, e, last, hist) {
-    var t = targetCore(it, e, last, hist);
+    /* a workout from an easy week had half the sets and no push: build on the last normal one from the same session */
+    if (last && last.easy && hist) { var norm = hist.filter(function (x) { return !x.easy && x.key === last.key; }); if (norm.length) last = norm[norm.length - 1]; }
+    if (hist) hist = hist.filter(function (x) { return !x.easy; });
+    var d0 = state.draft, t = d0 && d0.easy && !d0.editing && last && last.sets && e.log !== 'cardio' && it.hi ? easyTarget(it, e, last) : targetCore(it, e, last, hist);
     /* for the "last time" column: the working sets the target is built on, and the lighter sets that were left out */
     if (t.sets && last && last.sets && e.log !== 'cardio' && it.hi) { var sp = workSplit(e, it, last.sets); if (sp.light.length) { t.shown = sp.work; t.light = sp.light; } }
     return t;
+  }
+  /* the easy week: the working weight and last time's reps, for the sets the week has. Nothing goes up. */
+  function easyTarget(it, e, last) {
+    var sp = workSplit(e, it, last.sets), out = sp.work.slice(0, it.sets || 1).map(function (x) { return { w: Math.min(x.w || 0, sp.W || x.w || 0), r: x.r }; });
+    while (out.length < (it.sets || 1)) out.push({ w: sp.W, r: it.lo });
+    return { sets: out, text: 'Easy week: half the sets at the same weight, and stop with 3 or 4 reps left.', short: 'Easy week · same weight, stop 3-4 reps short', up: false, back: true };
   }
   function targetCore(it, e, last, hist) {
     var h = hint(it, e, last);
@@ -182,7 +191,7 @@
       r.items.forEach(function (it) {
         if (seen[it.ex]) return; seen[it.ex] = 1;
         var e = exi(it.ex); if (e.gone || (e.log !== 'wr' && e.log !== 'bw')) return;
-        var h = historyOf(it.ex, list); if (h.length < 4) return;
+        var h = historyOf(it.ex, list).filter(function (x) { return !x.easy; }); if (h.length < 4) return;
         var l4 = h.slice(-4); if (l4[3].date < addDays(t, -28)) return;
         var base = progressScore(e, l4[0].sets);
         if (!l4.slice(1).every(function (x) { return progressScore(e, x.sets) <= base + 1e-9; })) return;
@@ -216,7 +225,7 @@
     for (i = 1; i <= 12; i++) vals.push(wk[addDays(ws, -7 * i)] || 0);
     var nz = vals.filter(Boolean).sort(function (a, b) { return a - b; }), med = nz.length ? nz[Math.floor(nz.length / 2)] : 0;
     for (i = 0; i < vals.length; i++) { if (vals[i] > 0 && vals[i] >= 0.7 * med) run++; else break; }
-    if (run >= 7) out.push({ k: 'easy', t: NUM_WORDS[Math.min(run, 12)] + (run >= 12 ? ' or more' : '') + ' weeks without an easy week', s: 'Plan one lighter week', d: 'Consider one lighter week: the same exercises with about half the sets. It gives joints and tendons time to catch up.' });
+    if (run >= 7 && !blockInfo()) out.push({ k: 'easy', t: NUM_WORDS[Math.min(run, 12)] + (run >= 12 ? ' or more' : '') + ' weeks without an easy week', s: 'Plan one lighter week', d: 'Consider one lighter week: the same exercises with about half the sets. It gives joints and tendons time to catch up.' });
     return out;
   }
 
