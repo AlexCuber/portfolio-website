@@ -266,9 +266,10 @@
     if (!d.editing && d.items.length) h += '<div class="wtop">' + (r && r.warmup ? '<button class="act" type="button" data-act="warm-plan">Warm-up plan</button>' : '') + '<button class="act" type="button" data-act="notes-go">Workout notes</button></div>';
     h += '<!--T-->';
     var anyPr = false, anyTarget = false, hintTip = '', cur = curItem(d), open = cur ? mates(d, cur) : [];
+    histMemo = null;
     nextSet = '';
     d.items.forEach(function (it, idx) {
-      var e = exi(it.ex), last = lastEntry(d.key, it.ex, d.id), tg = d.editing ? null : targetFor(it, e, last), hi = tg ? { t: tg.text, s: tg.short, up: tg.up } : hint(it, e, last), showT = !!(tg && tg.sets && e.log !== 'cardio'), linked = isLinked(d.items, idx), grouped = it.group || linked;
+      var e = exi(it.ex), last = lastEntry(d.key, it.ex, d.id), tg = d.editing ? null : targetFor(it, e, last, exHist(it.ex)), hi = tg ? { t: tg.text, s: tg.short, up: tg.up } : hint(it, e, last), showT = !!(tg && tg.sets && e.log !== 'cardio'), linked = isLinked(d.items, idx), grouped = it.group || linked;
       var first = it.group ? (idx === 0 || d.items[idx - 1].group !== it.group) : (linked && !(idx > 0 && d.items[idx - 1].link));
       var allDone = it.rows.length && it.rows.every(function (x) { return x.d; }), nDone = it.rows.filter(function (x) { return x.d; }).length, isOpen = d.editing || open.indexOf(it) >= 0;
       var ph = tg && tg.sets ? tg.sets : (last ? last.sets : null), star = it.rows.some(function (x) { return x.d && x.pr; });
@@ -291,7 +292,8 @@
         '<button class="icon-btn" type="button" data-act="ex-menu" data-u="' + it.u + '" aria-label="More options for ' + esc(e.name) + '">' + IC.more + '</button></div>';
       if (!d.editing && (hi.s || hi.t)) h += '<p class="why' + (hi.up ? ' up' : '') + '">' + esc(hi.s || hi.t) + '</p>';
       if (last && last.note) h += '<p class="last-note">Last note: ' + esc(last.note) + '</p>';
-      var prev = last && !e.sport && e.log !== 'cardio' ? last.sets : null;
+      var prev = last && !e.sport && e.log !== 'cardio' ? (tg && tg.shown ? tg.shown : last.sets) : null;
+      if (tg && tg.light && !d.editing) h += '<p class="last-note">Lighter last time, counted as warm-up: ' + esc(setsText(e, tg.light)) + '</p>';
       var one1 = e.log === 'time';
       if (prev) h += '<div class="set-cols' + (one1 ? ' one' : '') + (one1 && !d.editing && undone(it) ? ' tm' : '') + '" aria-hidden="true"><span>Last · ' + fmtDate(last.date, true) + '</span>' + (one1 ? '' : '<span>' + UW() + '</span><span></span>') + '<span>' + esc(e.unit) + '</span><span></span></div>';
       else if (last && e.sport) h += '<p class="last-note">Last time · ' + fmtDate(last.date) + ': ' + esc(setsText(e, last.sets)) + '</p>';
@@ -326,7 +328,7 @@
       var it = todo.reduce(function (a, b) { return b.rows.filter(function (x) { return x.d; }).length < a.rows.filter(function (x) { return x.d; }).length ? b : a; });
       var e = exi(it.ex), i = 0; while (it.rows[i].d) i++;
       if (e.sport || e.log === 'cardio') return;
-      var last = lastEntry(d.key, it.ex, d.id), tg = targetFor(it, e, last), ph = tg && tg.sets ? tg.sets : (last ? last.sets : null), p = ph ? (ph[i] || ph[ph.length - 1]) : null, s = it.rows[i];
+      var last = lastEntry(d.key, it.ex, d.id), tg = targetFor(it, e, last, exHist(it.ex)), ph = tg && tg.sets ? tg.sets : (last ? last.sets : null), p = ph ? (ph[i] || ph[ph.length - 1]) : null, s = it.rows[i];
       var w = num(s.w), r = num(s.r); if (w == null && p) w = p.w; if (r == null && p) r = p.r;
       nextSet = r == null ? (todo.length > 1 || open.length > 1 ? e.name : '') : e.log === 'time' ? fmt(r) + ' s' : (e.log === 'bw' ? (w > 0 ? '+' + fmt(w) + ' ' + UW() + ' × ' : '') + fmt(r) + (w > 0 ? '' : ' reps') : fmt(w || 0) + ' ' + UW() + ' × ' + fmt(r));
       if (nextSet && open.length > 1 && r != null) nextSet = e.name + ', ' + nextSet;
@@ -630,7 +632,7 @@
     var sers = [];
     rs.forEach(function (r) {
       if (show[r.id] == null) return;
-      var first = null, pts = historyOf(r.id, list).map(function (x) { var v = liftVal(r.e, x.sets, mode); if (first == null && v > 0) first = v; return { x: x.date, raw: v, y: pct ? (first ? Math.round((v / first - 1) * 1000) / 10 : 0) : v }; });
+      var first = null, pts = historyOf(r.id, list).map(function (x) { var v = liftVal(r.e, x.sets, mode, x.warm); if (first == null && v > 0) first = v; return { x: x.date, raw: v, y: pct ? (first ? Math.round((v / first - 1) * 1000) / 10 : 0) : v }; });
       sers.push({ id: r.id, name: r.name, slot: show[r.id], e: r.e, pts: pts });
     });
     var h = '<div class="chips" role="group" aria-label="Muscle group">' + groups.map(function (x) { return '<button class="chip" type="button" data-act="lift-grp" data-v="' + esc(x) + '" aria-pressed="' + (x === g) + '">' + esc(x) + '</button>'; }).join('') + '</div>';
@@ -764,10 +766,10 @@
       /* the latest value and the best for each measure; tapping one puts it on the graph */
       var ms = wr ? [['max', 'Top weight'], ['e1rm', 'Est. 1RM'], ['tot', 'Total']] : [['max', e.log === 'bw' ? 'Most reps' : e.log === 'time' ? 'Longest hold' : 'Longest'], ['tot', e.log === 'bw' ? 'Total reps' : 'Total time']];
       h += '<div class="stats' + (ms.length === 2 ? ' two' : '') + '" role="group" aria-label="What to show on the graph">' + ms.map(function (q) {
-        var vs = hist.map(function (x) { return liftVal(e, x.sets, q[0]); }), lastV = vs[vs.length - 1], bestV = Math.max.apply(null, vs);
+        var vs = hist.map(function (x) { return liftVal(e, x.sets, q[0], x.warm); }), lastV = vs[vs.length - 1], bestV = Math.max.apply(null, vs);
         return '<button class="stat" type="button" data-act="lift-mode" data-v="' + q[0] + '" aria-pressed="' + (q[0] === em) + '"><small>' + q[1] + '</small><b class="num">' + big(lastV) + '<i>' + unit + '</i></b><span>best ' + big(bestV) + '</span></button>';
       }).join('') + '</div>';
-      var vals = hist.map(function (x) { return liftVal(e, x.sets, em); }), first = null, bi = 0;
+      var vals = hist.map(function (x) { return liftVal(e, x.sets, em, x.warm); }), first = null, bi = 0;
       vals.forEach(function (v, i) { if (first == null && v > 0) first = v; if (v > vals[bi] + 1e-9) bi = i; });
       function ch(v) { return first ? Math.round((v / first - 1) * 1000) / 10 : 0; }
       function sg(v) { return (v > 0 ? '+' : v < 0 ? '−' : '') + fmt(Math.abs(Math.round(v))) + '%'; }
@@ -904,6 +906,7 @@
     var i = d.items.indexOf(it), e = exi(it.ex);
     openSheet(head(e.name) + '<div class="menu"><button type="button" data-act="open-ex" data-ex="' + esc(it.ex) + '" data-u="' + u + '">How to do it</button>' +
       (e.log === 'wr' && !d.editing ? '<button type="button" data-act="help-open" data-u="' + u + '">' + (isBar(e) ? 'Plates and warm-up weights' : 'Warm-up weights') + '</button>' : '') +
+      (e.log === 'wr' ? '<button type="button" data-act="step-open" data-u="' + u + '">Weight step</button>' : '') +
       '<button type="button" data-act="' + (d.editing ? 'ex-replace' : 'swap-open') + '" data-u="' + u + '">Swap for another exercise</button>' +
       (it.rows.length > 1 || (it.warm && it.warm.length) ? '<button type="button" data-act="del-set" data-u="' + u + '">Remove set</button>' : '') +
       '<button type="button" data-act="ex-up" data-u="' + u + '"' + (i ? '' : ' disabled') + '>Move up</button><button type="button" data-act="ex-down" data-u="' + u + '"' + (i < d.items.length - 1 ? '' : ' disabled') + '>Move down</button>' +
@@ -970,7 +973,7 @@
   }
   /* ================= render and routing ================= */
   function render() {
-    var tab = state.ui.tab; charts = {};
+    var tab = state.ui.tab; charts = {}; histMemo = null;
     document.querySelectorAll('.tab').forEach(function (b) { if (b.dataset.tab === tab) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
     var lost = loadFail != null && syncSettled, su = !lost && syncSettled && needSetup(), wait = !syncSettled && (needSetup() || loadFail != null);
     document.body.classList.toggle('setup', !!(su || wait || lost));

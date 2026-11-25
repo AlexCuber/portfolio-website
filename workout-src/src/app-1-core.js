@@ -281,9 +281,10 @@
   }
   /* what the progress screens plot for one workout: the heaviest weight used, or (mode 'e1rm') the estimated 1-rep max */
   /* mode 'tot' is the work done that day: weight times reps added up over every set (reps, seconds or minutes added up when there is no weight) */
-  function liftVal(e, sets, mode) {
+  /* warm-up sets count toward Total, and only there: Oleksandr asked for that on 25 Nov */
+  function liftVal(e, sets, mode, warm) {
     if (!sets || !sets.length) return null;
-    if (mode === 'tot') return sets.reduce(function (a, x) { return a + (e.log === 'wr' ? (x.w || 0) * (x.r || 0) : (x.r || 0)); }, 0);
+    if (mode === 'tot') return sets.concat(e.log === 'wr' && warm ? warm : []).reduce(function (a, x) { return a + (e.log === 'wr' ? (x.w || 0) * (x.r || 0) : (x.r || 0)); }, 0);
     if (e.log === 'wr' && mode !== 'e1rm') return Math.max.apply(null, sets.map(function (s) { return s.w || 0; }));
     return metric(e, sets);
   }
@@ -312,7 +313,7 @@
   }
   function historyOf(exId, list) {
     var out = [];
-    (list || finished()).forEach(function (s) { (s.entries || []).forEach(function (en) { if (en.ex === exId && en.sets && en.sets.length) out.push({ date: s.date, key: s.key, id: s.id, sets: en.sets, note: en.note }); }); });
+    (list || finished()).forEach(function (s) { (s.entries || []).forEach(function (en) { if (en.ex === exId && en.sets && en.sets.length) out.push({ date: s.date, key: s.key, id: s.id, sets: en.sets, note: en.note, warm: en.warm }); }); });
     return out;
   }
   function lastEntry(key, exId, excludeId) {
@@ -342,7 +343,7 @@
     var prev = exPrev(exId, excludeId); if (!prev.n) return out;
     sets.forEach(function (x) { if (x.w > out.maxW) out.maxW = x.w; out.vol += (x.w || 0) * x.r; });
     out.best = metric(e, sets);
-    if (e.log === 'wr') { out.w = out.maxW > prev.maxW + 1e-9; out.v = out.vol > prev.maxVol + 1e-9; }
+    if (e.log === 'wr') out.w = out.maxW > prev.maxW + 1e-9; /* more total weight in a session is no longer a record: adding a set was enough to set it off */
     out.b = out.best > prev.best + 1e-9;
     return out;
   }
@@ -383,7 +384,8 @@
   }
   function lastDone(key) { var f = finished(); for (var i = f.length - 1; i >= 0; i--) if (f[i].key === key) return f[i]; return null; }
   function countSets(s) { return (s.entries || []).reduce(function (a, en) { return a + (exi(en.ex).log === 'cardio' ? 0 : en.sets.length); }, 0); }
-  function volOf(s) { var v = 0; (s.entries || []).forEach(function (en) { var e = exi(en.ex); if (e.log !== 'wr' && e.log !== 'bw') return; en.sets.forEach(function (x) { v += (x.w || 0) * x.r; }); }); return v; }
+  /* weight lifted in a workout: every set, warm-up sets included (they count here and in an exercise's Total, nowhere else) */
+  function volOf(s) { var v = 0; (s.entries || []).forEach(function (en) { var e = exi(en.ex); if (e.log !== 'wr' && e.log !== 'bw') return; en.sets.concat(en.warm || []).forEach(function (x) { v += (x.w || 0) * x.r; }); }); return v; }
   function durOf(s) { if (s.dur != null) return s.dur; if (!s.startedAt || !s.finishedAt) return null; var d = (s.finishedAt - s.startedAt) / 1000; return d >= 300 && d <= 18000 ? d : null; }
   function weeksWith(list) { var w = {}; list.forEach(function (s) { var k = weekStart(s.date); (w[k] = w[k] || []).push(s); }); return w; }
   function streakWeeks(list) {
@@ -398,7 +400,7 @@
     list.forEach(function (s) { (s.entries || []).forEach(function (en) { seen[en.ex] = en.name; }); });
     Object.keys(seen).forEach(function (id) {
       var e = exi(id, seen[id]), h = e.sport ? [] : historyOf(id, list), best = -Infinity, bi = 0, prs = 0, vals = [];
-      h.forEach(function (x, i) { var v = mode ? liftVal(e, x.sets, mode) : metric(e, x.sets); vals.push(v); if (v > best + 1e-9) { if (i) prs++; best = v; bi = i; } });
+      h.forEach(function (x, i) { var v = mode ? liftVal(e, x.sets, mode, x.warm) : metric(e, x.sets); vals.push(v); if (v > best + 1e-9) { if (i) prs++; best = v; bi = i; } });
       if (h.length) out.push({ id: id, e: e, name: e.gone ? seen[id] : e.name, best: best, date: h[bi].date, sets: h[bi].sets, vals: vals, n: h.length, prs: prs, first: vals[0], last: vals[vals.length - 1], lastDate: h[h.length - 1].date });
     });
     return out;
@@ -435,6 +437,7 @@
   function warmSets(it) { var out = []; (it.warm || []).forEach(function (x) { var r = num(x.r), w = num(x.w); if (x.d && r != null && r > 0) out.push({ w: w == null || w < 0 ? 0 : w, r: r }); }); return out; }
   function blankRows(n) { var r = []; for (var i = 0; i < n; i++) r.push({ w: '', r: '', d: false }); return r; }
   function startDraft(key, from) {
+    histMemo = null;
     var r = key === 'free' ? null : getRoutine(key);
     var d = { v: 2, id: from ? from.id : uid(), key: key, name: from ? (from.name || (r ? shortName(r.name) : 'Workout')) : (r ? shortName(r.name) : 'Workout'), date: from ? from.date : today(),
       startedAt: from ? from.startedAt : Date.now(), notes: from ? (from.notes || '') : '', editing: !!from, dur: from ? durOf(from) : null, items: [] };
@@ -442,7 +445,8 @@
     (r ? r.items : []).forEach(function (it, i) {
       var src = Object.assign({}, it, { n: it.n || String(i + 1) });
       var prev = from ? (from.entries || []).filter(function (en, j) { if (used[j]) return false; if (en.n === src.n && en.ex === it.ex) { used[j] = 1; return true; } return false; })[0] : null;
-      var last = lastEntry(key, it.ex, d.id), count = prev ? Math.max(prev.sets.length, it.sets) : Math.max(it.sets, last && last.key === key ? Math.min(last.sets.length, it.sets + 2) : 0), rows = [];
+      /* as many rows as today's target has: the planned sets, plus any extra working sets done last time (two at most) */
+      var last = lastEntry(key, it.ex, d.id), tgN = !prev && last && last.key === key ? targetFor(it, exi(it.ex), last, exHist(it.ex)) : null, count = prev ? Math.max(prev.sets.length, it.sets) : Math.max(it.sets, tgN && tgN.sets ? Math.min(tgN.sets.length, it.sets + 2) : 0), rows = [];
       for (var k = 0; k < count; k++) { var ps = prev && prev.sets[k]; rows.push(ps ? rowFrom(exi(it.ex), ps) : { w: '', r: '', d: false }); }
       var ni = itemFrom(src, rows, prev ? prev.note : ''); if (prev && prev.warm) ni.warm = warmRows(prev.warm); d.items.push(ni);
     });

@@ -360,6 +360,19 @@
       case 'lift':
         if (a.dataset.step) { state.ui.ex = a.dataset.ex; saveLocal(); render(); enter(); var nb = view.querySelector('.lift-nav [data-step="' + a.dataset.step + '"]'); if (nb) nb.focus({ preventScroll: true }); break; }
         state.ui.ex = a.dataset.ex; state.ui.prog = 'lifts'; state.ui.liftView = 'one'; closeSheet(); go('progress', true); break;
+      case 'step-open': {
+        it = findItem(u); if (!it) break; e = exi(it.ex); histMemo = null;
+        var sw = num((it.rows.filter(function (r) { return num(r.w) > 0; })[0] || {}).w), sl = lastEntry(d.key, it.ex, d.id); if (sw == null && sl) sw = workSplit(e, it, sl.sets).W;
+        var si = stepInfo(e, it.ex, sw || 20);
+        openSheet(head('Weight step', e.name) + '<p class="sheet-p">The next heavier weight is ' + fmt(si.v) + ' ' + UW() + ' up' + (si.by === 'set' ? ', as you set it.' : si.by === 'log' ? ', worked out from the weights you have logged.' : ', the usual step. Set it if this machine or these dumbbells move differently.') + '</p>' +
+          '<div class="weigh-form"><label class="field big"><input id="step-in" type="text" inputmode="decimal" autocomplete="off" placeholder="' + fmt(si.v) + '" aria-label="Weight step in ' + UW() + '"><span>' + UW() + '</span></label>' +
+          '<button class="btn primary block" type="button" data-act="step-save" data-u="' + u + '">Save</button>' + (si.by === 'set' ? '<button class="btn quiet block" type="button" data-act="step-clear" data-u="' + u + '">Work it out from my log</button>' : '') + '</div>');
+        var sin = document.getElementById('step-in'); if (sin) sin.focus(); break; }
+      case 'step-save': {
+        it = findItem(u); var sv = num(document.getElementById('step-in').value);
+        if (!it || sv == null || sv < 0.25 || sv > 50) { toast('Enter a step between 0.25 and 50 ' + UW() + '.'); break; }
+        state.settings.steps = state.settings.steps || {}; state.settings.steps[it.ex] = sv; saveSettings(); closeSheet(); render(); toast('Step set to ' + fmt(sv) + ' ' + UW()); break; }
+      case 'step-clear': it = findItem(u); if (it && state.settings.steps) { delete state.settings.steps[it.ex]; saveSettings(); closeSheet(); render(); } break;
       case 'weigh-open': {
         var wks = Object.keys(state.body).sort().filter(function (k) { return state.body[k].weight != null; }), wl = wks.length ? state.body[wks[wks.length - 1]].weight : null;
         openSheet(head('Log weight', fmtDate(today())) + '<div class="weigh-form"><label class="field big"><input id="weigh-in" type="text" inputmode="decimal" autocomplete="off" placeholder="' + (wl != null ? fmt(wl) : '') + '" aria-label="Body weight in ' + UW() + '"><span>' + UW() + '</span></label>' +
@@ -418,7 +431,7 @@
       case 'rir': it = findItem(u); if (it && it.rows[i]) { it.rows[i].rir = +a.dataset.v; touchDraft(); render(); } break;
       case 'timer': if (d && d.timer && d.timer.u === u && d.timer.i === i) timerStop(false); else timerStart(u, i); break;
       case 'help-open': helpSheet(u); break;
-      case 'help-step': if (help) { it = findItem(help.u); if (it) { e = exi(it.ex); var hs = wStep(e, help.w || 0); help.w = Math.max(0, roundTo((help.w || 0) + (+a.dataset.d) * hs, hs)); document.getElementById('help-w').value = fmt(help.w); document.getElementById('help-body').innerHTML = helpBody(); } } break;
+      case 'help-step': if (help) { it = findItem(help.u); if (it) { e = exi(it.ex); var hs = stepInfo(e, it.ex, help.w || 0).v; help.w = Math.max(0, roundTo((help.w || 0) + (+a.dataset.d) * hs, hs)); document.getElementById('help-w').value = fmt(help.w); document.getElementById('help-body').innerHTML = helpBody(); } } break;
       case 'help-bar': if (help) { it = findItem(help.u); if (it) { state.settings.bars = state.settings.bars || {}; state.settings.bars[it.ex] = +a.dataset.v; saveSettings(); document.getElementById('help-body').innerHTML = helpBody(); } } break;
       case 'warm-add': if (help) { it = findItem(help.u); if (it && help.w > 0) { it.warm = warmups(help.w, exi(it.ex), help.full).map(function (x) { return { w: fmt(x.w), r: String(x.r), d: false }; }); touchDraft(); closeSheet(); render(); toast(it.warm.length > 1 ? 'Warm-up sets added above set 1.' : 'Warm-up set added above set 1.'); } } break;
       case 'warm-clear': if (help) { it = findItem(help.u); if (it) { delete it.warm; touchDraft(); closeSheet(); render(); } } break;
