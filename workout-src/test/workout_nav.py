@@ -32,7 +32,7 @@ async def main():
                 bg = await pg.evaluate("getComputedStyle(document.getElementById('wbar')).backgroundImage + getComputedStyle(document.getElementById('wbar')).color")
                 ok('gradient' not in bg and (await pg.evaluate("getComputedStyle(document.getElementById('wbar')).color")) == (await pg.evaluate("getComputedStyle(document.body).color")), 'the top bar takes the page colours, not a dark block')
                 tg = await pg.evaluate("[...document.querySelectorAll('.exc-target')].map(e => [e.innerText, e.scrollWidth <= e.clientWidth, Math.round(e.getBoundingClientRect().height)])")
-                ok(len(tg) > 3 and all(t[1] and t[2] <= 26 and '\u2013' not in t[0] for t in tg), 'the line under each exercise name is one line, not cut, with short dashes: %s' % tg[0])
+                ok(len(tg) >= 1 and all(t[1] and t[2] <= 26 and '\u2013' not in t[0] for t in tg), 'the line under the open exercise\'s name is one line, not cut, with short dashes: %s' % tg[0])
                 rr = await pg.evaluate("['#rest', '#wmini'].map(q => parseFloat(getComputedStyle(document.querySelector(q)).borderTopLeftRadius))"); ok(all(r >= 30 for r in rr), 'the countdown bar and the minimised bar have round ends: %s' % rr)
                 br = await pg.evaluate("['#wbar-fin', '.seg', '.seg button', '.btn', '.icon-btn'].map(q => { const e = document.querySelector(q); return e ? [q, parseFloat(getComputedStyle(e).borderTopLeftRadius) >= e.getBoundingClientRect().height / 2 - 1] : [q, true] })")
                 ok(all(x[1] for x in br), 'buttons and segmented controls have fully round ends: %s' % br)

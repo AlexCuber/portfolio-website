@@ -28,6 +28,10 @@ async def main(which):
         srv.send_signal(signal.SIGTERM)
     print('ERRORS:', len(errors)); [print('  ', e) for e in errors[:30]]
 
+async def op(pg, u):
+    """opens an exercise that is folded to a line"""
+    b = pg.locator('button#x-%s' % u)
+    if await b.count(): await b.click(); await pg.wait_for_timeout(350)
 async def flow_basic(ctx, shot):
     c, pg = await ctx()
     await shot(pg, 't-home')
@@ -133,9 +137,9 @@ async def flow_sync(ctx, shot):
     await pg.click('[data-act="add-ex"]'); await pg.click('[data-act="pick-group"][data-key="Cardio"]'); await pg.wait_for_timeout(200); await pg.click('[data-act="pick"][data-ex="rowing-machine"]'); await pg.wait_for_timeout(300)
     await pg.click('[data-act="add-ex"]'); await pg.click('[data-act="pick"][data-ex="plank"]'); await pg.wait_for_timeout(300)
     us = await pg.evaluate("JSON.parse(localStorage.getItem('workout-log-v1')).draft.items.map(i=>i.u)")
-    await pg.fill('#w-%s-0' % us[0], '20'); await pg.fill('#r-%s-0' % us[0], '10'); await pg.click('[data-act="tick"][data-u="%s"][data-i="0"]' % us[0])
-    await pg.fill('#r-%s-0' % us[1], '12'); await pg.click('[data-act="tick"][data-u="%s"][data-i="0"]' % us[1])
-    await pg.fill('#r-%s-0' % us[2], '45'); await pg.click('[data-act="tick"][data-u="%s"][data-i="0"]' % us[2]); await pg.wait_for_timeout(300)
+    await op(pg, us[0]); await pg.fill('#w-%s-0' % us[0], '20'); await pg.fill('#r-%s-0' % us[0], '10'); await pg.click('[data-act="tick"][data-u="%s"][data-i="0"]' % us[0])
+    await op(pg, us[1]); await pg.fill('#r-%s-0' % us[1], '12'); await pg.click('[data-act="tick"][data-u="%s"][data-i="0"]' % us[1])
+    await op(pg, us[2]); await pg.fill('#r-%s-0' % us[2], '45'); await pg.click('[data-act="tick"][data-u="%s"][data-i="0"]' % us[2]); await pg.wait_for_timeout(300)
     await shot(pg, 's-free')
     await pg.evaluate("(()=>{})()")
     await pg.click('[data-act="finish-now"]'); await pg.wait_for_timeout(600); await shot(pg, 's-summary', full=False)

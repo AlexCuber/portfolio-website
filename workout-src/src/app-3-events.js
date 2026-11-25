@@ -49,9 +49,10 @@
   function drawMini() {
     var d = state.draft, el = document.getElementById('wmini'); if (!el || el.hidden || !d || d.editing) return;
     var busy = !restEl.hidden, p = draftProgress(), next = null;
-    d.items.some(function (it) { if (it.rows.some(function (r) { return !r.d; })) { next = it; return true; } return false; });
+    next = curItem(d); if (next && !undone(next)) next = null;
+    if (!next) d.items.some(function (it) { if (undone(it)) { next = it; return true; } return false; });
     document.getElementById('wmini-dot').hidden = !busy;
-    document.getElementById('wmini-a').textContent = busy ? restL.textContent : (d.name || 'Workout');
+    document.getElementById('wmini-a').textContent = busy ? (d.timer ? restL.textContent : restEl.classList.contains('over') ? 'Rest is over' : 'Rest') : (d.name || 'Workout');
     document.getElementById('wmini-t').textContent = busy ? restT.textContent : fmtClock((Date.now() - d.startedAt) / 1000);
     document.getElementById('wmini-s').textContent = (next ? exi(next.ex).name + ' · ' : '') + p.done + ' of ' + p.all + ' sets done';
   }
@@ -64,7 +65,7 @@
     var left = (rest.until - Date.now()) / 1000;
     if (left <= -8) { stopRest(); return; }
     restEl.hidden = false; restEl.classList.toggle('over', left <= 0);
-    restL.textContent = left > 0 ? 'Rest' : 'Rest is over';
+    restL.textContent = left > 0 ? (nextSet ? 'Next ' + nextSet : 'Rest') : 'Rest is over';
     restT.textContent = left > 0 ? fmtClock(Math.ceil(left)) : 'Go';
     restArc.setAttribute('stroke-dasharray', RC.toFixed(1));
     restArc.setAttribute('stroke-dashoffset', (RC * (1 - Math.max(0, Math.min(1, left / rest.total)))).toFixed(1));
@@ -213,9 +214,15 @@
 
   /* ================= actions ================= */
   function scrollToItem(u) { var el = document.getElementById('x-' + u); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' }); }
+  /* brings the exercise that has just opened under the workout bar; the page does not move when it is already in view */
+  function showItem(u) {
+    var el = document.getElementById('x-' + u); if (!el) return;
+    var r = el.getBoundingClientRect(), top = 104, vh = window.innerHeight;
+    if (r.top < top || r.top > vh * 0.45) window.scrollTo({ top: Math.max(0, window.scrollY + r.top - top), behavior: reduceMotion ? 'auto' : 'smooth' });
+  }
   function pickExercise(exId) {
     var p = picker, d = state.draft, e = exi(exId); if (!p) return;
-    if (p.mode === 'draft' && d) { var it = newItem(exId); d.items.push(it); touchDraft(); closeSheet(); render(); scrollToItem(it.u); }
+    if (p.mode === 'draft' && d) { var it = newItem(exId); d.items.push(it); d.cur = it.u; noteOpen = null; touchDraft(); closeSheet(); render(); scrollToItem(it.u); }
     else if (p.mode === 'replace' && d) { var ni = swapItem(p.u, exId); if (ni) { closeSheet(); render(); scrollToItem(ni.u); } }
     else if (p.mode === 'editor' && editor) { editor.items.push({ ex: exId, sets: e.log === 'cardio' ? 1 : e.sets, lo: e.lo, hi: e.hi, restSec: e.restSec, rir: e.rir, link: false }); render(); toast('Added ' + e.name); }
     else if (p.mode === 'lift') { state.ui.ex = exId; saveLocal(); closeSheet(); render(); enter(); }
@@ -292,14 +299,20 @@
             if (rc.b && !was.b && e.log !== 'wr') news.push(e.log === 'bw' ? 'Most reps yet on ' + e.name + ': ' + fmt(rc.best) : e.log === 'time' ? 'Longest hold yet on ' + e.name + ': ' + fmt(rc.best) + ' s' : e.sport ? 'Longest ' + e.name.toLowerCase() + ' yet: ' + distText(e, rc.best) : 'Longest ' + e.name + ' yet: ' + fmt(rc.best) + ' min');
             it.recNew = news.length ? { w: rc.w && !was.w, v: rc.v && !was.v, b: rc.b && !was.b } : null;
             it.rec = { w: rc.w, v: rc.v, b: rc.b };
-            if (news.length) toast(news[0], true);
+            if (news.length) toast(news.length > 1 ? news.length + ' records on ' + e.name : news[0], true);
             if (s.pr || news.length) { var br = a.getBoundingClientRect(); confetti(news.length ? 34 : 22, br.left + br.width / 2, br.top + br.height / 2); }
             if (state.settings.autoRest && it.restSec >= 30) startRest(it.restSec); else if (it.restSec < 30) stopRest();
           }
         } else { s.d = false; s.pr = false; delete s.rir; if (!d.editing) { var rc2 = itemRecords(it, d); it.rec = { w: rc2.w, v: rc2.v, b: rc2.b }; } }
-        touchDraft(); render(); break;
+        var moved = s.d && !d.editing && advance(d, it); if (moved) { delMode = null; noteOpen = null; }
+        if (s.d && !d.editing) { tipSeen('t'); state.ui.tips.t = 1; }
+        touchDraft(); render(); if (moved && d.cur) showItem(d.cur); break;
       case 'add-set': it = findItem(u); if (it) { var lr = it.rows[it.rows.length - 1]; it.rows.push({ w: lr ? lr.w : '', r: '', d: false }); touchDraft(); render(); } break;
-      case 'del-set': delMode = delMode === u ? null : u; render(); break;
+      case 'del-set': delMode = delMode === u ? null : u; if (!scrim.hidden) closeSheet(); render(); break;
+      case 'ex-open': it = findItem(u); if (it && d) { d.cur = u; delMode = null; noteOpen = null; touchDraft(); render(); showItem(u); } break;
+      case 'note-open': noteOpen = u; render(); var ni = document.getElementById('note-' + u); if (ni) ni.focus(); break;
+      case 'warm-plan': { var wr = d && d.key !== 'free' ? getRoutine(d.key) : null; if (wr && wr.warmup) openSheet(head('Warm-up') + (wr.focus ? '<p class="sub">' + esc(wr.focus) + '</p>' : '') + '<p class="sheet-p">' + esc(wr.warmup) + '</p>'); break; }
+      case 'notes-go': { var dn = document.getElementById('draft-notes'); if (dn) { dn.scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' }); dn.focus({ preventScroll: true }); } break; }
       case 'del-row': it = findItem(u); if (it) {
         if (a.dataset.w) { if (it.warm) { it.warm.splice(i, 1); if (!it.warm.length) delete it.warm; } }
         else if (it.rows.length > 1) { it.rows.splice(i, 1); if (d.timer && d.timer.u === u) d.timer = null; }
@@ -310,10 +323,10 @@
       case 'ex-menu': menuSheet(u); break;
       case 'ex-replace': openPicker('replace', { u: u }); break;
       case 'ex-up': case 'ex-down': it = findItem(u); if (it) { var ix = d.items.indexOf(it); swapItems(d.items, ix, ix + (act === 'ex-up' ? -1 : 1)); touchDraft(); closeSheet(); render(); scrollToItem(u); } break;
-      case 'ex-remove': it = findItem(u); if (it) { d.items.splice(d.items.indexOf(it), 1); touchDraft(); closeSheet(); render(); } break;
+      case 'ex-remove': it = findItem(u); if (it) { d.items.splice(d.items.indexOf(it), 1); if (d.cur === u) d.cur = null; touchDraft(); closeSheet(); render(); } break;
       case 'add-this': if (d && !d.editing) { var ni = newItem(a.dataset.ex); d.items.push(ni); touchDraft(); closeSheet(); go('log', true); scrollToItem(ni.u); toast('Added to your workout'); } break;
-      case 'finish': if (d && draftCount()) { var p = draftProgress(); if (p.done >= p.all || arm('finish', chrome)) finishDraft(); } break;
-      case 'finish-now': if (d && draftCount()) finishDraft(); break;
+      case 'finish': if (d && draftCount()) { var p = draftProgress(); if (p.done >= p.all || arm('finish', chrome)) { tipsDone(); finishDraft(); } } break;
+      case 'finish-now': if (d && draftCount()) { tipsDone(); finishDraft(); } break;
       case 'discard': if (d && arm('discard', render)) { state.draft = null; stopRest(); touchDraft(true); applyTheme(); wake(); render(); window.scrollTo(0, 0); } break;
       case 'rest-skip': if (d && d.timer) timerStop(false); else stopRest(); break;
       case 'rest-sub':

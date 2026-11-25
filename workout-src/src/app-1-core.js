@@ -234,6 +234,34 @@
   function restText(sec) { return !sec ? '' : sec < 120 ? sec + ' s' : (sec % 60 ? (Math.round(sec / 6) / 10) : sec / 60) + ' min'; }
   function repsText(it, e) { return it.reps || (it.lo + '–' + it.hi + (e.unit === 'reps' ? '' : ' ' + e.unit)); }
   function isLinked(items, i) { return !!(items[i].link || (i > 0 && items[i - 1].link)); }
+  /* the exercises done back to back with this one (a named group or a linked run), itself included, in order */
+  function mates(d, it) {
+    var its = d.items, i = its.indexOf(it), a = i, b = i; if (i < 0) return [];
+    if (it.group) { while (a > 0 && its[a - 1].group === it.group) a--; while (b < its.length - 1 && its[b + 1].group === it.group) b++; }
+    else { while (a > 0 && its[a - 1].link && !its[a - 1].group) a--; while (b < its.length - 1 && its[b].link && !its[b + 1].group) b++; }
+    return its.slice(a, b + 1);
+  }
+  function undone(it) { return it.rows.some(function (r) { return !r.d; }); }
+  /* The workout shows one exercise open and the rest folded to a line. Open is the one tapped (draft.cur),
+     otherwise the first with a set still to do. Editing a saved workout keeps everything open. */
+  function curItem(d) {
+    if (!d || d.editing) return null;
+    var c = d.cur ? findItem(d.cur) : null; if (c) return c;
+    for (var i = 0; i < d.items.length; i++) if (undone(d.items[i])) return d.items[i];
+    return null;
+  }
+  /* after a set is ticked: when everything in the open exercise (and its superset) is done, the next one with sets left opens.
+     When that was the last set of the workout the exercise stays open. */
+  function advance(d, it) {
+    var ms = mates(d, it); if (ms.some(undone)) return false;
+    var its = d.items, n = its.length, from = its.indexOf(ms[ms.length - 1]);
+    for (var k = 1; k <= n; k++) { var x = its[(from + k) % n]; if (undone(x)) { d.cur = x.u; return true; } }
+    d.cur = it.u; return false; /* nothing left to do: the last one stays open */
+  }
+  /* one-time tips: each shows until the workout it first appeared in is finished. A log with a few workouts has seen them. */
+  var tipShown = {};
+  function tipSeen(k) { var t = state.ui.tips; if (!t) t = state.ui.tips = Object.keys(state.sessions).length >= 3 ? { t: 1, s: 1, b: 1 } : {}; return !!t[k]; }
+  function tipsDone() { tipSeen('t'); Object.keys(tipShown).forEach(function (k) { state.ui.tips[k] = 1; }); tipShown = {}; }
   function rStats(r) {
     if (r.stats && r.builtin) return { n: r.items.length, sets: r.stats.sets, minutes: r.stats.minutes };
     var sets = 0, sec = 480;
@@ -331,20 +359,20 @@
   }
   function hint(it, e, last) {
     var range = repsText(it, e);
-    if (e.sport) return { t: last ? sportHint(e, last) : 'First time: start the stopwatch when you set off, or type the distance and time afterwards.' };
+    if (e.sport) return { t: last ? sportHint(e, last) : 'First time: start the stopwatch when you set off, or type the distance and time afterwards.', s: last ? sportHint(e, last).replace('. Match it, or', ' · match it, or').replace(/\.$/, '') : 'Start the stopwatch, or type it in afterwards' };
     if (!last) {
-      if (e.log === 'cardio') return { t: 'First time: an easy pace you can hold a conversation at.' };
-      if (e.log === 'time') return { t: 'First time: hold good form for ' + range + '.' };
-      return { t: 'First time: find a weight you can do for ' + range + ' reps' + (it.rir && it.rir !== '—' ? ' with ' + it.rir + ' in reserve.' : '.') };
+      if (e.log === 'cardio') return { t: 'First time: an easy pace you can hold a conversation at.', s: 'First time · an easy pace' };
+      if (e.log === 'time') return { t: 'First time: hold good form for ' + range + '.', s: 'First time · hold for ' + range };
+      return { t: 'First time: find a weight you can do for ' + range + ' reps' + (it.rir && it.rir !== '—' ? ' with ' + it.rir + ' in reserve.' : '.'), s: 'First time · find a weight for ' + range + ' reps' };
     }
-    if (e.log === 'cardio') return { t: 'Same again, or a few minutes longer.' };
+    if (e.log === 'cardio') return { t: 'Same again, or a few minutes longer.', s: 'Same again, or a few minutes longer' };
     var planned = last.sets.slice(0, it.sets);
     if (planned.length >= it.sets && planned.every(function (s) { return s.r >= it.hi; })) {
-      if (e.log === 'time') return { t: 'Every hold reached ' + it.hi + ' s. Make it harder or add a set.', up: true };
-      if (e.log === 'bw' && !planned[0].w) return { t: 'Every set reached ' + it.hi + '. Add a little weight today and build back up from ' + it.lo + '.', up: true };
-      return { t: 'Every set reached ' + it.hi + '. Add weight today (about 2.5–5%) and build back up from ' + it.lo + '.', up: true };
+      if (e.log === 'time') return { t: 'Every hold reached ' + it.hi + ' s. Make it harder or add a set.', s: 'Every hold reached ' + it.hi + ' s · make it harder', up: true };
+      if (e.log === 'bw' && !planned[0].w) return { t: 'Every set reached ' + it.hi + '. Add a little weight today and build back up from ' + it.lo + '.', s: 'Every set reached ' + it.hi + ' · add a little weight', up: true };
+      return { t: 'Every set reached ' + it.hi + '. Add weight today (about 2.5–5%) and build back up from ' + it.lo + '.', s: 'Every set reached ' + it.hi + ' · add weight today', up: true };
     }
-    return { t: e.log === 'time' ? 'Hold a little longer than last time on at least one set.' : 'Keep the weight. Beat last time by one rep on at least one set.' };
+    return { t: e.log === 'time' ? 'Hold a little longer than last time on at least one set.' : 'Keep the weight. Beat last time by one rep on at least one set.', s: e.log === 'time' ? 'Hold a little longer on one set' : 'Same weight · one more rep on one set' };
   }
   function nextKey() {
     var f = finished(), ids = routineList().filter(function (r) { return r.core !== false; }).map(function (r) { return r.id; });
