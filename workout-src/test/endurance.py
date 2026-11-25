@@ -40,7 +40,7 @@ async def main():
                 await scroll_to('.out-tiles'); await pg.wait_for_timeout(300)
                 f1 = await pg.locator('.out-tile svg').first.inner_html(); await pg.wait_for_timeout(350); f2 = await pg.locator('.out-tile svg').first.inner_html(); ok(f1 != f2, 'they are animated')
                 await shot('train')
-                ring0 = await pg.locator('.ring-n b').inner_text()
+                ring0 = await pg.locator('.week-n b').inner_text()
                 # ---- a run
                 await pg.click('[data-key="out-run"]'); await pg.wait_for_timeout(400)
                 d = await pg.evaluate(LS + ".draft"); u = d['items'][0]['u']
@@ -59,7 +59,7 @@ async def main():
                 await shot('summary'); await pg.click('[data-act="sheet-x"]'); await pg.wait_for_timeout(250)
                 s = [x for x in (await pg.evaluate(LS + ".sessions")).values() if x['key'] == 'out-run'][0]
                 ok(s['entries'][0]['sets'] == [{'w': 0, 'r': 28.6667, 'dist': 5.2}] and s['dur'] == 1720 and s['core'] is False, 'saved as distance and minutes, with the logged time as its length: %s' % s['entries'][0]['sets'])
-                ok(await pg.locator('.day.today.done.out').count() == (0 if any(x['date'] == D(0) for x in st['sessions'].values()) else 1) and await pg.locator('.ring-n b').inner_text() == ring0, 'today is ticked in the endurance colour and the weekly goal count is unchanged (%s)' % ring0)
+                ok(await pg.locator('.day.today.done.out').count() == (0 if any(x['date'] == D(0) for x in st['sessions'].values()) else 1) and await pg.locator('.week-n b').inner_text() == ring0, 'today is ticked in the endurance colour and the weekly goal count is unchanged (%s)' % ring0)
                 ok('5.2 km' in await pg.locator('.out-tile').first.inner_text(), 'the Run tile shows the last distance')
                 # ---- the second run: last time in grey, one tap, then longer and faster
                 await pg.click('[data-key="out-run"]'); await pg.wait_for_timeout(400); u = await pg.evaluate(LS + ".draft.items[0].u")
@@ -136,11 +136,11 @@ async def main():
                 await pg.wait_for_timeout(300); t = await pg.locator('#view').inner_text()
                 ok(all(x in t for x in ('Run', 'Trail run', 'Bike ride', 'Swim', 'Open-water swim')), 'the exercise library has an Endurance group with five entries'); await shot('library')
                 # ---- counting toward the goal, and units
-                await pg.click('[data-tab="log"]'); await pg.wait_for_timeout(200); r0 = await pg.locator('.ring-n b').inner_text()
+                await pg.click('[data-tab="log"]'); await pg.wait_for_timeout(200); r0 = await pg.locator('.week-n b').inner_text()
                 await pg.evaluate("(()=>{const s=%s; const id='outnow'; s.sessions[id]={v:2,id:id,key:'out-run',name:'Run',date:new Date().toLocaleDateString('sv'),startedAt:0,finishedAt:1,dur:1800,core:false,notes:'',entries:[{n:'1',ex:'outdoor-run',name:'Run',note:'',sets:[{w:0,r:30,dist:5}]}],updatedAt:1}; localStorage.setItem('workout-log-v1', JSON.stringify(s))})()" % LS); await pg.reload(); await pg.wait_for_timeout(500)
-                r1 = await pg.locator('.ring-n b').inner_text()
+                r1 = await pg.locator('.week-n b').inner_text()
                 await pg.click('[data-act="settings"]'); await pg.wait_for_timeout(250); await pg.click('[data-act="toggle"][data-k="outCore"]'); await pg.wait_for_timeout(200); await pg.evaluate("document.querySelector('#scrim').click()"); await pg.wait_for_timeout(250)
-                r2 = await pg.locator('.ring-n b').inner_text(); ok(r0 == r1 and int(r2.split('/')[0]) > int(r1.split('/')[0]), 'runs count toward the weekly goal only when the setting is on (%s, %s, %s)' % (r0, r1, r2))
+                r2 = await pg.locator('.week-n b').inner_text(); ok(r0 == r1 and int(r2.split('/')[0]) > int(r1.split('/')[0]), 'runs count toward the weekly goal only when the setting is on (%s, %s, %s)' % (r0, r1, r2))
                 await pg.click('[data-act="settings"]'); await pg.wait_for_timeout(250); await pg.click('[data-act="unit"][data-v="lb"]'); await pg.wait_for_timeout(150); await pg.click('[data-act="unit"][data-v="lb"]'); await pg.wait_for_timeout(400); await pg.evaluate("document.querySelector('#scrim').click()")
                 sx = await pg.evaluate(LS + ".sessions.out7.entries[0].sets[0]"); ok(abs(sx['dist'] - 6.21) < 0.011 and sx['r'] == 57.5, 'switching to pounds turns 10 km into 6.21 miles and leaves the time alone: %s' % sx)
                 await pg.click('[data-tab="progress"]'); await pg.click('[data-act="prog"][data-v="endur"]'); await pg.click('[data-act="sport"][data-v="run"]'); await pg.wait_for_timeout(900); t = await pg.locator('#view').inner_text()

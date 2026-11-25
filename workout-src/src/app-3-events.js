@@ -360,6 +360,16 @@
       case 'lift':
         if (a.dataset.step) { state.ui.ex = a.dataset.ex; saveLocal(); render(); enter(); var nb = view.querySelector('.lift-nav [data-step="' + a.dataset.step + '"]'); if (nb) nb.focus({ preventScroll: true }); break; }
         state.ui.ex = a.dataset.ex; state.ui.prog = 'lifts'; state.ui.liftView = 'one'; closeSheet(); go('progress', true); break;
+      case 'weigh-open': {
+        var wks = Object.keys(state.body).sort().filter(function (k) { return state.body[k].weight != null; }), wl = wks.length ? state.body[wks[wks.length - 1]].weight : null;
+        openSheet(head('Log weight', fmtDate(today())) + '<div class="weigh-form"><label class="field big"><input id="weigh-in" type="text" inputmode="decimal" autocomplete="off" placeholder="' + (wl != null ? fmt(wl) : '') + '" aria-label="Body weight in ' + UW() + '"><span>' + UW() + '</span></label>' +
+          '<button class="btn primary block" type="button" data-act="weigh-save">Save</button></div>');
+        var wi = document.getElementById('weigh-in'); if (wi) wi.focus(); break; }
+      case 'weigh-save': {
+        var wv = num(document.getElementById('weigh-in').value), lbw = isLb();
+        if (wv == null || wv < (lbw ? 66 : 30) || wv > (lbw ? 550 : 250)) { toast('Enter your weight in ' + UW() + '.'); document.getElementById('weigh-in').focus(); break; }
+        var wd = today(); state.body[wd] = Object.assign({}, state.body[wd] || {}, { date: wd, weight: wv, updatedAt: Date.now() }); mark('body/' + wd); closeSheet(); render(); toast('Saved'); break; }
+      case 'weigh-body': state.ui.tab = 'progress'; state.ui.prog = 'body'; saveLocal(); render(); window.scrollTo(0, 0); break;
       case 'body-del': delete state.body[a.dataset.id]; mark('body/' + a.dataset.id); render(); break;
       case 'lib': state.ui.lib = a.dataset.key; saveLocal(); render(); break;
       case 'pick-group': if (picker) { picker.group = a.dataset.key; pickerSheet(); } break;

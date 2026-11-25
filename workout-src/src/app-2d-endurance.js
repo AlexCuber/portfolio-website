@@ -37,7 +37,7 @@
     }
     f.forEach(function (s) { if (s.date < ws) return; sessSports(s).forEach(function (b) { wk[b.sport] = r2((wk[b.sport] || 0) + b.dist); }); });
     SPORTS.forEach(function (sp) { if (wk[sp[0]]) bits.push(distText({ sport: sp[0] }, wk[sp[0]]) + ' ' + sportWord(sp[0])); });
-    h += '<section class="card"><div class="plan-head"><div><h3>Endurance</h3><p class="sub">' + (bits.length ? 'This week: ' + esc(bits.join(', ')) + '.' : 'Tap one to start it.') + '</p></div><button class="btn quiet" type="button" data-act="out-edit" data-v="1">Edit</button></div>';
+    h += '<section class="card"><div class="plan-head"><div><h3>Endurance</h3>' + (bits.length ? '<p class="sub">This week: ' + esc(bits.join(', ')) + '</p>' : '') + '</div><button class="btn quiet" type="button" data-act="out-edit" data-v="1">Edit</button></div>';
     if (!tiles.length) return h + '<p class="empty">Nothing here. Tap Edit to add a run, a ride, a swim or any other cardio.</p></section>';
     h += '<div class="out-tiles">';
     tiles.forEach(function (id) {

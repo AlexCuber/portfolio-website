@@ -96,25 +96,44 @@
       n += day.filter(isCore).length;
       h += '<div class="day' + (day.length ? ' done' : '') + (day.length && day.every(allSport) ? ' out' : '') + (dt === today() ? ' today' : '') + '"><i>' + (day.length ? IC.check : '') + '</i>' + letters[i] + '</div>';
     }
-    var st = streakWeeks(f), C = 2 * Math.PI * 35, pct = Math.min(1, n / goal), left = goal - n;
-    var note = st >= 2 ? '<span class="pill hot">' + IC.flame + st + ' weeks in a row</span>' : '<span class="sub">' + (left <= 0 ? 'Weekly goal reached.' : left + ' more to reach this week’s goal.') + '</span>';
-    return '<section class="card"><div class="week"><div class="week-l"><div class="days" role="img" aria-label="' + n + ' of ' + goal + ' sessions done this week">' + h + '</div><div class="pills">' + note + '</div></div>' +
-      '<div class="ring"><svg viewBox="0 0 88 88" aria-hidden="true"><defs><linearGradient id="rg" gradientUnits="userSpaceOnUse" x1="44" y1="0" x2="44" y2="88"><stop offset="0" style="stop-color:var(--lime)"/><stop offset="0.55" style="stop-color:var(--ring-mid)"/><stop offset="1" style="stop-color:var(--ring-end)"/></linearGradient></defs>' +
-      '<circle class="trk" cx="44" cy="44" r="35"/>' + (pct > 0 ? '<circle class="ring-arc" cx="44" cy="44" r="35" style="stroke:url(#rg);--c:' + C.toFixed(1) + '" stroke-dasharray="' + C.toFixed(1) + '" stroke-dashoffset="' + (C * (1 - pct)).toFixed(1) + '"/>' : '') + '</svg>' +
-      '<div class="ring-n"><b>' + n + '/' + goal + '</b><span>this week</span></div></div></div></section>';
+    var st = streakWeeks(f);
+    return '<section class="card"><div class="week"><div class="days" role="img" aria-label="' + n + ' of ' + goal + ' sessions done this week">' + h + '</div>' +
+      '<div class="week-n' + (n >= goal ? ' hit' : '') + '" aria-hidden="true"><b>' + n + '<i>/' + goal + '</i></b><span>this week</span></div></div>' +
+      (st >= 2 ? '<div class="pills"><span class="pill hot">' + IC.flame + st + ' weeks in a row</span></div>' : '') + '</section>';
+  }
+  /* Train: a slim strip for the weigh-in (T3, N4). It appears once a weight or a goal weight exists, goes when today is
+     logged, and says so when the last weigh-in is four days old or the waist two weeks old (the plan's own rhythm). */
+  function weighStrip() {
+    var b = state.body, ks = Object.keys(b).sort(), wk = ks.filter(function (k) { return b[k].weight != null; }), ck = ks.filter(function (k) { return b[k].waist != null; });
+    if (!wk.length && state.settings.goalWeight == null) return '';
+    var td = today(), done = !!(b[td] && b[td].weight != null), last = wk[wk.length - 1], age = last ? Math.round((toDate(td) - toDate(last)) / 864e5) : null;
+    var wAge = ck.length ? Math.round((toDate(td) - toDate(ck[ck.length - 1])) / 864e5) : null, wDue = wAge != null && wAge >= 14, h = '';
+    if (done && !wDue) return '';
+    if (!done) {
+      var from = addDays(td, -6), wk7 = wk.filter(function (k) { return k >= from; }), avg = wk7.length ? Math.round(wk7.reduce(function (a, k) { return a + b[k].weight; }, 0) / wk7.length * 10) / 10 : null;
+      var late = age != null && age >= 4;
+      h += '<div class="weigh-row"><span class="weigh-t">' + (last ? '<b>' + fmt(avg != null ? avg : b[last].weight) + ' ' + UW() + '</b>' : '<b>Weight</b>') +
+        '<small' + (late ? ' class="late"' : '') + '>' + (late ? 'last weighed ' + age + ' days ago' : avg != null ? '7-day average' : last ? fmtDate(last) : 'no weigh-in yet') + '</small></span>' +
+        '<button class="act" type="button" data-act="weigh-open">Log weight</button></div>';
+    }
+    if (wDue) h += '<div class="weigh-row"><span class="weigh-t"><b>Waist</b><small class="late">measured ' + wAge + ' days ago</small></span><button class="act" type="button" data-act="weigh-body">Measure</button></div>';
+    return '<section class="card weigh">' + h + '</section>';
   }
   var planEdit = false;
   function planCard() {
     var list = routineList(), h = '', ini = sessInitials();
     if (!planEdit) {
-      h += '<section class="card"><div class="plan-head"><div><h3>Your plan</h3><p class="sub">Tap a session to start it.</p></div><button class="btn quiet" type="button" data-act="plan-edit">Edit</button></div>';
-      if (!list.length) return h + '<p class="empty">Your plan is empty. Tap Edit to bring a session back, or build a new one below.</p></section>';
-      h += '<ul class="list">';
+      var nk = wLive() ? null : nextKey(), rest = list.filter(function (x) { return x.id !== nk; });
+      h += '<section class="card"><div class="plan-head"><div><h3>' + (nk && list.length > rest.length ? 'Other sessions' : 'Your plan') + '</h3></div><button class="btn quiet" type="button" data-act="plan-edit">Edit</button></div>';
+      if (!list.length) return h + '<p class="empty">Your plan is empty. Tap Edit to bring a session back or build a new one.</p></section>';
+      if (!rest.length) return h + '</section>';
+      h += '<div class="sess-row">';
       list.forEach(function (x, i) {
-        var l = lastDone(x.id), s = rStats(x);
-        h += '<li><button class="item" type="button" data-act="start" data-key="' + esc(x.id) + '"><span class="avatar av' + (i % 5) + '" aria-hidden="true">' + esc(ini[x.id] || initials(x.name)) + '</span><span class="txt"><b>' + esc(x.name) + '</b><small>' + plural(s.n, 'exercise') + ' · ' + (l ? 'last done ' + fmtDate(l.date) : 'not logged yet') + '</small></span></button></li>';
+        if (x.id === nk) return;
+        var l = lastDone(x.id);
+        h += '<button class="sess" type="button" data-act="start" data-key="' + esc(x.id) + '"><span class="avatar av' + (i % 5) + '" aria-hidden="true">' + esc(ini[x.id] || initials(x.name)) + '</span><b>' + esc(shortName(x.name)) + '</b><small>' + (l ? fmtDate(l.date, true) : '&nbsp;') + '</small></button>';
       });
-      return h + '</ul></section>';
+      return h + '</div></section>';
     }
     var off = offList();
     h += '<section class="card"><div class="plan-head"><div><h3>Your plan</h3><p class="sub">Put the sessions in the order you train them. Next up follows this order.</p></div><button class="btn quiet" type="button" data-act="plan-done">Done</button></div>';
@@ -153,7 +172,7 @@
     } else if (r) {
       var st = rStats(r), ld = lastDone(key), seen = {}, strip = '';
       r.items.forEach(function (it) { var k = exi(it.ex).illo; if (seen[k] || Object.keys(seen).length >= 5) return; seen[k] = 1; strip += '<div class="illo">' + illoSvg(k, null, true) + '</div>'; });
-      h += '<section class="card next"><div class="spread"><span class="label">Next up</span><span class="next-last">' + (ld ? 'last done ' + fmtDate(ld.date) : 'not logged yet') + '</span></div>' +
+      h += '<section class="card next"><div class="spread"><span class="label">Next up</span><span class="next-last">' + (ld ? 'last done ' + fmtDate(ld.date) : '') + '</span></div>' +
         '<div><div class="next-title">' + esc(shortName(r.name)) + '</div>' + (r.focus ? '<p class="sub">' + esc(r.focus) + '</p>' : '') + '</div>' +
         (strip ? '<div class="strip">' + strip + '</div>' : '') +
         '<p class="next-meta">' + plural(st.n, 'exercise') + (st.sets ? ' · ' + st.sets + ' sets' : '') + ' · about ' + st.minutes + ' min</p>' +
@@ -162,11 +181,10 @@
     var bk = STANDALONE && !planEdit ? backupState() : null;
     if (bk && bk.due) h += '<section class="card backup-card"><div><h3>Back up your log</h3><p class="sub">' + (bk.at ? plural(bk.fresh, 'workout') + ' since your last backup on ' + fmtDate(iso(new Date(bk.at))) + '.' : 'Your ' + plural(bk.n, 'workout') + ' are stored on this phone only.') + ' A backup file lets you bring everything back if the app is removed or the phone is reset.</p></div>' +
       '<div class="row"><button class="btn sm primary-sm" type="button" data-act="backup-save">Save backup file</button><button class="btn sm quiet" type="button" data-act="backup-later">Later</button></div></section>';
+    if (!planEdit) h += weighStrip();
     h += planCard();
     if (!planEdit) h += outCard(f);
-    h += '<div class="actions">' +
-      '<button class="action" type="button" data-act="ed-new"><span class="ico">' + IC.plus + '</span><span><b>New session</b><small>Build your own from the exercise library</small></span></button>' +
-      '<button class="action alt" type="button" data-act="start" data-key="free"><span class="ico">' + IC.bolt + '</span><span><b>Empty workout</b><small>Start now and add exercises as you go</small></span></button></div>';
+    h += '<div class="train-more"><button class="act" type="button" data-act="ed-new">' + IC.plus + 'New session</button><button class="act" type="button" data-act="start" data-key="free">' + IC.bolt + 'Empty workout</button></div>';
     return h;
   }
   /* ================= log tab: session editor ================= */
