@@ -6,35 +6,110 @@
   function progressScore(e, sets) { return e.log === 'bw' ? Math.max.apply(null, sets.map(function (x) { return (x.w || 0) * 1000 + x.r; })) : metric(e, sets); }
   /* the next step up in weight: small for light loads, the usual dumbbell or plate jump after that */
   function wStep(e, w) { if (isLb()) return w < 20 ? 2.5 : 5; if (w < 10) return 1; return /dumbbell/i.test(e.equip || '') ? 2 : 2.5; }
-  /* Today's target from last time's sets, by double progression: add a rep until every planned set is at the top
-     of the range, then add weight and start again from the bottom. Returns { sets, text, up, step }; sets is null the first time. */
-  function targetFor(it, e, last) {
+  /* ---- weight steps (C4): what the next heavier weight of an exercise is ---- */
+  var histMemo = null;
+  function exHist(exId) { if (!histMemo) histMemo = {}; return histMemo[exId] || (histMemo[exId] = historyOf(exId)); }
+  /* every weight logged for an exercise, lightest first */
+  function loggedWeights(exId) {
+    var seen = {}, out = [];
+    exHist(exId).forEach(function (h) { h.sets.forEach(function (s) { if (s.w > 0 && !seen[s.w]) { seen[s.w] = 1; out.push(s.w); } }); });
+    return out.sort(function (a, b) { return a - b; });
+  }
+  /* The step of an exercise: the one set by hand, else the smallest gap between the weights logged for it when that
+     gap could be a plate or a pin (at most 15 % of the weight), else the default. A machine that moves in 7 kg steps
+     then gets 7, and dumbbells that come in twos get 2. Returns { v, by } with by 'set', 'log' or 'default'. */
+  function stepInfo(e, exId, w) {
+    var own = state.settings.steps && state.settings.steps[exId]; if (own > 0) return { v: own, by: 'set' };
+    var ws = exId ? loggedWeights(exId) : [], g = null, def = wStep(e, w), i;
+    for (i = 1; i < ws.length; i++) { var d = r2(ws[i] - ws[i - 1]); if (d >= 0.25 && (g == null || d < g)) g = d; }
+    return g != null && g <= Math.max(def, 0.15 * w) ? { v: g, by: 'log' } : { v: def, by: 'default' };
+  }
+  function nextWeight(e, exId, w) {
+    var st = stepInfo(e, exId, w), ws = exId ? loggedWeights(exId) : [], i;
+    if (st.by !== 'set') for (i = 0; i < ws.length; i++) if (ws[i] > w + 0.01) { if (ws[i] - w <= 1.6 * st.v) return ws[i]; break; }
+    return r2(w + st.v);
+  }
+  /* a lighter weight, about the given share of w: one already logged when it is close, else a whole number of steps */
+  function lighterWeight(e, exId, w, share) {
+    var st = stepInfo(e, exId, w), ws = exId ? loggedWeights(exId) : [], want = w * share, best = null;
+    ws.forEach(function (x) { if (x < w - 0.01 && x >= w * 0.82 && (best == null || Math.abs(x - want) < Math.abs(best - want))) best = x; });
+    if (best != null) return best;
+    var v = roundTo(want, st.v); if (v >= w - 0.01) v = r2(w - st.v);
+    return Math.max(0, v);
+  }
+  /* Which of a session's sets were the working sets. The working weight is the heaviest one that was done for at least the
+     bottom of the rep range; sets within 5 % of it are working sets, lighter ones were a ramp up or a back-off set. */
+  function workSplit(e, it, sets) {
+    var loaded = e.log === 'wr' || (e.log === 'bw' && sets.some(function (s) { return s.w > 0; }));
+    if (!loaded) return { W: 0, work: sets.slice(), light: [], loaded: false };
+    var ok = sets.filter(function (s) { return s.r >= (it.lo || 1); }), W = Math.max.apply(null, (ok.length ? ok : sets).map(function (s) { return s.w || 0; }));
+    return { W: W, loaded: true, work: sets.filter(function (s) { return (s.w || 0) >= W * 0.95 - 1e-9; }), light: sets.filter(function (s) { return (s.w || 0) < W * 0.95 - 1e-9; }) };
+  }
+  function repSum(sets, n) { return sets.slice(0, n).reduce(function (a, s) { return a + s.r; }, 0); }
+  /* Today's target, by double progression at the working weight: add a rep until every planned set is at the top of
+     the range, then add weight and start again from the bottom. `last` is the entry shown as "last time"; `hist` is
+     every earlier entry of the exercise in any session, oldest first, and switches on three rules for weeks that are
+     not normal: a break (C3), two sessions under the range (C2) and one bad day (C1).
+     Returns { sets, text, short, up, step }; sets is null the first time. */
+  function targetFor(it, e, last, hist) {
+    var t = targetCore(it, e, last, hist);
+    /* for the "last time" column: the working sets the target is built on, and the lighter sets that were left out */
+    if (t.sets && last && last.sets && e.log !== 'cardio' && it.hi) { var sp = workSplit(e, it, last.sets); if (sp.light.length) { t.shown = sp.work; t.light = sp.light; } }
+    return t;
+  }
+  function targetCore(it, e, last, hist) {
     var h = hint(it, e, last);
     if (!last || !last.sets || !last.sets.length) return { sets: null, text: h.t, short: h.s, up: false };
-    var prev = last.sets, n = e.log === 'cardio' ? 1 : Math.max(it.sets || 1, prev.length), sets = [], i, k = -1;
-    for (i = 0; i < n; i++) { var p = prev[i] || prev[prev.length - 1]; sets.push({ w: p.w || 0, r: p.r, dist: p.dist }); }
-    if (e.log === 'cardio' || !it.hi) return { sets: sets, text: h.t, short: h.s, up: false };
-    var planned = prev.slice(0, it.sets), top = planned.length >= it.sets && planned.every(function (s) { return s.r >= it.hi; });
-    var loaded = e.log === 'wr' || (e.log === 'bw' && prev.some(function (s) { return s.w > 0; }));
-    var easy = !top && loaded && planned.length >= it.sets && planned.every(function (s) { return s.rir != null && s.rir >= 3; });
-    if (easy) {
-      var st2 = wStep(e, sets[0].w);
-      sets.forEach(function (s) { s.w = r2(s.w + wStep(e, s.w)); });
-      return { sets: sets, text: 'You had 3 or more reps left on every set last time, so the weight goes up by ' + fmt(st2) + ' ' + UW() + '. Same reps.', short: '+' + fmt(st2) + ' ' + UW() + ' today · same reps', up: true, step: st2, easy: true };
+    var prev = last.sets, i, k = -1, exId = it.ex;
+    if (e.log === 'cardio' || !it.hi) { var cs = []; for (i = 0; i < (e.log === 'cardio' ? 1 : Math.max(it.sets || 1, prev.length)); i++) { var p0 = prev[i] || prev[prev.length - 1]; cs.push({ w: p0.w || 0, r: p0.r, dist: p0.dist }); } return { sets: cs, text: h.t, short: h.s, up: false }; }
+    var sp = workSplit(e, it, prev), W = sp.W, loaded = sp.loaded, nSets = it.sets || 1, unit = e.log === 'time' ? ' s' : ' reps';
+    /* n sets from the working sets of an entry: its own, then more at the working weight and the bottom of the range */
+    function build(split, w) {
+      var out = split.work.map(function (s) { return { w: w != null ? w : Math.min(s.w || 0, split.W), r: s.r }; }), n = split.light.length ? Math.max(nSets, out.length) : Math.max(nSets, split.work.length);
+      while (out.length < n) out.push(split.light.length || !out.length ? { w: w != null ? w : split.W, r: it.lo } : { w: out[out.length - 1].w, r: out[out.length - 1].r });
+      return out;
     }
-    if (top && !loaded) return { sets: sets, text: h.t, short: h.s, up: true };
-    if (top) {
-      var step = wStep(e, sets[0].w);
-      sets.forEach(function (s) { s.w = r2(s.w + wStep(e, s.w)); s.r = it.lo; });
-      return { sets: sets, text: 'Every set reached ' + it.hi + ' last time, so the weight goes up by ' + fmt(step) + ' ' + UW() + ' and the reps start again at ' + it.lo + '.', short: '+' + fmt(step) + ' ' + UW() + ' today · reps restart at ' + it.lo, up: true, step: step };
+    var sets = build(sp), kg = ' ' + UW();
+    if (hist && hist.length && (e.log === 'wr' || e.log === 'bw')) {
+      var newest = hist[hist.length - 1], days = Math.round((toDate(today()) - toDate(newest.date)) / 864e5), wks = Math.floor(days / 7);
+      /* C3: a break. Two weeks or more: repeat last time. Four or more: about a tenth lighter. */
+      if (days >= 28 && loaded && W > 0) {
+        var wl = lighterWeight(e, exId, W, 0.9), ls = build(sp, wl);
+        return { sets: ls, text: 'It has been ' + wks + ' weeks since you did this, so today is ' + fmt(wl) + kg + ', about a tenth lighter, for the same reps.', short: wks + ' weeks off · ' + fmt(wl) + kg + ' today', up: false, back: true };
+      }
+      if (days >= 14) return { sets: sets, text: 'It has been ' + wks + ' weeks since you did this, so today repeats last time.', short: wks + ' weeks off · repeat last time', up: false, back: true };
+      /* only entries from the session that "last time" comes from: the same exercise can have another rep range elsewhere */
+      var near = hist.filter(function (x) { return !last.key || x.key === last.key; }).slice(-3).map(function (x) { return { x: x, s: workSplit(e, it, x.sets) }; }).filter(function (o) { return !loaded || Math.abs(o.s.W - W) <= W * 0.05 + 1e-9; });
+      /* C2: the last two sessions at this weight both had a set under the range. Go lighter. */
+      var two = near.slice(-2);
+      if (loaded && W > 0 && two.length === 2 && two[1].x.sets === prev && two.every(function (o) { return o.s.work.slice(0, nSets).some(function (s) { return s.r < it.lo; }); })) {
+        var wd = lighterWeight(e, exId, W, 0.925), rr = Math.min(it.hi, it.lo + 2), ds = []; for (i = 0; i < nSets; i++) ds.push({ w: wd, r: rr });
+        return { sets: ds, text: 'Two sessions in a row had a set under ' + it.lo + ' reps at ' + fmt(W) + kg + ', so today is ' + fmt(wd) + kg + ' for sets of ' + rr + '.', short: fmt(wd) + kg + ' today · two sessions under ' + it.lo + ' reps', up: false, back: true };
+      }
+      /* C1: one bad day does not become the baseline. Build on the best of the last three sessions at this weight. */
+      var mine = repSum(sp.work, nSets), bestO = null;
+      near.forEach(function (o) { var v = repSum(o.s.work, nSets); if (o.x.sets !== prev && o.s.work.length >= sp.work.length && v > mine && (!bestO || v > repSum(bestO.s.work, nSets))) bestO = o; });
+      if (bestO) {
+        var bs = build(bestO.s);
+        return { sets: bs, text: 'Last time was below ' + fmtDate(bestO.x.date) + ', so today goes back to those numbers.', short: 'Back to ' + setsText(e, bs.slice(0, nSets)) + ' from ' + fmtDate(bestO.x.date, true), up: false, back: true };
+      }
     }
-    for (i = 0; i < Math.min(sets.length, it.sets || sets.length); i++) if (sets[i].r < it.hi) { k = i; break; }
-    if (k < 0) return { sets: sets, text: 'Same ' + (e.log === 'time' ? 'holds' : 'weight') + '. Get all ' + it.sets + ' sets to ' + it.hi + (e.log === 'time' ? ' s.' : ' reps.'), short: 'Same ' + (e.log === 'time' ? 'holds' : 'weight') + ' · all ' + it.sets + ' sets to ' + it.hi, up: false };
+    var planned = prev.slice(0, nSets), top = planned.length >= nSets && planned.every(function (s) { return s.r >= it.hi; });
+    var easy = !top && loaded && planned.length >= nSets && planned.every(function (s) { return s.rir != null && s.rir >= 3; });
+    if (easy || (top && loaded)) {
+      var wn = nextWeight(e, exId, W), st = r2(wn - W), us = build(sp, wn).slice(0, Math.max(nSets, sp.light.length ? 0 : prev.length));
+      if (easy) return { sets: us, text: 'You had 3 or more reps left on every set last time, so the weight goes up by ' + fmt(st) + kg + '. Same reps.', short: '+' + fmt(st) + kg + ' today · same reps', up: true, step: st, easy: true };
+      us.forEach(function (s) { s.r = it.lo; });
+      return { sets: us, text: 'Every set reached ' + it.hi + ' last time, so the weight goes up by ' + fmt(st) + kg + ' and the reps start again at ' + it.lo + '.', short: '+' + fmt(st) + kg + ' today · reps restart at ' + it.lo, up: true, step: st };
+    }
+    if (top) return { sets: sets, text: h.t, short: h.s, up: true };
+    var pad = sp.light.length && sp.work.length < sets.length, all = pad ? ' · ' + sets.length + ' sets at ' + fmt(W) + kg : '', allT = pad ? ' All ' + sets.length + ' sets at your working weight, ' + fmt(W) + kg + '.' : '';
+    for (i = 0; i < Math.min(sp.work.length, nSets); i++) if (sets[i].r < it.hi) { k = i; break; }
+    if (k < 0) return { sets: sets, text: 'Same ' + (e.log === 'time' ? 'holds' : 'weight') + '. Get all ' + nSets + ' sets to ' + it.hi + unit + '.' + allT, short: pad ? fmt(W) + kg + ' for all ' + sets.length + ' sets' : 'Same ' + (e.log === 'time' ? 'holds' : 'weight') + ' · all ' + nSets + ' sets to ' + it.hi, up: false };
     if (e.log === 'time') { sets[k].r = Math.min(it.hi, sets[k].r + 5); return { sets: sets, text: 'Hold set ' + (k + 1) + ' a little longer than last time.', short: 'Hold set ' + (k + 1) + ' a little longer', up: false }; }
     sets[k].r = sets[k].r + 1;
-    return { sets: sets, text: (loaded ? 'Same weight. ' : '') + 'One more rep on set ' + (k + 1) + ' than last time.', short: (loaded ? 'Same weight · one' : 'One') + ' more rep on set ' + (k + 1), up: false };
+    return { sets: sets, text: (loaded ? 'Same weight. ' : '') + 'One more rep on set ' + (k + 1) + ' than last time.' + allT, short: all ? 'One more rep on set ' + (k + 1) + all : (loaded ? 'Same weight · one' : 'One') + ' more rep on set ' + (k + 1), up: false };
   }
-
   /* how one exercise went against the last time: { st: up | same | down, label } */
   function entryDelta(e, a, b) {
     function sum(x) { return x.reduce(function (t, s) { return t + s.r; }, 0); }
@@ -120,9 +195,9 @@
     });
     stalled.sort(function (a, b) { return b.n - a.n; }).slice(0, 2).forEach(function (s) {
       var e = s.e, it = s.it, top = bestSet(e, s.last.sets, 'top'), swap = it.swap || e.swap, tip;
-      if (top.w > 0) tip = 'Try ' + (e.log === 'bw' ? '+' : '') + fmt(r2(top.w + wStep(e, top.w))) + ' ' + UW() + ' for sets of ' + it.lo + (swap ? ', or swap it for a few weeks: ' + swap.charAt(0).toLowerCase() + swap.slice(1) + '.' : ', or swap it for a similar exercise for a few weeks.');
+      if (top.w > 0) tip = 'Try ' + (e.log === 'bw' ? '+' : '') + fmt(nextWeight(e, it.ex, top.w)) + ' ' + UW() + ' for sets of ' + it.lo + (swap ? ', or swap it for a few weeks: ' + swap.charAt(0).toLowerCase() + swap.slice(1) + '.' : ', or swap it for a similar exercise for a few weeks.');
       else tip = 'Add a little weight or slow the lowering' + (swap ? ', or swap it for a few weeks: ' + swap.charAt(0).toLowerCase() + swap.slice(1) + '.' : '.');
-      out.push({ k: 'stall', ex: it.ex, t: e.name + ' has stalled', s: top.w > 0 ? 'Try ' + (e.log === 'bw' ? '+' : '') + fmt(r2(top.w + wStep(e, top.w))) + ' ' + UW() + ' for sets of ' + it.lo : 'Add a little weight or slow the lowering', d: setsText(e, s.last.sets) + ' last time, and no better set in the last ' + NUM_WORDS[Math.min(s.n, 12)].toLowerCase() + ' sessions. ' + tip });
+      out.push({ k: 'stall', ex: it.ex, t: e.name + ' has stalled', s: top.w > 0 ? 'Try ' + (e.log === 'bw' ? '+' : '') + fmt(nextWeight(e, it.ex, top.w)) + ' ' + UW() + ' for sets of ' + it.lo : 'Add a little weight or slow the lowering', d: setsText(e, s.last.sets) + ' last time, and no better set in the last ' + NUM_WORDS[Math.min(s.n, 12)].toLowerCase() + ' sessions. ' + tip });
     });
     var from = addDays(ws, -28), plan = planTargets(), got = {}, weeks = {};
     list.forEach(function (s) {
@@ -210,7 +285,7 @@
     });
     if (s.goalWeight != null) s.goalWeight = Math.round(s.goalWeight * f * 2) / 2;
     s.goalRate = to === 'lb' ? Math.round((s.goalRate || 0.25) * f * 10) / 10 : Math.round((s.goalRate || 0.5) * f * 20) / 20;
-    delete s.bars; s.unit = to; saveSettings();
+    delete s.bars; delete s.steps; s.unit = to; saveSettings();
   }
 
   /* ================= plates and warm-up sets ================= */
@@ -236,7 +311,7 @@
   }
   /* the weight the next set will use: what is typed, else today's target, else the last set done */
   function workingWeight(it) {
-    var d = state.draft, e = exi(it.ex), tg = d.editing ? null : targetFor(it, e, lastEntry(d.key, it.ex, d.id)), i, w;
+    var d = state.draft, e = exi(it.ex), tg = d.editing ? null : targetFor(it, e, lastEntry(d.key, it.ex, d.id), exHist(it.ex)), i, w;
     for (i = 0; i < it.rows.length; i++) { if (it.rows[i].d) continue; w = num(it.rows[i].w); if (w != null) return w; if (tg && tg.sets) return (tg.sets[i] || tg.sets[tg.sets.length - 1]).w || null; break; }
     for (i = it.rows.length - 1; i >= 0; i--) { w = num(it.rows[i].w); if (w != null) return w; }
     return null;

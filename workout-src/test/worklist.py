@@ -77,7 +77,7 @@ try:
         pg.locator('.exc.cur .tick.del').last.tap(); pg.wait_for_timeout(300); ok(pg.locator('.exc.cur .set').count() == n0 and pg.locator('.exc.cur .tick.del').count() == 0, 'a cross removes that set')
         # ---- records in one message, which does not take taps
         pg.fill('#w-%s-1' % us[1], '400'); pg.fill('#r-%s-1' % us[1], '40'); tick(pg, us[1], 1)
-        tt = pg.locator('#toast').inner_text(); ok(re.match(r'\d records on ', tt) is not None, 'several records from one set make one message: "%s"' % tt)
+        tt = pg.locator('#toast').inner_text(); ok(tt.startswith('Record weight on ') and 'volume' not in pg.locator('.exc.cur').inner_text().lower(), 'a heavier set gives one record message and no volume record: "%s"' % tt)
         ok(pg.evaluate("getComputedStyle(document.getElementById('toast')).pointerEvents") == 'none', 'the message lets taps through')
         tb = pg.locator('#toast').bounding_box(); rb = pg.locator('#rest').bounding_box(); ok(tb and rb and tb['y'] + tb['height'] <= rb['y'] and rb['y'] - (tb['y'] + tb['height']) < 40, 'and sits just above the rest bar')
         pg.screenshot(path=os.path.join(SH, 'WL-mid.png'))
