@@ -1,0 +1,45 @@
+# Hitit (workout.omaksimov.com): build the source, check that workout/ matches it, run the tests.
+name: Hitit build and tests
+
+on:
+  pull_request:
+    paths: ['workout/**', 'workout-src/**', '.github/workflows/workout.yml']
+  push:
+    branches: [main]
+    paths: ['workout/**', 'workout-src/**', '.github/workflows/workout.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: workout-src
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build
+        run: python build.py
+      - name: workout/ matches the source
+        run: python check_dist.py
+      - name: Install the test browser
+        run: |
+          pip install playwright==1.63.0
+          python -m playwright install --with-deps chromium
+      - name: Tests
+        env:
+          TZ: Europe/Copenhagen
+          HITIT_CHROME: bundled
+        run: python test/all.py
+      - name: Keep the screenshots when a test fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: workout-src/shots
+          retention-days: 7

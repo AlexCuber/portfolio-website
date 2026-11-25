@@ -12,8 +12,11 @@ tools
 games/src
 games/README.md
 
-# The Workout Log app is its own Worker at workout.omaksimov.com (see workout/wrangler.jsonc), so the website does not publish it
+# The workout app (Hitit) is its own Worker at workout.omaksimov.com (see workout/wrangler.jsonc), so the website does not publish it.
+# Its source and the GitHub workflow that tests it are not published either.
 workout
+workout-src
+.github
 
 # Local-only files (also kept out of git): never publish them, even from a local deploy
 *.mov

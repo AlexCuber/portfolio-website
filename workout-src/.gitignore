@@ -1,0 +1,4 @@
+# built files (the published copy is ../workout) and test screenshots
+dist/
+shots/
+__pycache__/

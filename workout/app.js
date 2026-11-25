@@ -933,16 +933,32 @@ var LIBRARY = (function () {
   var state = { sessions: {}, body: {}, routines: {}, custom: {}, settings: Object.assign({}, DEF_SET), settingsAt: 0, draft: null, draftAt: 0, dirty: {}, ui: Object.assign({}, DEF_UI) };
   var draftWait = false, justWrote = {}, db = null, syncState = 'local', busy = {}, again = {}, draftTimer = null;
   var rest = { until: 0, total: 0, beeped: true }, armed = null, editor = null, picker = null, summary = null, toastTimer = null;
+  /* loadFail holds the stored text when a log is there but cannot be read. While it is set nothing is written,
+     so a log that failed to open is never replaced by an empty one. saveFail is true while saving does not work. */
+  var RESCUE = 'hitit-rescue-v1', loadFail = null, saveFail = false;
   try {
-    var raw = JSON.parse(localStorage.getItem(LS));
-    if (raw && raw.sessions) {
+    var rawText = localStorage.getItem(LS), raw = null, readable = true;
+    if (rawText) { try { raw = JSON.parse(rawText); } catch (e) { readable = false; } }
+    if (readable && raw && typeof raw === 'object' && raw.sessions && typeof raw.sessions === 'object') {
       state = Object.assign(state, raw);
       state.ui = Object.assign({}, DEF_UI, raw.ui || {});
       state.settings = Object.assign({}, DEF_SET, raw.settings || {});
       state.routines = raw.routines || {}; state.custom = raw.custom || {};
-    }
+    } else if (rawText && (!readable || (raw && (typeof raw !== 'object' || Object.keys(raw).length)))) loadFail = rawText;
   } catch (e) {}
-  function saveLocal() { try { localStorage.setItem(LS, JSON.stringify(state)); } catch (e) {} }
+  function saveLocal() {
+    if (loadFail != null) return false;
+    try { localStorage.setItem(LS, JSON.stringify(state)); if (saveFail) { saveFail = false; saveWarn(); } return true; }
+    catch (e) { if (!saveFail) { saveFail = true; saveWarn(); } return false; }
+  }
+  function saveWarn() { var el = document.getElementById('savewarn'); if (el) el.hidden = !saveFail; document.body.classList.toggle('save-fail', saveFail); }
+  /* puts the unreadable text aside under its own key, then lets saving start again */
+  function keepRescue() {
+    if (loadFail == null) return;
+    try { localStorage.setItem(RESCUE, loadFail); } catch (e) { try { localStorage.removeItem(LS); localStorage.setItem(RESCUE, loadFail); } catch (e2) {} }
+    lostText = loadFail; loadFail = null;
+  }
+  var lostText = null;
   function setSync(s) {
     syncState = s;
     var el = document.getElementById('sync'); if (!el) return;
@@ -1006,7 +1022,7 @@ var LIBRARY = (function () {
         var rs = r[5].data();
         if ((rs.updatedAt || 0) > (state.settingsAt || 0)) { state.settings = Object.assign({}, DEF_SET, rs.settings || {}); state.settingsAt = rs.updatedAt; applyTheme(); }
       }
-      saveLocal(); flushDirty(); refreshSync(); syncSettled = true;
+      keepRescue(); saveLocal(); flushDirty(); refreshSync(); syncSettled = true;
       if (!isTyping() && !editor && !picker) render();
     }, function () { refreshSync(); settle(); });
   }
@@ -1866,7 +1882,7 @@ var LIBRARY = (function () {
   function chrome() {
     var d = state.draft, live = wLive() && !state.ui.wmin && state.ui.tab === 'log' && !editor, bar = document.getElementById('bar'), wbar = document.getElementById('wbar'), tab = state.ui.tab, now = new Date();
     bar.hidden = !!live; wbar.hidden = !live;
-    if (document.body.classList.contains('setup')) { document.getElementById('bar-title').textContent = 'Hitit'; document.getElementById('bar-date').textContent = 'Welcome'; return; }
+    if (document.body.classList.contains('setup')) { document.getElementById('bar-title').textContent = 'Hitit'; document.getElementById('bar-date').textContent = loadFail != null && syncSettled ? '' : 'Welcome'; return; }
     document.getElementById('bar-title').textContent = tab === 'progress' ? 'Progress' : tab === 'exercises' ? (state.ui.lib3 === 'exercises' ? 'Exercises' : 'History') : DAYS_FULL[now.getDay()];
     document.getElementById('bar-date').textContent = tab === 'progress' ? plural(Object.keys(state.sessions).length, 'workout') + ' logged' : tab === 'exercises' ? (state.ui.lib3 === 'exercises' ? allEx().length + ' exercises' : plural(Object.keys(state.sessions).length, 'workout')) : now.getDate() + ' ' + MONTHS_FULL[now.getMonth()];
     if (!live) return;
@@ -2707,10 +2723,10 @@ var LIBRARY = (function () {
   function render() {
     var tab = state.ui.tab; charts = {};
     document.querySelectorAll('.tab').forEach(function (b) { if (b.dataset.tab === tab) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
-    var su = syncSettled && needSetup(), wait = !syncSettled && needSetup();
-    document.body.classList.toggle('setup', !!(su || wait));
-    view.innerHTML = su ? setupView() : wait ? loadingView() : tab === 'progress' ? progressView() : tab === 'exercises' ? thirdView() : (editor ? editorView() : wOpen() ? draftView() : homeView());
-    var full = wLive() && !state.ui.wmin && tab === 'log' && !editor && !su && !wait, mini = wLive() && !full && !su && !wait && !editor;
+    var lost = loadFail != null && syncSettled, su = !lost && syncSettled && needSetup(), wait = !syncSettled && (needSetup() || loadFail != null);
+    document.body.classList.toggle('setup', !!(su || wait || lost));
+    view.innerHTML = lost ? lostView() : su ? setupView() : wait ? loadingView() : tab === 'progress' ? progressView() : tab === 'exercises' ? thirdView() : (editor ? editorView() : wOpen() ? draftView() : homeView());
+    var full = wLive() && !state.ui.wmin && tab === 'log' && !editor && !su && !wait && !lost, mini = wLive() && !full && !su && !wait && !editor && !lost;
     document.body.classList.toggle('in-workout', full); document.body.classList.toggle('has-mini', mini);
     document.getElementById('wmini').hidden = !mini;
     chrome(); observe(); if (mini) drawMini();
@@ -3060,6 +3076,16 @@ var LIBRARY = (function () {
     h += '<p class="foot setup-foot">Used Hitit before? <label class="link">Restore from a backup file<input id="backup-file" type="file" accept=".json,application/json,text/plain" hidden></label></p>';
     return h;
   }
+  /* shown instead of the app when a stored log is there but cannot be read; nothing is written until the user chooses */
+  var lostArm = false;
+  function lostView() {
+    return '<section class="setup-top"><h2>Your log could not be opened</h2><p class="sub">The log saved on this ' + (STANDALONE ? 'phone' : 'device') + ' is still there, but it could not be read. Nothing has been changed or deleted.</p></section>' +
+      '<section class="card lost"><button class="btn primary block" type="button" data-act="lost-retry">Try again</button>' +
+      '<label class="btn block">Restore from a backup file<input id="backup-file" type="file" accept=".json,application/json,text/plain" hidden></label>' +
+      '<button class="btn block" type="button" data-act="lost-save">Save the unreadable log as a file</button></section>' +
+      '<p class="foot setup-foot"><button class="link" type="button" data-act="lost-new">' + (lostArm ? 'Tap again to start a new log' : 'Start a new log') + '</button></p>' +
+      '<p class="foot setup-foot">Starting a new log or restoring a backup keeps a copy of the unreadable one on this ' + (STANDALONE ? 'phone' : 'device') + '.</p>';
+  }
   function loadingView() { return '<section class="card"><h3>Opening your log</h3><p class="sub">Checking for workouts saved from another device.</p></section>'; }
   function templateSheet() {
     var days = state.settings.weeklyGoal || 4;
@@ -3368,6 +3394,7 @@ var LIBRARY = (function () {
   function restore(text) {
     var data; try { data = JSON.parse(text); } catch (e) { toast('That is not a Hitit backup. Nothing was changed.'); return; }
     if (!data || !data.sessions || typeof data.sessions !== 'object') { toast('That is not a Hitit backup. Nothing was changed.'); return; }
+    keepRescue();
     var n = 0, wasEmpty = emptyLog(), bu = data.settings && data.settings.unit === 'lb' ? 'lb' : 'kg';
     if (!wasEmpty && bu !== (isLb() ? 'lb' : 'kg')) { toast('That backup is in ' + (bu === 'lb' ? 'pounds' : 'kilograms') + ' and this log is not. Switch units in settings, then restore.'); return; }
     [['sessions', 'sessions', 'sessions/'], ['body', 'body', 'body/'], ['routines', 'routines', 'routines/'], ['custom', 'custom', 'exercises/']].forEach(function (c) {
@@ -3378,14 +3405,14 @@ var LIBRARY = (function () {
     CAT = null; saveLocal(); applyTheme(); closeSheet(); render();
     toast('Backup restored. ' + plural(n, 'workout') + ' added.');
   }
-  function saveBackupFile() {
-    var text = JSON.stringify(backupData()), name = 'hitit-backup-' + today() + '.json';
-    function done() { backupDone(); toast('Backup saved'); if (scrim.hidden) render(); else settingsSheet(); }
+  function saveBackupFile(lost) {
+    var text = lost ? (loadFail != null ? loadFail : lostText) || '' : JSON.stringify(backupData()), name = (lost ? 'hitit-unreadable-log-' : 'hitit-backup-') + today() + (lost ? '.txt' : '.json');
+    function done() { if (lost) { toast('File saved'); return; } backupDone(); toast('Backup saved'); if (scrim.hidden) render(); else settingsSheet(); }
     try {
-      var file = new File([text], name, { type: 'application/json' });
+      var file = new File([text], name, { type: lost ? 'text/plain' : 'application/json' });
       if (navigator.canShare && navigator.canShare({ files: [file] })) { navigator.share({ files: [file], title: 'Hitit backup' }).then(done, function () {}); return; }
     } catch (e) {}
-    try { var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); done(); } catch (e) { toast('Could not save a file here. Use the backup text instead.'); }
+    try { var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: lost ? 'text/plain' : 'application/json' })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); done(); } catch (e) { toast('Could not save a file here. Use the backup text instead.'); }
   }
 
   /* ================= actions ================= */
@@ -3509,6 +3536,10 @@ var LIBRARY = (function () {
       case 'goal': state.settings.weeklyGoal = Math.max(1, Math.min(7, (state.settings.weeklyGoal || 4) + (+a.dataset.d))); saveSettings(); settingsSheet(); render(); break;
       case 'toggle': state.settings[a.dataset.k] = !state.settings[a.dataset.k]; saveSettings(); if (a.dataset.k === 'sound' && state.settings.sound) { unlockAudio(); beep(); } wake(); if (a.dataset.k === 'rir' || a.dataset.k === 'outCore') render(); settingsSheet(); break;
       case 'backup-save': saveBackupFile(); break;
+      case 'save-retry': toast(saveLocal() ? 'Saved' : 'Still not saved. Save a backup file to be safe.'); break;
+      case 'lost-retry': location.reload(); break;
+      case 'lost-save': saveBackupFile(true); break;
+      case 'lost-new': if (!lostArm) { lostArm = true; render(); setTimeout(function () { if (lostArm) { lostArm = false; if (loadFail != null) render(); } }, 3500); } else { lostArm = false; keepRescue(); saveLocal(); render(); window.scrollTo(0, 0); } break;
       case 'backup-later': setBackupInfo({ later: Object.keys(state.sessions).length }); render(); break;
       case 'backup-show': { var bx = document.getElementById('backup-box'); bx.hidden = false; document.getElementById('backup-text').value = JSON.stringify(backupData()); break; }
       case 'backup-copy': { var ta = document.getElementById('backup-text'); try { navigator.clipboard.writeText(ta.value).then(function () { backupDone(); toast('Backup copied'); }, function () { ta.select(); toast('Select all and copy the text'); }); } catch (err) { ta.select(); toast('Select all and copy the text'); } break; }
