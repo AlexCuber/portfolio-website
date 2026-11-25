@@ -1133,6 +1133,34 @@ var LIBRARY = (function () {
   function restText(sec) { return !sec ? '' : sec < 120 ? sec + ' s' : (sec % 60 ? (Math.round(sec / 6) / 10) : sec / 60) + ' min'; }
   function repsText(it, e) { return it.reps || (it.lo + '–' + it.hi + (e.unit === 'reps' ? '' : ' ' + e.unit)); }
   function isLinked(items, i) { return !!(items[i].link || (i > 0 && items[i - 1].link)); }
+  /* the exercises done back to back with this one (a named group or a linked run), itself included, in order */
+  function mates(d, it) {
+    var its = d.items, i = its.indexOf(it), a = i, b = i; if (i < 0) return [];
+    if (it.group) { while (a > 0 && its[a - 1].group === it.group) a--; while (b < its.length - 1 && its[b + 1].group === it.group) b++; }
+    else { while (a > 0 && its[a - 1].link && !its[a - 1].group) a--; while (b < its.length - 1 && its[b].link && !its[b + 1].group) b++; }
+    return its.slice(a, b + 1);
+  }
+  function undone(it) { return it.rows.some(function (r) { return !r.d; }); }
+  /* The workout shows one exercise open and the rest folded to a line. Open is the one tapped (draft.cur),
+     otherwise the first with a set still to do. Editing a saved workout keeps everything open. */
+  function curItem(d) {
+    if (!d || d.editing) return null;
+    var c = d.cur ? findItem(d.cur) : null; if (c) return c;
+    for (var i = 0; i < d.items.length; i++) if (undone(d.items[i])) return d.items[i];
+    return null;
+  }
+  /* after a set is ticked: when everything in the open exercise (and its superset) is done, the next one with sets left opens.
+     When that was the last set of the workout the exercise stays open. */
+  function advance(d, it) {
+    var ms = mates(d, it); if (ms.some(undone)) return false;
+    var its = d.items, n = its.length, from = its.indexOf(ms[ms.length - 1]);
+    for (var k = 1; k <= n; k++) { var x = its[(from + k) % n]; if (undone(x)) { d.cur = x.u; return true; } }
+    d.cur = it.u; return false; /* nothing left to do: the last one stays open */
+  }
+  /* one-time tips: each shows until the workout it first appeared in is finished. A log with a few workouts has seen them. */
+  var tipShown = {};
+  function tipSeen(k) { var t = state.ui.tips; if (!t) t = state.ui.tips = Object.keys(state.sessions).length >= 3 ? { t: 1, s: 1, b: 1 } : {}; return !!t[k]; }
+  function tipsDone() { tipSeen('t'); Object.keys(tipShown).forEach(function (k) { state.ui.tips[k] = 1; }); tipShown = {}; }
   function rStats(r) {
     if (r.stats && r.builtin) return { n: r.items.length, sets: r.stats.sets, minutes: r.stats.minutes };
     var sets = 0, sec = 480;
@@ -1230,20 +1258,20 @@ var LIBRARY = (function () {
   }
   function hint(it, e, last) {
     var range = repsText(it, e);
-    if (e.sport) return { t: last ? sportHint(e, last) : 'First time: start the stopwatch when you set off, or type the distance and time afterwards.' };
+    if (e.sport) return { t: last ? sportHint(e, last) : 'First time: start the stopwatch when you set off, or type the distance and time afterwards.', s: last ? sportHint(e, last).replace('. Match it, or', ' · match it, or').replace(/\.$/, '') : 'Start the stopwatch, or type it in afterwards' };
     if (!last) {
-      if (e.log === 'cardio') return { t: 'First time: an easy pace you can hold a conversation at.' };
-      if (e.log === 'time') return { t: 'First time: hold good form for ' + range + '.' };
-      return { t: 'First time: find a weight you can do for ' + range + ' reps' + (it.rir && it.rir !== '—' ? ' with ' + it.rir + ' in reserve.' : '.') };
+      if (e.log === 'cardio') return { t: 'First time: an easy pace you can hold a conversation at.', s: 'First time · an easy pace' };
+      if (e.log === 'time') return { t: 'First time: hold good form for ' + range + '.', s: 'First time · hold for ' + range };
+      return { t: 'First time: find a weight you can do for ' + range + ' reps' + (it.rir && it.rir !== '—' ? ' with ' + it.rir + ' in reserve.' : '.'), s: 'First time · find a weight for ' + range + ' reps' };
     }
-    if (e.log === 'cardio') return { t: 'Same again, or a few minutes longer.' };
+    if (e.log === 'cardio') return { t: 'Same again, or a few minutes longer.', s: 'Same again, or a few minutes longer' };
     var planned = last.sets.slice(0, it.sets);
     if (planned.length >= it.sets && planned.every(function (s) { return s.r >= it.hi; })) {
-      if (e.log === 'time') return { t: 'Every hold reached ' + it.hi + ' s. Make it harder or add a set.', up: true };
-      if (e.log === 'bw' && !planned[0].w) return { t: 'Every set reached ' + it.hi + '. Add a little weight today and build back up from ' + it.lo + '.', up: true };
-      return { t: 'Every set reached ' + it.hi + '. Add weight today (about 2.5–5%) and build back up from ' + it.lo + '.', up: true };
+      if (e.log === 'time') return { t: 'Every hold reached ' + it.hi + ' s. Make it harder or add a set.', s: 'Every hold reached ' + it.hi + ' s · make it harder', up: true };
+      if (e.log === 'bw' && !planned[0].w) return { t: 'Every set reached ' + it.hi + '. Add a little weight today and build back up from ' + it.lo + '.', s: 'Every set reached ' + it.hi + ' · add a little weight', up: true };
+      return { t: 'Every set reached ' + it.hi + '. Add weight today (about 2.5–5%) and build back up from ' + it.lo + '.', s: 'Every set reached ' + it.hi + ' · add weight today', up: true };
     }
-    return { t: e.log === 'time' ? 'Hold a little longer than last time on at least one set.' : 'Keep the weight. Beat last time by one rep on at least one set.' };
+    return { t: e.log === 'time' ? 'Hold a little longer than last time on at least one set.' : 'Keep the weight. Beat last time by one rep on at least one set.', s: e.log === 'time' ? 'Hold a little longer on one set' : 'Same weight · one more rep on one set' };
   }
   function nextKey() {
     var f = finished(), ids = routineList().filter(function (r) { return r.core !== false; }).map(function (r) { return r.id; });
@@ -1404,29 +1432,29 @@ var LIBRARY = (function () {
      of the range, then add weight and start again from the bottom. Returns { sets, text, up, step }; sets is null the first time. */
   function targetFor(it, e, last) {
     var h = hint(it, e, last);
-    if (!last || !last.sets || !last.sets.length) return { sets: null, text: h.t, up: false };
+    if (!last || !last.sets || !last.sets.length) return { sets: null, text: h.t, short: h.s, up: false };
     var prev = last.sets, n = e.log === 'cardio' ? 1 : Math.max(it.sets || 1, prev.length), sets = [], i, k = -1;
     for (i = 0; i < n; i++) { var p = prev[i] || prev[prev.length - 1]; sets.push({ w: p.w || 0, r: p.r, dist: p.dist }); }
-    if (e.log === 'cardio' || !it.hi) return { sets: sets, text: h.t, up: false };
+    if (e.log === 'cardio' || !it.hi) return { sets: sets, text: h.t, short: h.s, up: false };
     var planned = prev.slice(0, it.sets), top = planned.length >= it.sets && planned.every(function (s) { return s.r >= it.hi; });
     var loaded = e.log === 'wr' || (e.log === 'bw' && prev.some(function (s) { return s.w > 0; }));
     var easy = !top && loaded && planned.length >= it.sets && planned.every(function (s) { return s.rir != null && s.rir >= 3; });
     if (easy) {
       var st2 = wStep(e, sets[0].w);
       sets.forEach(function (s) { s.w = r2(s.w + wStep(e, s.w)); });
-      return { sets: sets, text: 'You had 3 or more reps left on every set last time, so the weight goes up by ' + fmt(st2) + ' ' + UW() + '. Same reps.', up: true, step: st2, easy: true };
+      return { sets: sets, text: 'You had 3 or more reps left on every set last time, so the weight goes up by ' + fmt(st2) + ' ' + UW() + '. Same reps.', short: '+' + fmt(st2) + ' ' + UW() + ' today · same reps', up: true, step: st2, easy: true };
     }
-    if (top && !loaded) return { sets: sets, text: h.t, up: true };
+    if (top && !loaded) return { sets: sets, text: h.t, short: h.s, up: true };
     if (top) {
       var step = wStep(e, sets[0].w);
       sets.forEach(function (s) { s.w = r2(s.w + wStep(e, s.w)); s.r = it.lo; });
-      return { sets: sets, text: 'Every set reached ' + it.hi + ' last time, so the weight goes up by ' + fmt(step) + ' ' + UW() + ' and the reps start again at ' + it.lo + '.', up: true, step: step };
+      return { sets: sets, text: 'Every set reached ' + it.hi + ' last time, so the weight goes up by ' + fmt(step) + ' ' + UW() + ' and the reps start again at ' + it.lo + '.', short: '+' + fmt(step) + ' ' + UW() + ' today · reps restart at ' + it.lo, up: true, step: step };
     }
     for (i = 0; i < Math.min(sets.length, it.sets || sets.length); i++) if (sets[i].r < it.hi) { k = i; break; }
-    if (k < 0) return { sets: sets, text: 'Same ' + (e.log === 'time' ? 'holds' : 'weight') + '. Get all ' + it.sets + ' sets to ' + it.hi + (e.log === 'time' ? ' s.' : ' reps.'), up: false };
-    if (e.log === 'time') { sets[k].r = Math.min(it.hi, sets[k].r + 5); return { sets: sets, text: 'Hold set ' + (k + 1) + ' a little longer than last time.', up: false }; }
+    if (k < 0) return { sets: sets, text: 'Same ' + (e.log === 'time' ? 'holds' : 'weight') + '. Get all ' + it.sets + ' sets to ' + it.hi + (e.log === 'time' ? ' s.' : ' reps.'), short: 'Same ' + (e.log === 'time' ? 'holds' : 'weight') + ' · all ' + it.sets + ' sets to ' + it.hi, up: false };
+    if (e.log === 'time') { sets[k].r = Math.min(it.hi, sets[k].r + 5); return { sets: sets, text: 'Hold set ' + (k + 1) + ' a little longer than last time.', short: 'Hold set ' + (k + 1) + ' a little longer', up: false }; }
     sets[k].r = sets[k].r + 1;
-    return { sets: sets, text: (loaded ? 'Same weight. ' : '') + 'One more rep on set ' + (k + 1) + ' than last time.', up: false };
+    return { sets: sets, text: (loaded ? 'Same weight. ' : '') + 'One more rep on set ' + (k + 1) + ' than last time.', short: (loaded ? 'Same weight · one' : 'One') + ' more rep on set ' + (k + 1), up: false };
   }
 
   /* how one exercise went against the last time: { st: up | same | down, label } */
@@ -2025,19 +2053,28 @@ var LIBRARY = (function () {
   /* ================= log tab: the workout ================= */
   /* "Remove a set" turns the ticks of one exercise into crosses; tapping a cross removes that set */
   var delMode = null;
+  var nextSet = '', noteOpen = null; /* the set the rest bar names as next; the exercise whose note field was opened by hand */
   function delBtn(u, i, warm, label) { return '<button class="tick del" type="button" data-act="del-row" data-u="' + u + '" data-i="' + i + '"' + (warm ? ' data-w="1"' : '') + ' aria-label="' + label + '">' + IC.x + '</button>'; }
-  function warmRow(it, i, s) {
+  function warmRow(it, i, s, prev) {
     var n = i + 1;
-    return '<div class="set warm' + (s.d ? ' done' : '') + '"><span class="set-n" title="Warm-up set">W</span>' +
+    return '<div class="set warm' + (s.d ? ' done' : '') + '"><span class="set-n" title="Warm-up set">W</span>' + (prev ? '<span class="set-prev"></span>' : '') +
       '<div class="field"><input type="text" inputmode="decimal" autocomplete="off" data-wf="w" data-u="' + it.u + '" data-i="' + i + '" value="' + esc(s.w) + '" aria-label="Warm-up set ' + n + ' weight in ' + UW() + '"><span>' + UW() + '</span></div><span class="set-x">×</span>' +
       '<div class="field"><input type="text" inputmode="numeric" autocomplete="off" data-wf="r" data-u="' + it.u + '" data-i="' + i + '" value="' + esc(s.r) + '" aria-label="Warm-up set ' + n + ' reps"><span>reps</span></div>' +
       (delMode === it.u ? delBtn(it.u, i, 1, 'Remove warm-up set ' + n) : '<button class="tick" type="button" data-act="wtick" data-u="' + it.u + '" data-i="' + i + '" aria-pressed="' + (s.d ? 'true' : 'false') + '" aria-label="Warm-up set ' + n + ' done">' + IC.check + '</button>') + '</div>';
   }
-  function setRow(it, e, i, s, lastSets) {
+  /* what was done on this set last time, short and without units: "60 × 9", "+10 × 8", "12", "45 s" */
+  function prevText(e, p) {
+    if (!p) return '';
+    if (e.log === 'time') return fmt(p.r) + ' s';
+    if (e.log === 'cardio') return fmt(p.r) + ' min';
+    return (e.log === 'bw' ? (p.w > 0 ? '+' + fmt(p.w) + ' × ' : '') : fmt(p.w) + ' × ') + fmt(p.r);
+  }
+  function setRow(it, e, i, s, lastSets, prev) {
     var d = state.draft, ls = lastSets ? (lastSets[i] || lastSets[lastSets.length - 1]) : null, one = e.log === 'cardio' || e.log === 'time';
     if (e.sport) return sportRow(it, e, i, s, ls);
     var tm = one && !d.editing && !s.d, run = !!(d.timer && d.timer.u === it.u && d.timer.i === i), left = s.d && s.rir != null ? (s.rir >= 3 ? '3+' : String(s.rir)) : '';
     var h = '<div class="set' + (one ? ' one' : '') + (tm ? ' tm' : '') + (s.d ? ' done' : '') + (s.d && s.pr ? ' pr' : '') + '"><span class="set-n">' + (i + 1) + '</span>';
+    if (prev) h += '<span class="set-prev">' + esc(prevText(e, prev[i])) + '</span>';
     if (!one) h += '<div class="field"><input id="w-' + it.u + '-' + i + '" type="text" inputmode="decimal" autocomplete="off" data-f="w" data-u="' + it.u + '" data-i="' + i + '" value="' + esc(s.w) + '" placeholder="' + (ls ? fmt(ls.w) : (e.log === 'bw' ? '0' : '')) + '" aria-label="Set ' + (i + 1) + ' weight in ' + UW() + '"><span>' + UW() + '</span></div><span class="set-x">×</span>';
     h += '<div class="field"><input id="r-' + it.u + '-' + i + '" type="text" inputmode="' + (one ? 'decimal' : 'numeric') + '" autocomplete="off" data-f="r" data-u="' + it.u + '" data-i="' + i + '" value="' + esc(s.r) + '" placeholder="' + (ls ? fmt(ls.r) : '') + '" aria-label="Set ' + (i + 1) + ' ' + e.unit + '"><span>' + e.unit + '</span></div>';
     if (tm) h += '<button class="tbtn' + (run ? ' on' : '') + '" type="button" data-act="timer" data-u="' + it.u + '" data-i="' + i + '" aria-label="' + (run ? 'Stop the countdown' : 'Start a countdown for set ' + (i + 1)) + '">' + (run ? IC.stop : IC.timer) + '</button>';
@@ -2052,34 +2089,46 @@ var LIBRARY = (function () {
     h += '<section class="draft-head">';
     if (d.editing) h += '<div class="spread"><h2>' + esc(d.name) + '</h2><span class="pill">editing a saved workout</span></div>';
     if (d.key === 'free' && !d.editing) h += '<label class="fld">Workout name<input id="draft-name" type="text" maxlength="40" autocomplete="off" value="' + esc(d.name) + '"></label>';
-    var lead = r && r.focus ? r.focus : (d.items.length ? '' : 'Add your first exercise to get going.');
+    var lead = d.editing ? (r && r.focus ? r.focus : '') : (d.items.length ? '' : 'Add your first exercise to get going.');
     if (d.editing) h += '<div class="spread"><p class="sub">' + esc(lead) + '</p><input class="date-in" id="draft-date" type="date" value="' + esc(d.date) + '" max="' + today() + '" aria-label="Workout date"></div>';
     else if (lead) h += '<p class="sub">' + esc(lead) + '</p>';
     h +=
       (d.editing ? '<label class="dur-row">How long it took<span><input class="text-in" id="draft-dur" type="number" inputmode="numeric" min="0" max="600" step="1" placeholder="–" value="' + (d.dur ? Math.round(d.dur / 60) : '') + '">minutes</span></label>' : '') + '</section>';
-    if (r && r.warmup && !d.editing) h += '<p class="warm"><b>Warm-up:</b> ' + esc(r.warmup) + '</p>';
+    if (!d.editing && d.items.length) h += '<div class="wtop">' + (r && r.warmup ? '<button class="act" type="button" data-act="warm-plan">Warm-up plan</button>' : '') + '<button class="act" type="button" data-act="notes-go">Workout notes</button></div>';
     h += '<!--T-->';
-    var anyPr = false, anyTarget = false;
+    var anyPr = false, anyTarget = false, hintTip = '', cur = curItem(d), open = cur ? mates(d, cur) : [];
+    nextSet = '';
     d.items.forEach(function (it, idx) {
-      var e = exi(it.ex), last = lastEntry(d.key, it.ex, d.id), tg = d.editing ? null : targetFor(it, e, last), hi = tg ? { t: tg.text, up: tg.up } : hint(it, e, last), showT = !!(tg && tg.sets && e.log !== 'cardio'), linked = isLinked(d.items, idx), grouped = it.group || linked;
+      var e = exi(it.ex), last = lastEntry(d.key, it.ex, d.id), tg = d.editing ? null : targetFor(it, e, last), hi = tg ? { t: tg.text, s: tg.short, up: tg.up } : hint(it, e, last), showT = !!(tg && tg.sets && e.log !== 'cardio'), linked = isLinked(d.items, idx), grouped = it.group || linked;
       var first = it.group ? (idx === 0 || d.items[idx - 1].group !== it.group) : (linked && !(idx > 0 && d.items[idx - 1].link));
-      if (grouped && first) h += '<div class="group-tag">' + esc(it.group || 'Superset') + ': back to back, rest after the last one</div>';
-      var allDone = it.rows.length && it.rows.every(function (x) { return x.d; });
-      h += '<section class="card exc' + (grouped ? ' in-group' : '') + (allDone ? ' all-done' : '') + '" id="x-' + it.u + '"><div class="exc-head">' +
+      var allDone = it.rows.length && it.rows.every(function (x) { return x.d; }), nDone = it.rows.filter(function (x) { return x.d; }).length, isOpen = d.editing || open.indexOf(it) >= 0;
+      var ph = tg && tg.sets ? tg.sets : (last ? last.sets : null), star = it.rows.some(function (x) { return x.d && x.pr; });
+      if (star) anyPr = true;
+      if (showT) anyTarget = true;
+      if (grouped && first && (isOpen || !allDone)) h += '<div class="group-tag">' + esc(it.group || 'Superset') + (isOpen ? ': back to back, rest after the last one' : '') + '</div>';
+      if (!isOpen) {
+        /* folded: one line. Done shows what was done, the rest show the plan and today's target */
+        var did = setsText(e, rowSets({ ex: it.ex, rows: it.rows.filter(function (x) { return x.d; }) })), plan = e.log === 'cardio' ? repsText(it, e) : it.sets + ' × ' + repsText(it, e).replace(/–/g, '-');
+        var sub = allDone ? did : nDone ? nDone + ' of ' + it.rows.length + ' sets · ' + did : plan + (ph && !e.sport ? ' · ' + setsText(e, ph.slice(0, Math.max(1, Math.min(it.rows.length, ph.length)))) : '');
+        h += '<button class="card exc fold' + (grouped ? ' in-group' : '') + (allDone ? ' done' : '') + '" type="button" id="x-' + it.u + '" data-act="ex-open" data-u="' + it.u + '" aria-expanded="false" aria-label="' + esc(e.name) + ', ' + (allDone ? 'done' : nDone ? nDone + ' of ' + it.rows.length + ' sets done' : 'to do') + '. Open">' +
+          (allDone ? '<span class="fold-ck">' + IC.check + '</span>' : '<span class="fold-th">' + illoSvg(e.illo) + '</span>') +
+          '<span class="fold-t"><b>' + esc(e.name) + (star ? '<i class="fold-star">' + IC.star + '</i>' : '') + '</b><small>' + esc(sub) + '</small></span><span class="fold-go">' + IC.right + '</span></button>';
+        it.rows.forEach(function (x) { x.pop = false; }); it.recNew = null;
+        return;
+      }
+      h += '<section class="card exc' + (d.editing ? '' : ' cur') + (grouped ? ' in-group' : '') + (allDone ? ' all-done' : '') + '" id="x-' + it.u + '"><div class="exc-head">' +
         '<button class="thumb" type="button" data-act="open-ex" data-ex="' + esc(it.ex) + '" data-u="' + it.u + '" aria-label="How to do ' + esc(e.name) + '">' + illoSvg(e.illo) + '</button>' +
         '<div><div class="exc-name">' + (it.n && it.n.charAt(0) !== 'x' ? '<span class="exc-n">' + esc(it.n) + '</span>' : '') + esc(e.name) + '</div><div class="exc-target">' + targetHtml(it, e) + '</div></div>' +
         '<button class="icon-btn" type="button" data-act="ex-menu" data-u="' + it.u + '" aria-label="More options for ' + esc(e.name) + '">' + IC.more + '</button></div>';
-      if (showT) anyTarget = true;
-      h += '<div class="last"><div class="last-row"><span class="label">' + (last ? 'Last time · ' + fmtDate(last.date) : 'Last time') + '</span>' +
-        '<span class="' + (showT ? 'last-prev' : 'last-sets') + '">' + (last ? esc(setsText(e, last.sets)) : 'No entry yet') + '</span></div>' +
-        (showT ? '<div class="last-row"><span class="label tgt">Target today</span><span class="last-sets">' + esc(setsText(e, tg.sets.slice(0, Math.max(1, Math.min(it.rows.length, tg.sets.length))))) + '</span></div>' : '') +
-        (last && last.note ? '<span class="last-hint">Note: ' + esc(last.note) + '</span>' : '') +
-        '<span class="last-hint' + (hi.up ? ' up' : '') + '">' + esc(hi.t) + '</span></div>';
-      var anyDone = it.rows.some(function (x) { return x.d; });
-      if (!d.editing && !allDone) h += '<div class="tools">' + (e.log === 'wr' ? '<button class="tool" type="button" data-act="warm-one" data-u="' + it.u + '" aria-label="Add a warm-up set">' + IC.bar + 'Warm-up</button>' : '') + (e.sport ? (function () { var open = 0; while (open < it.rows.length - 1 && it.rows[open].d) open++; var on = !!(d.timer && d.timer.u === it.u); return '<button class="tool' + (on ? ' on' : '') + '" type="button" data-act="timer" data-u="' + it.u + '" data-i="' + (on ? d.timer.i : open) + '">' + (on ? IC.stop + 'Stop the stopwatch' : IC.timer + 'Stopwatch') + '</button>'; })() : '') + (anyDone ? '' : '<button class="tool" type="button" data-act="swap-open" data-u="' + it.u + '">' + IC.swap + 'Swap</button>') + '</div>';
-      h += '<div class="sets">';
-      if (it.warm && it.warm.length) it.warm.forEach(function (s, i) { h += warmRow(it, i, s); });
-      it.rows.forEach(function (s, i) { h += setRow(it, e, i, s, tg && tg.sets ? tg.sets : (last ? last.sets : null)); if (s.d && s.pr) anyPr = true; s.pop = false; });
+      if (!d.editing && (hi.s || hi.t)) h += '<p class="why' + (hi.up ? ' up' : '') + '">' + esc(hi.s || hi.t) + '</p>';
+      if (last && last.note) h += '<p class="last-note">Last note: ' + esc(last.note) + '</p>';
+      var prev = last && !e.sport && e.log !== 'cardio' ? last.sets : null;
+      var one1 = e.log === 'time';
+      if (prev) h += '<div class="set-cols' + (one1 ? ' one' : '') + (one1 && !d.editing && undone(it) ? ' tm' : '') + '" aria-hidden="true"><span>Last · ' + fmtDate(last.date, true) + '</span>' + (one1 ? '' : '<span>' + UW() + '</span><span></span>') + '<span>' + esc(e.unit) + '</span><span></span></div>';
+      else if (last && e.sport) h += '<p class="last-note">Last time · ' + fmtDate(last.date) + ': ' + esc(setsText(e, last.sets)) + '</p>';
+      h += '<div class="sets' + (prev ? ' hp' : '') + '">';
+      if (it.warm && it.warm.length) it.warm.forEach(function (s, i) { h += warmRow(it, i, s, prev); });
+      it.rows.forEach(function (s, i) { h += setRow(it, e, i, s, ph, prev); s.pop = false; });
       h += '</div>';
       var rc = itemRecords(it, d), chips = '', nw = it.recNew || {};
       if (rc.w) chips += '<span class="rec-chip' + (nw.w ? ' new' : '') + '">' + IC.star + 'Record weight · ' + fmt(rc.maxW) + ' ' + UW() + '</span>';
@@ -2087,13 +2136,36 @@ var LIBRARY = (function () {
       if (rc.b && e.log !== 'wr') chips += '<span class="rec-chip' + (nw.b ? ' new' : '') + '">' + IC.star + (e.log === 'bw' ? 'Most reps yet · ' + fmt(rc.best) : e.log === 'time' ? 'Longest hold yet · ' + fmt(rc.best) + ' s' : 'Longest yet · ' + fmt(rc.best) + ' min') + '</span>';
       if (chips) h += '<div class="recs">' + chips + '</div>';
       it.recNew = null;
-      if (e.weightHint) h += '<span class="unit-hint">' + esc(e.weightHint) + '</span>';
-      if (e.log !== 'cardio') h += '<div class="row"><button class="btn quiet" type="button" data-act="add-set" data-u="' + it.u + '">+ Add set</button>' + (it.rows.length > 1 || (it.warm && it.warm.length) ? '<button class="btn quiet" type="button" data-act="del-set" data-u="' + it.u + '" aria-pressed="' + (delMode === it.u) + '">' + (delMode === it.u ? 'Cancel' : 'Remove set') + '</button>' : '') + '</div>';
-      h += '<input class="note-in" id="note-' + it.u + '" type="text" data-f="note" data-u="' + it.u + '" value="' + esc(it.note) + '" placeholder="Note (machine setting, swap used…)" aria-label="Note for ' + esc(e.name) + '"></section>';
+      if (e.weightHint && !d.editing && !tipSeen('b')) { h += '<span class="unit-hint">' + esc(e.weightHint) + '</span>'; tipShown.b = 1; }
+      /* one row of small actions; while sets are being removed it is only the way out */
+      var acts = '';
+      if (delMode === it.u) acts = '<button class="act on" type="button" data-act="del-set" data-u="' + it.u + '">Done removing</button>';
+      else {
+        if (e.sport && !d.editing && !allDone) { var op = 0; while (op < it.rows.length - 1 && it.rows[op].d) op++; var on = !!(d.timer && d.timer.u === it.u); acts += '<button class="act' + (on ? ' on' : '') + '" type="button" data-act="timer" data-u="' + it.u + '" data-i="' + (on ? d.timer.i : op) + '">' + (on ? IC.stop + 'Stop the stopwatch' : IC.timer + 'Stopwatch') + '</button>'; }
+        if (e.log !== 'cardio') acts += '<button class="act" type="button" data-act="add-set" data-u="' + it.u + '">+ Set</button>';
+        if (e.log === 'wr' && !d.editing && !allDone) acts += '<button class="act" type="button" data-act="warm-one" data-u="' + it.u + '" aria-label="Add a warm-up set">Warm-up</button>';
+        if (!d.editing && !nDone) acts += '<button class="act" type="button" data-act="swap-open" data-u="' + it.u + '">Swap</button>';
+        if (!it.note && noteOpen !== it.u) acts += '<button class="act" type="button" data-act="note-open" data-u="' + it.u + '">Note</button>';
+      }
+      h += '<div class="acts">' + acts + '</div>';
+      if (it.note || noteOpen === it.u) h += '<input class="note-in" id="note-' + it.u + '" type="text" data-f="note" data-u="' + it.u + '" value="' + esc(it.note) + '" placeholder="Note (machine setting, swap used…)" aria-label="Note for ' + esc(e.name) + '">';
+      h += '</section>';
     });
+    /* what the rest bar names as coming up: the first open set of the open exercise, taking turns in a superset */
+    if (cur) (function () {
+      var todo = open.filter(undone); if (!todo.length) return;
+      var it = todo.reduce(function (a, b) { return b.rows.filter(function (x) { return x.d; }).length < a.rows.filter(function (x) { return x.d; }).length ? b : a; });
+      var e = exi(it.ex), i = 0; while (it.rows[i].d) i++;
+      if (e.sport || e.log === 'cardio') return;
+      var last = lastEntry(d.key, it.ex, d.id), tg = targetFor(it, e, last), ph = tg && tg.sets ? tg.sets : (last ? last.sets : null), p = ph ? (ph[i] || ph[ph.length - 1]) : null, s = it.rows[i];
+      var w = num(s.w), r = num(s.r); if (w == null && p) w = p.w; if (r == null && p) r = p.r;
+      nextSet = r == null ? (todo.length > 1 || open.length > 1 ? e.name : '') : e.log === 'time' ? fmt(r) + ' s' : (e.log === 'bw' ? (w > 0 ? '+' + fmt(w) + ' ' + UW() + ' × ' : '') + fmt(r) + (w > 0 ? '' : ' reps') : fmt(w || 0) + ' ' + UW() + ' × ' + fmt(r));
+      if (nextSet && open.length > 1 && r != null) nextSet = e.name + ', ' + nextSet;
+    })();
     h += '<button class="add-ex" type="button" data-act="add-ex">+ Add exercise</button>';
-    if (anyPr) h += '<p class="foot">A star marks a set that beats your best set for that exercise so far.</p>';
-    h = h.replace('<!--T-->', anyTarget && !draftProgress().done ? '<p class="note">The grey numbers in each set are today’s target. Tick a set to log it as written, or type what you did.</p>' : '');
+    if (anyPr && !d.editing && !tipSeen('s')) { h += '<p class="foot">A star marks a set that beats your best set for that exercise so far.</p>'; tipShown.s = 1; }
+    var tTip = anyTarget && !draftProgress().done && !tipSeen('t'); if (tTip) tipShown.t = 1;
+    h = h.replace('<!--T-->', tTip ? '<p class="note">The grey numbers in each set are today’s target. Tick a set to log it as written, or type what you did.</p>' : '');
     h += '<section class="card"><label class="label" for="draft-notes">Workout notes</label><textarea class="notes-in" id="draft-notes" data-f="notes" placeholder="Sleep, energy, anything worth remembering">' + esc(d.notes) + '</textarea>' +
       '<button class="btn primary block" type="button" data-act="finish-now" id="finish-btn"' + (draftCount() ? '' : ' disabled') + '>' + (d.editing ? 'Save changes' : 'Finish workout') + '</button>' +
       (d.editing ? '' : '<button class="btn quiet" type="button" data-act="clock">Change the date or start time</button>') +
@@ -2657,6 +2729,7 @@ var LIBRARY = (function () {
     openSheet(head(e.name) + '<div class="menu"><button type="button" data-act="open-ex" data-ex="' + esc(it.ex) + '" data-u="' + u + '">How to do it</button>' +
       (e.log === 'wr' && !d.editing ? '<button type="button" data-act="help-open" data-u="' + u + '">' + (isBar(e) ? 'Plates and warm-up weights' : 'Warm-up weights') + '</button>' : '') +
       '<button type="button" data-act="' + (d.editing ? 'ex-replace' : 'swap-open') + '" data-u="' + u + '">Swap for another exercise</button>' +
+      (it.rows.length > 1 || (it.warm && it.warm.length) ? '<button type="button" data-act="del-set" data-u="' + u + '">Remove set</button>' : '') +
       '<button type="button" data-act="ex-up" data-u="' + u + '"' + (i ? '' : ' disabled') + '>Move up</button><button type="button" data-act="ex-down" data-u="' + u + '"' + (i < d.items.length - 1 ? '' : ' disabled') + '>Move down</button>' +
       '<button type="button" class="danger" data-act="ex-remove" data-u="' + u + '">Remove from this workout</button></div>');
   }
@@ -3253,9 +3326,10 @@ var LIBRARY = (function () {
   function drawMini() {
     var d = state.draft, el = document.getElementById('wmini'); if (!el || el.hidden || !d || d.editing) return;
     var busy = !restEl.hidden, p = draftProgress(), next = null;
-    d.items.some(function (it) { if (it.rows.some(function (r) { return !r.d; })) { next = it; return true; } return false; });
+    next = curItem(d); if (next && !undone(next)) next = null;
+    if (!next) d.items.some(function (it) { if (undone(it)) { next = it; return true; } return false; });
     document.getElementById('wmini-dot').hidden = !busy;
-    document.getElementById('wmini-a').textContent = busy ? restL.textContent : (d.name || 'Workout');
+    document.getElementById('wmini-a').textContent = busy ? (d.timer ? restL.textContent : restEl.classList.contains('over') ? 'Rest is over' : 'Rest') : (d.name || 'Workout');
     document.getElementById('wmini-t').textContent = busy ? restT.textContent : fmtClock((Date.now() - d.startedAt) / 1000);
     document.getElementById('wmini-s').textContent = (next ? exi(next.ex).name + ' · ' : '') + p.done + ' of ' + p.all + ' sets done';
   }
@@ -3268,7 +3342,7 @@ var LIBRARY = (function () {
     var left = (rest.until - Date.now()) / 1000;
     if (left <= -8) { stopRest(); return; }
     restEl.hidden = false; restEl.classList.toggle('over', left <= 0);
-    restL.textContent = left > 0 ? 'Rest' : 'Rest is over';
+    restL.textContent = left > 0 ? (nextSet ? 'Next ' + nextSet : 'Rest') : 'Rest is over';
     restT.textContent = left > 0 ? fmtClock(Math.ceil(left)) : 'Go';
     restArc.setAttribute('stroke-dasharray', RC.toFixed(1));
     restArc.setAttribute('stroke-dashoffset', (RC * (1 - Math.max(0, Math.min(1, left / rest.total)))).toFixed(1));
@@ -3417,9 +3491,15 @@ var LIBRARY = (function () {
 
   /* ================= actions ================= */
   function scrollToItem(u) { var el = document.getElementById('x-' + u); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' }); }
+  /* brings the exercise that has just opened under the workout bar; the page does not move when it is already in view */
+  function showItem(u) {
+    var el = document.getElementById('x-' + u); if (!el) return;
+    var r = el.getBoundingClientRect(), top = 104, vh = window.innerHeight;
+    if (r.top < top || r.top > vh * 0.45) window.scrollTo({ top: Math.max(0, window.scrollY + r.top - top), behavior: reduceMotion ? 'auto' : 'smooth' });
+  }
   function pickExercise(exId) {
     var p = picker, d = state.draft, e = exi(exId); if (!p) return;
-    if (p.mode === 'draft' && d) { var it = newItem(exId); d.items.push(it); touchDraft(); closeSheet(); render(); scrollToItem(it.u); }
+    if (p.mode === 'draft' && d) { var it = newItem(exId); d.items.push(it); d.cur = it.u; noteOpen = null; touchDraft(); closeSheet(); render(); scrollToItem(it.u); }
     else if (p.mode === 'replace' && d) { var ni = swapItem(p.u, exId); if (ni) { closeSheet(); render(); scrollToItem(ni.u); } }
     else if (p.mode === 'editor' && editor) { editor.items.push({ ex: exId, sets: e.log === 'cardio' ? 1 : e.sets, lo: e.lo, hi: e.hi, restSec: e.restSec, rir: e.rir, link: false }); render(); toast('Added ' + e.name); }
     else if (p.mode === 'lift') { state.ui.ex = exId; saveLocal(); closeSheet(); render(); enter(); }
@@ -3496,14 +3576,20 @@ var LIBRARY = (function () {
             if (rc.b && !was.b && e.log !== 'wr') news.push(e.log === 'bw' ? 'Most reps yet on ' + e.name + ': ' + fmt(rc.best) : e.log === 'time' ? 'Longest hold yet on ' + e.name + ': ' + fmt(rc.best) + ' s' : e.sport ? 'Longest ' + e.name.toLowerCase() + ' yet: ' + distText(e, rc.best) : 'Longest ' + e.name + ' yet: ' + fmt(rc.best) + ' min');
             it.recNew = news.length ? { w: rc.w && !was.w, v: rc.v && !was.v, b: rc.b && !was.b } : null;
             it.rec = { w: rc.w, v: rc.v, b: rc.b };
-            if (news.length) toast(news[0], true);
+            if (news.length) toast(news.length > 1 ? news.length + ' records on ' + e.name : news[0], true);
             if (s.pr || news.length) { var br = a.getBoundingClientRect(); confetti(news.length ? 34 : 22, br.left + br.width / 2, br.top + br.height / 2); }
             if (state.settings.autoRest && it.restSec >= 30) startRest(it.restSec); else if (it.restSec < 30) stopRest();
           }
         } else { s.d = false; s.pr = false; delete s.rir; if (!d.editing) { var rc2 = itemRecords(it, d); it.rec = { w: rc2.w, v: rc2.v, b: rc2.b }; } }
-        touchDraft(); render(); break;
+        var moved = s.d && !d.editing && advance(d, it); if (moved) { delMode = null; noteOpen = null; }
+        if (s.d && !d.editing) { tipSeen('t'); state.ui.tips.t = 1; }
+        touchDraft(); render(); if (moved && d.cur) showItem(d.cur); break;
       case 'add-set': it = findItem(u); if (it) { var lr = it.rows[it.rows.length - 1]; it.rows.push({ w: lr ? lr.w : '', r: '', d: false }); touchDraft(); render(); } break;
-      case 'del-set': delMode = delMode === u ? null : u; render(); break;
+      case 'del-set': delMode = delMode === u ? null : u; if (!scrim.hidden) closeSheet(); render(); break;
+      case 'ex-open': it = findItem(u); if (it && d) { d.cur = u; delMode = null; noteOpen = null; touchDraft(); render(); showItem(u); } break;
+      case 'note-open': noteOpen = u; render(); var ni = document.getElementById('note-' + u); if (ni) ni.focus(); break;
+      case 'warm-plan': { var wr = d && d.key !== 'free' ? getRoutine(d.key) : null; if (wr && wr.warmup) openSheet(head('Warm-up') + (wr.focus ? '<p class="sub">' + esc(wr.focus) + '</p>' : '') + '<p class="sheet-p">' + esc(wr.warmup) + '</p>'); break; }
+      case 'notes-go': { var dn = document.getElementById('draft-notes'); if (dn) { dn.scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' }); dn.focus({ preventScroll: true }); } break; }
       case 'del-row': it = findItem(u); if (it) {
         if (a.dataset.w) { if (it.warm) { it.warm.splice(i, 1); if (!it.warm.length) delete it.warm; } }
         else if (it.rows.length > 1) { it.rows.splice(i, 1); if (d.timer && d.timer.u === u) d.timer = null; }
@@ -3514,10 +3600,10 @@ var LIBRARY = (function () {
       case 'ex-menu': menuSheet(u); break;
       case 'ex-replace': openPicker('replace', { u: u }); break;
       case 'ex-up': case 'ex-down': it = findItem(u); if (it) { var ix = d.items.indexOf(it); swapItems(d.items, ix, ix + (act === 'ex-up' ? -1 : 1)); touchDraft(); closeSheet(); render(); scrollToItem(u); } break;
-      case 'ex-remove': it = findItem(u); if (it) { d.items.splice(d.items.indexOf(it), 1); touchDraft(); closeSheet(); render(); } break;
+      case 'ex-remove': it = findItem(u); if (it) { d.items.splice(d.items.indexOf(it), 1); if (d.cur === u) d.cur = null; touchDraft(); closeSheet(); render(); } break;
       case 'add-this': if (d && !d.editing) { var ni = newItem(a.dataset.ex); d.items.push(ni); touchDraft(); closeSheet(); go('log', true); scrollToItem(ni.u); toast('Added to your workout'); } break;
-      case 'finish': if (d && draftCount()) { var p = draftProgress(); if (p.done >= p.all || arm('finish', chrome)) finishDraft(); } break;
-      case 'finish-now': if (d && draftCount()) finishDraft(); break;
+      case 'finish': if (d && draftCount()) { var p = draftProgress(); if (p.done >= p.all || arm('finish', chrome)) { tipsDone(); finishDraft(); } } break;
+      case 'finish-now': if (d && draftCount()) { tipsDone(); finishDraft(); } break;
       case 'discard': if (d && arm('discard', render)) { state.draft = null; stopRest(); touchDraft(true); applyTheme(); wake(); render(); window.scrollTo(0, 0); } break;
       case 'rest-skip': if (d && d.timer) timerStop(false); else stopRest(); break;
       case 'rest-sub':

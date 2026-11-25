@@ -46,7 +46,7 @@ async def main():
                 d = await pg.evaluate(LS + ".draft"); u = d['items'][0]['u']
                 ok(d['key'] == 'out-run' and d['name'] == 'Run' and [i['ex'] for i in d['items']] == ['outdoor-run'], 'tapping Run starts a workout with the run in it')
                 ok(await pg.locator('#d-%s-0' % u).count() == 1 and await pg.locator('#r-%s-0' % u).count() == 1 and await pg.locator('#s-%s-0' % u).count() == 1, 'the set asks for distance, minutes and seconds')
-                ok('stopwatch' in (await pg.locator('#x-%s .last-hint' % u).last.inner_text()).lower() and await pg.locator('#x-%s .tool:has-text("Stopwatch")' % u).count() == 1, 'first time: a hint and a stopwatch button')
+                ok('stopwatch' in (await pg.locator('#x-%s .why' % u).inner_text()).lower() and await pg.locator('#x-%s .act:has-text("Stopwatch")' % u).count() == 1, 'first time: a hint and a stopwatch button')
                 await pg.fill('#d-%s-0' % u, '5.2'); await pg.fill('#r-%s-0' % u, '28'); await pg.fill('#s-%s-0' % u, '40'); await pg.wait_for_timeout(120)
                 ok(await pg.locator('#p-%s-0' % u).inner_text() == 'Pace 5:31 /km', 'the pace shows as you type: %s' % await pg.locator('#p-%s-0' % u).inner_text())
                 await shot('run')
@@ -64,7 +64,7 @@ async def main():
                 # ---- the second run: last time in grey, one tap, then longer and faster
                 await pg.click('[data-key="out-run"]'); await pg.wait_for_timeout(400); u = await pg.evaluate(LS + ".draft.items[0].u")
                 ph = [await pg.get_attribute('#%s-%s-0' % (k, u), 'placeholder') for k in 'drs']
-                ok(ph == ['5.2', '28', '40'] and 'Last time 5:31 /km' in await pg.locator('#x-%s .last-hint' % u).last.inner_text() and '5.2 km in 28:40' in await pg.locator('#x-%s .last' % u).inner_text(), 'next time last run is there in grey with its pace: %s' % ph)
+                ok(ph == ['5.2', '28', '40'] and 'Last time 5:31 /km' in await pg.locator('#x-%s .why' % u).inner_text() and '5.2 km in 28:40' in await pg.locator('#x-%s .last-note' % u).inner_text(), 'next time last run is there in grey with its pace: %s' % ph)
                 await pg.click('[data-act="tick"][data-u="%s"][data-i="0"]' % u); await pg.wait_for_timeout(150)
                 row = await pg.evaluate(LS + ".draft.items[0].rows[0]"); ok(row['d'] and [row.get('dist'), row['r'], row.get('sec')] == ['5.2', '28', '40'], 'one tap logs the same run again')
                 await pg.click('[data-act="tick"][data-u="%s"][data-i="0"]' % u); await pg.fill('#d-%s-0' % u, '6'); await pg.fill('#r-%s-0' % u, '32'); await pg.fill('#s-%s-0' % u, ''); await pg.click('[data-act="tick"][data-u="%s"][data-i="0"]' % u); await pg.wait_for_timeout(150)
@@ -75,7 +75,7 @@ async def main():
                 await shot('summary2'); await pg.click('[data-act="sheet-x"]'); await pg.wait_for_timeout(250)
                 # ---- stopwatch on a ride
                 await pg.click('[data-key="out-ride"]'); await pg.wait_for_timeout(400); u = await pg.evaluate(LS + ".draft.items[0].u")
-                await pg.click('#x-%s .tool:has-text("Stopwatch")' % u); await pg.wait_for_timeout(1200)
+                await pg.click('#x-%s .act:has-text("Stopwatch")' % u); await pg.wait_for_timeout(1200)
                 ok(await pg.locator('#rest').is_visible() and await pg.locator('#rest-step').is_hidden() and await pg.locator('#rest [data-act="rest-skip"]').inner_text() == 'Stop' and 'Bike ride' in await pg.locator('#rest-l').inner_text(), 'the stopwatch counts up in the bar, with Stop and no plus or minus')
                 await shot('stopwatch'); await pg.wait_for_timeout(5200); await pg.click('#rest [data-act="rest-skip"]'); await pg.wait_for_timeout(300)
                 row = await pg.evaluate(LS + ".draft.items[0].rows[0]"); ok(row['r'] == '0' and row.get('sec') in ('6', '7') and not row['d'] and await pg.evaluate("document.activeElement.id") == 'd-%s-0' % u, 'Stop writes the time into the set and moves to the distance (%s s)' % row.get('sec'))

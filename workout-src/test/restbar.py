@@ -44,6 +44,7 @@ async def main():
                 tw = await pg.evaluate("(() => { const b = document.getElementById('rest-t'), r = document.createRange(); r.selectNodeContents(b); return [r.getBoundingClientRect().right, b.parentElement.getBoundingClientRect().right]; })()"); ok(tw[0] <= tw[1] + 0.5, 'cardio: the time is not cut off (%d of %d)' % (tw[0], tw[1]))
                 await pg.screenshot(path=os.path.join(SH, 'R-cardio-%d.png' % w))
                 await pg.click('#rest [data-act="rest-skip"]'); await pg.wait_for_timeout(200)
+                if await pg.locator('button#x-%s' % sp).count(): await pg.click('button#x-%s' % sp); await pg.wait_for_timeout(350)
                 await pg.fill('#r-%s-0' % sp, '25'); await pg.click('#x-%s [data-act="timer"][data-i="0"]' % sp); await pg.wait_for_timeout(300)
                 btn = [x.strip() for x in await pg.locator('#rest button').all_inner_texts()]; ok(btn == ['−', '+', 'Stop'] and await pg.locator('#rest-by').inner_text() == '10 s', 'a hold: minus and plus work in tens of seconds')
                 await pg.click('#rest [data-act="rest-sub"]'); await pg.click('#rest [data-act="rest-sub"]'); await pg.click('#rest [data-act="rest-sub"]'); await pg.wait_for_timeout(100)

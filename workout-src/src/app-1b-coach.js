@@ -10,29 +10,29 @@
      of the range, then add weight and start again from the bottom. Returns { sets, text, up, step }; sets is null the first time. */
   function targetFor(it, e, last) {
     var h = hint(it, e, last);
-    if (!last || !last.sets || !last.sets.length) return { sets: null, text: h.t, up: false };
+    if (!last || !last.sets || !last.sets.length) return { sets: null, text: h.t, short: h.s, up: false };
     var prev = last.sets, n = e.log === 'cardio' ? 1 : Math.max(it.sets || 1, prev.length), sets = [], i, k = -1;
     for (i = 0; i < n; i++) { var p = prev[i] || prev[prev.length - 1]; sets.push({ w: p.w || 0, r: p.r, dist: p.dist }); }
-    if (e.log === 'cardio' || !it.hi) return { sets: sets, text: h.t, up: false };
+    if (e.log === 'cardio' || !it.hi) return { sets: sets, text: h.t, short: h.s, up: false };
     var planned = prev.slice(0, it.sets), top = planned.length >= it.sets && planned.every(function (s) { return s.r >= it.hi; });
     var loaded = e.log === 'wr' || (e.log === 'bw' && prev.some(function (s) { return s.w > 0; }));
     var easy = !top && loaded && planned.length >= it.sets && planned.every(function (s) { return s.rir != null && s.rir >= 3; });
     if (easy) {
       var st2 = wStep(e, sets[0].w);
       sets.forEach(function (s) { s.w = r2(s.w + wStep(e, s.w)); });
-      return { sets: sets, text: 'You had 3 or more reps left on every set last time, so the weight goes up by ' + fmt(st2) + ' ' + UW() + '. Same reps.', up: true, step: st2, easy: true };
+      return { sets: sets, text: 'You had 3 or more reps left on every set last time, so the weight goes up by ' + fmt(st2) + ' ' + UW() + '. Same reps.', short: '+' + fmt(st2) + ' ' + UW() + ' today · same reps', up: true, step: st2, easy: true };
     }
-    if (top && !loaded) return { sets: sets, text: h.t, up: true };
+    if (top && !loaded) return { sets: sets, text: h.t, short: h.s, up: true };
     if (top) {
       var step = wStep(e, sets[0].w);
       sets.forEach(function (s) { s.w = r2(s.w + wStep(e, s.w)); s.r = it.lo; });
-      return { sets: sets, text: 'Every set reached ' + it.hi + ' last time, so the weight goes up by ' + fmt(step) + ' ' + UW() + ' and the reps start again at ' + it.lo + '.', up: true, step: step };
+      return { sets: sets, text: 'Every set reached ' + it.hi + ' last time, so the weight goes up by ' + fmt(step) + ' ' + UW() + ' and the reps start again at ' + it.lo + '.', short: '+' + fmt(step) + ' ' + UW() + ' today · reps restart at ' + it.lo, up: true, step: step };
     }
     for (i = 0; i < Math.min(sets.length, it.sets || sets.length); i++) if (sets[i].r < it.hi) { k = i; break; }
-    if (k < 0) return { sets: sets, text: 'Same ' + (e.log === 'time' ? 'holds' : 'weight') + '. Get all ' + it.sets + ' sets to ' + it.hi + (e.log === 'time' ? ' s.' : ' reps.'), up: false };
-    if (e.log === 'time') { sets[k].r = Math.min(it.hi, sets[k].r + 5); return { sets: sets, text: 'Hold set ' + (k + 1) + ' a little longer than last time.', up: false }; }
+    if (k < 0) return { sets: sets, text: 'Same ' + (e.log === 'time' ? 'holds' : 'weight') + '. Get all ' + it.sets + ' sets to ' + it.hi + (e.log === 'time' ? ' s.' : ' reps.'), short: 'Same ' + (e.log === 'time' ? 'holds' : 'weight') + ' · all ' + it.sets + ' sets to ' + it.hi, up: false };
+    if (e.log === 'time') { sets[k].r = Math.min(it.hi, sets[k].r + 5); return { sets: sets, text: 'Hold set ' + (k + 1) + ' a little longer than last time.', short: 'Hold set ' + (k + 1) + ' a little longer', up: false }; }
     sets[k].r = sets[k].r + 1;
-    return { sets: sets, text: (loaded ? 'Same weight. ' : '') + 'One more rep on set ' + (k + 1) + ' than last time.', up: false };
+    return { sets: sets, text: (loaded ? 'Same weight. ' : '') + 'One more rep on set ' + (k + 1) + ' than last time.', short: (loaded ? 'Same weight · one' : 'One') + ' more rep on set ' + (k + 1), up: false };
   }
 
   /* how one exercise went against the last time: { st: up | same | down, label } */
