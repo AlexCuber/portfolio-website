@@ -1544,7 +1544,7 @@ var LIBRARY = (function () {
       var e = s.e, it = s.it, top = bestSet(e, s.last.sets, 'top'), swap = it.swap || e.swap, tip;
       if (top.w > 0) tip = 'Try ' + (e.log === 'bw' ? '+' : '') + fmt(r2(top.w + wStep(e, top.w))) + ' ' + UW() + ' for sets of ' + it.lo + (swap ? ', or swap it for a few weeks: ' + swap.charAt(0).toLowerCase() + swap.slice(1) + '.' : ', or swap it for a similar exercise for a few weeks.');
       else tip = 'Add a little weight or slow the lowering' + (swap ? ', or swap it for a few weeks: ' + swap.charAt(0).toLowerCase() + swap.slice(1) + '.' : '.');
-      out.push({ k: 'stall', ex: it.ex, t: e.name + ' has stalled', d: setsText(e, s.last.sets) + ' last time, and no better set in the last ' + NUM_WORDS[Math.min(s.n, 12)].toLowerCase() + ' sessions. ' + tip });
+      out.push({ k: 'stall', ex: it.ex, t: e.name + ' has stalled', s: top.w > 0 ? 'Try ' + (e.log === 'bw' ? '+' : '') + fmt(r2(top.w + wStep(e, top.w))) + ' ' + UW() + ' for sets of ' + it.lo : 'Add a little weight or slow the lowering', d: setsText(e, s.last.sets) + ' last time, and no better set in the last ' + NUM_WORDS[Math.min(s.n, 12)].toLowerCase() + ' sessions. ' + tip });
     });
     var from = addDays(ws, -28), plan = planTargets(), got = {}, weeks = {};
     list.forEach(function (s) {
@@ -1555,7 +1555,7 @@ var LIBRARY = (function () {
       var behind = LIBRARY.MUSCLES.filter(function (m) { return plan[m.id] >= 4 && (got[m.id] || 0) < 0.7 * plan[m.id]; }).sort(function (a, b) { return (got[a.id] || 0) / plan[a.id] - (got[b.id] || 0) / plan[b.id]; }).slice(0, 3);
       if (behind.length) {
         var names = behind.map(function (m) { return m.name; }), title = names.length === 1 ? names[0] + (/s$/.test(names[0]) ? ' are' : ' is') : names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1].toLowerCase() + ' are';
-        out.push({ k: 'mus', t: title + ' behind your plan', d: behind.map(function (m) { return m.name + ' ' + fmt(Math.round((got[m.id] || 0) * 10) / 10) + ' of ' + fmt(Math.round(plan[m.id] * 10) / 10); }).join(', ') + ' sets a week, averaged over the last four weeks.' });
+        out.push({ k: 'mus', t: title + ' behind your plan', s: behind.map(function (m) { return m.name + ' ' + fmt(Math.round((got[m.id] || 0) * 10) / 10) + ' of ' + fmt(Math.round(plan[m.id] * 10) / 10); }).join(' · ') + ' sets a week', d: behind.map(function (m) { return m.name + ' ' + fmt(Math.round((got[m.id] || 0) * 10) / 10) + ' of ' + fmt(Math.round(plan[m.id] * 10) / 10); }).join(', ') + ' sets a week, averaged over the last four weeks.' });
       }
     }
     var wk = {}, vals = [], run = 0;
@@ -1563,7 +1563,7 @@ var LIBRARY = (function () {
     for (i = 1; i <= 12; i++) vals.push(wk[addDays(ws, -7 * i)] || 0);
     var nz = vals.filter(Boolean).sort(function (a, b) { return a - b; }), med = nz.length ? nz[Math.floor(nz.length / 2)] : 0;
     for (i = 0; i < vals.length; i++) { if (vals[i] > 0 && vals[i] >= 0.7 * med) run++; else break; }
-    if (run >= 7) out.push({ k: 'easy', t: NUM_WORDS[Math.min(run, 12)] + (run >= 12 ? ' or more' : '') + ' weeks without an easy week', d: 'Consider one lighter week: the same exercises with about half the sets. It gives joints and tendons time to catch up.' });
+    if (run >= 7) out.push({ k: 'easy', t: NUM_WORDS[Math.min(run, 12)] + (run >= 12 ? ' or more' : '') + ' weeks without an easy week', s: 'Plan one lighter week', d: 'Consider one lighter week: the same exercises with about half the sets. It gives joints and tendons time to catch up.' });
     return out;
   }
 
@@ -2371,8 +2371,7 @@ var LIBRARY = (function () {
       '<div class="cal-rows"><span>Mon</span><span></span><span>Wed</span><span></span><span>Fri</span><span></span><span>Sun</span></div><div class="cal-grid">' + h + '</div></div>';
   }
   function muscleBars(list) {
-    var ws = weekStart(today()), four = state.ui.musWin === 'four', from = four ? addDays(ws, -21) : ws, got = {}, h = '', plan = planTargets();
-    list.forEach(function (s) { if (s.date < from) return; (s.entries || []).forEach(function (en) { var e = exi(en.ex); if (e.log === 'cardio') return; Object.keys(e.muscles).forEach(function (mu) { got[mu] = (got[mu] || 0) + en.sets.length * e.muscles[mu] / (four ? 4 : 1); }); }); });
+    var md = musData(list), got = md.got, h = '', plan = md.plan;
     var rows = LIBRARY.MUSCLES.filter(function (m) { return plan[m.id] || got[m.id]; }), free = 10;
     if (!rows.length) return '<p class="sub">Add a session to your plan to get weekly targets.</p>';
     rows.forEach(function (m) { if (!plan[m.id]) free = Math.max(free, got[m.id] || 0); });
@@ -2424,25 +2423,31 @@ var LIBRARY = (function () {
       tile('t-violet', IC.weight, cnt(Math.round(vol), 'short'), UW() + ' lifted') +
       tile('t-star', IC.star, cnt(prs), prs === 1 ? 'personal best' : 'personal bests') + '</div>';
     h += attentionCard(list);
+    var mdN = musData(list), nMus = LIBRARY.MUSCLES.filter(function (m) { return mdN.plan[m.id] || mdN.got[m.id]; }).length;
     h += '<section class="card"><h3>Hard sets per muscle</h3>' +
-      '<div class="seg" role="group" aria-label="Period"><button type="button" data-act="mus-win" data-v="week" aria-pressed="' + (state.ui.musWin !== 'four') + '">This week</button><button type="button" data-act="mus-win" data-v="four" aria-pressed="' + (state.ui.musWin === 'four') + '">Average of 4 weeks</button></div>' +
-      muscleFigure(list) + muscleBars(list) + '</section>';
+      '<div class="seg" role="group" aria-label="Period"><button type="button" data-act="mus-win" data-v="week" aria-pressed="' + (state.ui.musWin !== 'four') + '">Last 7 days</button><button type="button" data-act="mus-win" data-v="four" aria-pressed="' + (state.ui.musWin === 'four') + '">4-week average</button></div>' +
+      muscleFigure(list) + (musAll ? muscleBars(list) : '') + (nMus ? '<button class="act more" type="button" data-act="mus-all" aria-expanded="' + musAll + '">' + (musAll ? 'Hide the list' : 'All ' + nMus + ' muscles') + '</button>' : '') + '</section>';
     var wk = lastWeeks(10), vw = lastWeeks(10);
     list.forEach(function (s) { var k = weekStart(s.date); wk.forEach(function (w) { if (w.start === k) { if (isCore(s)) w.a++; else w.b++; } }); vw.forEach(function (w) { if (w.start === k) w.a += volOf(s); }); });
-    h += '<section class="card"><div class="spread"><h3>Sessions per week</h3><div class="legend"><span><i></i>Main</span><span><i class="x"></i>Extra</span></div></div><div class="chart" data-chart="wk">' +
-      colChart('wk', wk, { int: true, min: Math.max(5, goal + 1), target: goal, label: 'Sessions per week for the last 10 weeks', tip: function (w) { return '<b>Week of ' + fmtDate(w.start, true) + '</b><br>' + plural(w.a, 'main session') + (w.b ? ' + ' + w.b + ' extra' : ''); } }) + '</div></section>';
-    h += '<section class="card"><h3>Weight lifted per week</h3><p class="sub">Kilograms times reps, added up over every set.</p><div class="chart" data-chart="vol">' +
-      colChart('vol', vw, { label: 'Kilograms lifted per week for the last 10 weeks', fmt: function (t) { return t >= 1000 ? (t / 1000) + 'K' : t; }, tip: function (w) { return '<b>Week of ' + fmtDate(w.start, true) + '</b><br>' + compact(w.a) + ' ' + UW() + ' lifted'; } }) + '</div></section>';
     var durs = [], dayIx = {};
     list.forEach(function (s) { var dd = durOf(s); if (!dd) return; var o = dayIx[s.date]; if (!o) { o = dayIx[s.date] = { date: s.date, d: 0, names: [] }; durs.push(o); } o.d += dd; o.names.push(s.name || 'Workout'); });
     durs = durs.slice(-24);
-    h += '<section class="card"><div class="spread"><h3>Workout length</h3>' + (durs.length ? '<span class="pill">average ' + fmtDur(durs.reduce(function (a, x) { return a + x.d; }, 0) / durs.length) + '</span>' : '') + '</div>';
-    h += durs.length ? '<p class="sub">Minutes from start to finish, added up when a day has more than one workout. The line is orange for short days and turns green at 60 minutes.</p><div class="chart" data-chart="dur">' + lineChart('dur', durs.map(function (x) { return { x: x.date, y: Math.round(x.d / 60), tip: '<b>' + fmtDate(x.date) + '</b><br>' + esc(x.names.join(' + ')) + ' · ' + fmtDur(x.d) }; }), null, { scale: [30, 60] }) + '</div>' : '<p class="sub">The clock at the top of a workout records how long it took. Your next finished workout shows up here.</p>';
+    /* one card for the three weekly trends; what each shows is behind the info button */
+    var tr = state.ui.trend === 'vol' || state.ui.trend === 'dur' ? state.ui.trend : 'wk';
+    h += '<section class="card"><div class="spread" style="align-items:center"><h3>Trends</h3><button class="info-btn" type="button" data-act="trend-info" aria-expanded="' + trendInfo + '" aria-label="What this chart shows">i</button></div>' +
+      '<div class="seg" role="group" aria-label="Which trend"><button type="button" data-act="trend" data-v="wk" aria-pressed="' + (tr === 'wk') + '">Sessions</button><button type="button" data-act="trend" data-v="vol" aria-pressed="' + (tr === 'vol') + '">' + (isLb() ? 'Pounds' : 'Kilograms') + '</button><button type="button" data-act="trend" data-v="dur" aria-pressed="' + (tr === 'dur') + '">Length</button></div>';
+    if (trendInfo) h += '<p class="note">' + (tr === 'wk' ? 'Sessions per week for the last 10 weeks. The dashed line is your weekly goal; sessions that do not count toward it are shown as extra.' : tr === 'vol' ? 'Weight lifted per week: weight times reps, added up over every set.' : 'Minutes from start to finish, added up when a day has more than one workout. The line is orange for short days and turns green at 60 minutes.') + '</p>';
+    if (tr === 'wk') h += '<div class="chart" data-chart="wk">' +
+      colChart('wk', wk, { int: true, min: Math.max(5, goal + 1), target: goal, label: 'Sessions per week for the last 10 weeks', tip: function (w) { return '<b>Week of ' + fmtDate(w.start, true) + '</b><br>' + plural(w.a, 'main session') + (w.b ? ' + ' + w.b + ' extra' : ''); } }) + '</div>' +
+      (wk.some(function (w) { return w.b; }) ? '<div class="legend"><span><i></i>Main</span><span><i class="x"></i>Extra</span></div>' : '');
+    else if (tr === 'vol') h += '<div class="chart" data-chart="vol">' +
+      colChart('vol', vw, { label: 'Weight lifted per week for the last 10 weeks', fmt: function (t) { return t >= 1000 ? (t / 1000) + 'K' : t; }, tip: function (w) { return '<b>Week of ' + fmtDate(w.start, true) + '</b><br>' + compact(w.a) + ' ' + UW() + ' lifted'; } }) + '</div>';
+    else h += durs.length ? '<div class="chart" data-chart="dur">' + lineChart('dur', durs.map(function (x) { return { x: x.date, y: Math.round(x.d / 60), tip: '<b>' + fmtDate(x.date) + '</b><br>' + esc(x.names.join(' + ')) + ' · ' + fmtDur(x.d) }; }), null, { scale: [30, 60] }) + '</div><div class="pills"><span class="pill">average ' + fmtDur(durs.reduce(function (a, x) { return a + x.d; }, 0) / durs.length) + '</span></div>' : '<p class="sub">Your next finished workout shows up here.</p>';
     h += '</section>';
-    h += '<section class="card"><div><h3>Milestones</h3><p class="sub">The colour is the level you have reached, the ring is how close the next one is. Tap one to see every level.</p></div>' + badgesHtml(list) + '</section>';
+    h += '<section class="card"><h3>Milestones</h3>' + badgesHtml(list) + '</section>';
     return h;
   }
-  var liftInfo = false;
+  var liftInfo = false, trendInfo = false, musAll = false, attOpen = {};
   function modeSeg() {
     var mode = state.ui.liftMode === 'e1rm' ? 'e1rm' : 'max';
     return '<div class="seg" role="group" aria-label="What to show for weighted lifts"><button type="button" data-act="lift-mode" data-v="max" aria-pressed="' + (mode === 'max') + '">Top weight</button><button type="button" data-act="lift-mode" data-v="e1rm" aria-pressed="' + (mode === 'e1rm') + '">Est. 1-rep max</button></div>';
@@ -2684,6 +2689,8 @@ var LIBRARY = (function () {
   }
   function searchBox(id, val) { return '<div class="search">' + IC.search + '<input id="' + id + '" type="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Search ' + allEx().length + ' exercises" value="' + esc(val) + '" aria-label="Search exercises"></div>'; }
   function libraryView() {
+    /* once, the list moves to "In my plan": the exercises you train are a short list and the rest is one tap or a search away */
+    if (!state.ui.libPlan) { state.ui.libPlan = 1; if (routineList().length) state.ui.lib = 'mine'; saveLocal(); }
     var f = state.ui.lib || 'all', h = searchBox('lib-q', libQ) + chipsHtml(f, 'lib', [['mine', 'In my plan']]);
     if (f === 'mine' && !libQ) {
       routineList().forEach(function (r) {
@@ -2868,9 +2875,10 @@ var LIBRARY = (function () {
     ['', 'M47 225 L53 225 L53 233 L47 233 Z'],
     ['', 'M45 236 L54 236 L55 242 L41 242 Z']
   ];
-  /* sets per muscle this week (or a week's worth from the last four), next to what the plan gives each one */
+  /* Sets per muscle over the last 7 days, or a week's worth from the last 28, next to what the plan gives each one.
+     Both windows end today and are always full, so the numbers mean the same on a Monday as on a Sunday. */
   function musData(list) {
-    var ws = weekStart(today()), four = state.ui.musWin === 'four', from = four ? addDays(ws, -21) : ws, got = {};
+    var four = state.ui.musWin === 'four', from = addDays(today(), four ? -27 : -6), got = {};
     list.forEach(function (s) { if (s.date < from) return; (s.entries || []).forEach(function (en) { var e = exi(en.ex); if (e.log === 'cardio') return; Object.keys(e.muscles).forEach(function (mu) { got[mu] = (got[mu] || 0) + en.sets.length * e.muscles[mu] / (four ? 4 : 1); }); }); });
     return { got: got, plan: planTargets(), four: four };
   }
@@ -2897,7 +2905,7 @@ var LIBRARY = (function () {
     if (behind.length) {
       side += '<ul class="mm-list">' + behind.map(function (x) { return '<li><i style="background:' + (x.g > 0 ? ramp('--ramp', x.r) : 'var(--mm-off)') + '"></i><span>' + esc(x.m.name) + '</span><b>' + fmt(Math.round(x.g * 10) / 10) + '<small> / ' + fmt(Math.round(x.p * 10) / 10) + '</small></b></li>'; }).join('') + '</ul>';
       if (done) side += '<p class="foot">' + done + ' of ' + rows.length + ' muscles have their sets.</p>';
-    } else side += '<p class="sub">Every muscle in your plan has its sets' + (md.four ? ' on average.' : ' for the week.') + '</p>';
+    } else side += '<p class="sub">Every muscle in your plan has its sets.</p>';
     side += '</div>';
     return '<div class="mm"><svg viewBox="0 0 250 262" role="img" aria-label="Front and back of a body with each muscle coloured by how many of its planned sets are done' + (behind.length ? '. Furthest behind: ' + behind.map(function (x) { return x.m.name; }).join(', ') : '') + '">' +
       half(FIG_FRONT, 0) + half(FIG_BACK, 130) + '<text x="60" y="259">Front</text><text x="190" y="259">Back</text></svg>' + side + '</div>';
@@ -2938,11 +2946,11 @@ var LIBRARY = (function () {
       if (ss) cells += '<button type="button" class="hd on' + (tint[ss[0].key] != null ? ' av' + tint[ss[0].key] : '') + (dt === sel ? ' sel' : '') + (dt === t ? ' now' : '') + '" data-act="hist-day" data-d="' + dt + '" aria-pressed="' + (dt === sel) + '" aria-label="' + fmtDate(dt) + ': ' + esc(ss.map(function (s) { return s.name || 'Workout'; }).join(' and ')) + '"><b>' + d + '</b><small>' + esc(ini[ss[0].key] || initials(ss[0].name || 'Workout')) + (ss.length > 1 ? '+' : '') + '</small></button>';
       else cells += '<span class="hd' + (dt === t ? ' now' : '') + (dt > t ? ' future' : '') + '"><b>' + d + '</b></span>';
     }
-    h += '<section class="card"><div class="hist-nav"><button class="icon-btn" type="button" data-act="hist-prev" aria-label="Previous month"' + (mk <= f[0].date.slice(0, 7) ? ' disabled' : '') + '>' + IC.left + '</button><h3>' + MONTHS_FULL[mo] + ' ' + y + '</h3>' +
+    h += '<section class="card"><div class="hist-nav"><button class="icon-btn" type="button" data-act="hist-prev" aria-label="Previous month"' + (mk <= f[0].date.slice(0, 7) ? ' disabled' : '') + '>' + IC.left + '</button><h3>' + MONTHS_FULL[mo] + ' ' + y + '<small>' + plural(count, 'workout') + '</small></h3>' +
       '<button class="icon-btn" type="button" data-act="hist-next" aria-label="Next month"' + (mk >= t.slice(0, 7) ? ' disabled' : '') + '>' + IC.right + '</button></div>' +
       '<div class="hist-grid"><span class="hw">M</span><span class="hw">T</span><span class="hw">W</span><span class="hw">T</span><span class="hw">F</span><span class="hw">S</span><span class="hw">S</span>' + cells + '</div>';
     if (legend.length) h += '<div class="hist-key">' + legend.map(function (s) { return '<span><i class="hk' + (tint[s.key] != null ? ' av' + tint[s.key] : '') + '">' + esc(ini[s.key] || initials(s.name || 'Workout')) + '</i>' + esc(s.name || 'Workout') + '</span>'; }).join('') + '</div>';
-    h += '<p class="foot">' + (sel ? 'Showing ' + fmtDate(sel) + '. Tap the day again to see all workouts.' : count ? plural(count, 'workout') + ' this month. Tap a day to see only that day.' : 'No workouts this month.') + '</p></section>';
+    h += '</section>';
     var rec = recordsBy(f), shown = sel ? by[sel] : f.slice(-histN).reverse();
     h += '<div class="hist-list" id="hist-list"><h3 class="hist-h">' + (sel ? fmtDate(sel) : 'Latest workouts') + '</h3>';
     shown.forEach(function (s) {
@@ -3001,12 +3009,14 @@ var LIBRARY = (function () {
     mus: IC.target,
     easy: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6v12M15 6v12"/></svg>'
   };
+  /* each item is a title and the one thing to do; the reasoning opens on tap */
   function attentionCard(list) {
     var a = attention(list); if (!a.length) return '';
     var h = '<section class="card"><h3>Needs attention</h3><ul class="att">';
     a.forEach(function (x) {
-      h += '<li><span class="att-i" aria-hidden="true">' + ATT_IC[x.k] + '</span><span class="txt"><b>' + esc(x.t) + '</b><small>' + esc(x.d) + '</small>' +
-        (x.ex ? '<button class="btn quiet sm" type="button" data-act="lift" data-ex="' + esc(x.ex) + '">See its chart</button>' : '') + '</span></li>';
+      var id = x.k + (x.ex || ''), open = !!attOpen[id];
+      h += '<li><button class="att-row" type="button" data-act="att-open" data-id="' + esc(id) + '" aria-expanded="' + open + '"><span class="att-i" aria-hidden="true">' + ATT_IC[x.k] + '</span><span class="txt"><b>' + esc(x.t) + '</b><small>' + esc(x.s) + '</small></span><span class="att-go" aria-hidden="true">' + IC.right + '</span></button>' +
+        (open ? '<div class="att-more"><p>' + esc(x.d) + '</p>' + (x.ex ? '<button class="act" type="button" data-act="lift" data-ex="' + esc(x.ex) + '">See its chart</button>' : '') + '</div>' : '') + '</li>';
     });
     return h + '</ul></section>';
   }
@@ -3704,6 +3714,10 @@ var LIBRARY = (function () {
       case 'pb-sort': state.ui.pbSort = a.dataset.v; saveLocal(); render(); break;
       case 'pb-all': pbAll = !pbAll; render(); break;
       case 'lift-info': liftInfo = !liftInfo; render(); break;
+      case 'trend-info': trendInfo = !trendInfo; render(); break;
+      case 'trend': state.ui.trend = a.dataset.v; saveLocal(); render(); enter(); break;
+      case 'mus-all': musAll = !musAll; render(); break;
+      case 'att-open': attOpen[a.dataset.id] = !attOpen[a.dataset.id]; render(); break;
       case 'ms-open': msSheet(+a.dataset.i); break;
       case 'sport': state.ui.sport = a.dataset.v; saveLocal(); render(); enter(); break;
       case 'rir': it = findItem(u); if (it && it.rows[i]) { it.rows[i].rir = +a.dataset.v; touchDraft(); render(); } break;

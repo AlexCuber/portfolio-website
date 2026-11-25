@@ -25,7 +25,7 @@
   --grad-btn: linear-gradient(135deg, #0a7f8c 0%, #12a08f 100%);
   --btn-glow: rgba(10, 127, 140, 0.3);
   --board: #06262b; --board-2: #0a3d43; --board-ink: #f1f8f8; --board-dim: #9cc2c5; --board-line: #1c4d53;
-  --g0: #e4ecec; --g1: #bfecca; --g2: #7fd79a; --g3: #36b866; --g4: #168a43;
+  --g0: #e4ecec; --g1: #e3d8f8; --g2: #b99cf0; --g3: #7d4fd6; --g4: #3f1a98; /* P2: the consistency grid is an amount, so it is the purple of the charts */
   --ramp: #e5682a@0 #ee9034@0.25 #d9d046@0.5 #93b34d@0.67 #4fae52@0.85 #1aa858@1; --ramp-line: #ee8f52 #dcae2a #6db548 #1aa858;
   --hero: linear-gradient(135deg, rgba(10, 127, 140, 0.22) 0%, rgba(18, 160, 143, 0.16) 55%, rgba(150, 215, 30, 0.24) 100%), var(--surface); --hero-line: rgba(10, 127, 140, 0.18); --hero-tile: #f4fafa;
   --mm-body: #e3eced; --mm-off: #ccd7d9;
@@ -58,7 +58,7 @@
   --grad-btn: linear-gradient(135deg, #1fb0bd 0%, #2ccdb4 100%);
   --btn-glow: rgba(35, 183, 196, 0.3);
   --board: #0b282d; --board-2: #0d3f45; --board-ink: #f1f8f8; --board-dim: #a4c6c9; --board-line: #215259;
-  --g0: #14292d; --g1: #133d27; --g2: #1b6a3a; --g3: #27a153; --g4: #4ade80;
+  --g0: #14292d; --g1: #2a1f55; --g2: #4a34a0; --g3: #7a52ea; --g4: #c39bff;
   --ramp: #e8702f@0 #f09a3f@0.25 #dcd44e@0.5 #9aba55@0.67 #55b95a@0.85 #2fbf68@1; --ramp-line: #ec9c6b #dcc65f #7ccb62 #2fbf68;
   --hero: linear-gradient(135deg, rgba(35, 183, 196, 0.26) 0%, rgba(44, 205, 180, 0.16) 55%, rgba(182, 255, 26, 0.16) 100%), var(--surface); --hero-line: rgba(90, 210, 220, 0.22); --hero-tile: #1a363b;
   --mm-body: #1b3136; --mm-off: #345157;
@@ -87,7 +87,7 @@
   --grad-btn: linear-gradient(135deg, #1fb0bd 0%, #2ccdb4 100%);
   --btn-glow: rgba(35, 183, 196, 0.3);
   --board: #0b282d; --board-2: #0d3f45; --board-ink: #f1f8f8; --board-dim: #a4c6c9; --board-line: #215259;
-  --g0: #14292d; --g1: #133d27; --g2: #1b6a3a; --g3: #27a153; --g4: #4ade80;
+  --g0: #14292d; --g1: #2a1f55; --g2: #4a34a0; --g3: #7a52ea; --g4: #c39bff;
   --ramp: #e8702f@0 #f09a3f@0.25 #dcd44e@0.5 #9aba55@0.67 #55b95a@0.85 #2fbf68@1; --ramp-line: #ec9c6b #dcc65f #7ccb62 #2fbf68;
   --hero: linear-gradient(135deg, rgba(35, 183, 196, 0.26) 0%, rgba(44, 205, 180, 0.16) 55%, rgba(182, 255, 26, 0.16) 100%), var(--surface); --hero-line: rgba(90, 210, 220, 0.22); --hero-tile: #1a363b;
   --mm-body: #1b3136; --mm-off: #345157;
@@ -115,7 +115,7 @@
   --grad-btn: linear-gradient(135deg, #1fb0bd 0%, #2ccdb4 100%);
   --btn-glow: rgba(35, 183, 196, 0.3);
   --board: #0b282d; --board-2: #0d3f45; --board-ink: #f1f8f8; --board-dim: #a4c6c9; --board-line: #215259;
-  --g0: #14292d; --g1: #133d27; --g2: #1b6a3a; --g3: #27a153; --g4: #4ade80;
+  --g0: #14292d; --g1: #2a1f55; --g2: #4a34a0; --g3: #7a52ea; --g4: #c39bff;
   --ramp: #e8702f@0 #f09a3f@0.25 #dcd44e@0.5 #9aba55@0.67 #55b95a@0.85 #2fbf68@1; --ramp-line: #ec9c6b #dcc65f #7ccb62 #2fbf68;
   --hero: linear-gradient(135deg, rgba(35, 183, 196, 0.26) 0%, rgba(44, 205, 180, 0.16) 55%, rgba(182, 255, 26, 0.16) 100%), var(--surface); --hero-line: rgba(90, 210, 220, 0.22); --hero-tile: #1a363b;
   --mm-body: #1b3136; --mm-off: #345157;
@@ -2471,3 +2471,19 @@ body.in-workout .toast { bottom: calc(92px + var(--safe-b)); }
 .train-more { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
 .train-more .act { min-height: 40px; padding: 0 16px; }
 .train-more .act::before { inset: -3px 0; }
+
+/* ---- Progress overview (P1, P2): short rows in Needs attention, muscle bars behind a pill, one Trends card ---- */
+.att li { display: block; padding: 0; }
+.att-row { appearance: none; border: 0; background: none; font: inherit; color: inherit; text-align: left; width: 100%; display: grid; grid-template-columns: 36px minmax(0, 1fr) 20px; gap: 12px; align-items: center; padding: 10px 0; min-height: 56px; }
+.att li:first-child .att-row { padding-top: 0; }
+.att li:last-child .att-row { padding-bottom: 0; }
+.att .txt { gap: 1px; }
+.att b { font-size: var(--t-body); }
+.att small { font-size: var(--t-label); line-height: 1.35; }
+.att-go svg { width: 20px; height: 20px; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform 0.18s; display: block; }
+.att-row[aria-expanded="true"] .att-go svg { transform: rotate(90deg); }
+.att-more { padding: 0 0 12px 48px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.att li:last-child .att-more { padding-bottom: 0; padding-top: 10px; }
+.att-more p { margin: 0; font-size: var(--t-label); color: var(--ink-2); line-height: 1.45; }
+.act.more { align-self: center; }
+.hist-nav h3 small { display: block; font-family: var(--font-body); font-size: var(--t-cap); font-weight: 600; color: var(--ink-2); letter-spacing: 0; text-transform: none; margin-top: 2px; }

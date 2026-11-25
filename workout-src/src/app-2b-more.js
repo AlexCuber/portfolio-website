@@ -38,9 +38,10 @@
     ['', 'M47 225 L53 225 L53 233 L47 233 Z'],
     ['', 'M45 236 L54 236 L55 242 L41 242 Z']
   ];
-  /* sets per muscle this week (or a week's worth from the last four), next to what the plan gives each one */
+  /* Sets per muscle over the last 7 days, or a week's worth from the last 28, next to what the plan gives each one.
+     Both windows end today and are always full, so the numbers mean the same on a Monday as on a Sunday. */
   function musData(list) {
-    var ws = weekStart(today()), four = state.ui.musWin === 'four', from = four ? addDays(ws, -21) : ws, got = {};
+    var four = state.ui.musWin === 'four', from = addDays(today(), four ? -27 : -6), got = {};
     list.forEach(function (s) { if (s.date < from) return; (s.entries || []).forEach(function (en) { var e = exi(en.ex); if (e.log === 'cardio') return; Object.keys(e.muscles).forEach(function (mu) { got[mu] = (got[mu] || 0) + en.sets.length * e.muscles[mu] / (four ? 4 : 1); }); }); });
     return { got: got, plan: planTargets(), four: four };
   }
@@ -67,7 +68,7 @@
     if (behind.length) {
       side += '<ul class="mm-list">' + behind.map(function (x) { return '<li><i style="background:' + (x.g > 0 ? ramp('--ramp', x.r) : 'var(--mm-off)') + '"></i><span>' + esc(x.m.name) + '</span><b>' + fmt(Math.round(x.g * 10) / 10) + '<small> / ' + fmt(Math.round(x.p * 10) / 10) + '</small></b></li>'; }).join('') + '</ul>';
       if (done) side += '<p class="foot">' + done + ' of ' + rows.length + ' muscles have their sets.</p>';
-    } else side += '<p class="sub">Every muscle in your plan has its sets' + (md.four ? ' on average.' : ' for the week.') + '</p>';
+    } else side += '<p class="sub">Every muscle in your plan has its sets.</p>';
     side += '</div>';
     return '<div class="mm"><svg viewBox="0 0 250 262" role="img" aria-label="Front and back of a body with each muscle coloured by how many of its planned sets are done' + (behind.length ? '. Furthest behind: ' + behind.map(function (x) { return x.m.name; }).join(', ') : '') + '">' +
       half(FIG_FRONT, 0) + half(FIG_BACK, 130) + '<text x="60" y="259">Front</text><text x="190" y="259">Back</text></svg>' + side + '</div>';
@@ -108,11 +109,11 @@
       if (ss) cells += '<button type="button" class="hd on' + (tint[ss[0].key] != null ? ' av' + tint[ss[0].key] : '') + (dt === sel ? ' sel' : '') + (dt === t ? ' now' : '') + '" data-act="hist-day" data-d="' + dt + '" aria-pressed="' + (dt === sel) + '" aria-label="' + fmtDate(dt) + ': ' + esc(ss.map(function (s) { return s.name || 'Workout'; }).join(' and ')) + '"><b>' + d + '</b><small>' + esc(ini[ss[0].key] || initials(ss[0].name || 'Workout')) + (ss.length > 1 ? '+' : '') + '</small></button>';
       else cells += '<span class="hd' + (dt === t ? ' now' : '') + (dt > t ? ' future' : '') + '"><b>' + d + '</b></span>';
     }
-    h += '<section class="card"><div class="hist-nav"><button class="icon-btn" type="button" data-act="hist-prev" aria-label="Previous month"' + (mk <= f[0].date.slice(0, 7) ? ' disabled' : '') + '>' + IC.left + '</button><h3>' + MONTHS_FULL[mo] + ' ' + y + '</h3>' +
+    h += '<section class="card"><div class="hist-nav"><button class="icon-btn" type="button" data-act="hist-prev" aria-label="Previous month"' + (mk <= f[0].date.slice(0, 7) ? ' disabled' : '') + '>' + IC.left + '</button><h3>' + MONTHS_FULL[mo] + ' ' + y + '<small>' + plural(count, 'workout') + '</small></h3>' +
       '<button class="icon-btn" type="button" data-act="hist-next" aria-label="Next month"' + (mk >= t.slice(0, 7) ? ' disabled' : '') + '>' + IC.right + '</button></div>' +
       '<div class="hist-grid"><span class="hw">M</span><span class="hw">T</span><span class="hw">W</span><span class="hw">T</span><span class="hw">F</span><span class="hw">S</span><span class="hw">S</span>' + cells + '</div>';
     if (legend.length) h += '<div class="hist-key">' + legend.map(function (s) { return '<span><i class="hk' + (tint[s.key] != null ? ' av' + tint[s.key] : '') + '">' + esc(ini[s.key] || initials(s.name || 'Workout')) + '</i>' + esc(s.name || 'Workout') + '</span>'; }).join('') + '</div>';
-    h += '<p class="foot">' + (sel ? 'Showing ' + fmtDate(sel) + '. Tap the day again to see all workouts.' : count ? plural(count, 'workout') + ' this month. Tap a day to see only that day.' : 'No workouts this month.') + '</p></section>';
+    h += '</section>';
     var rec = recordsBy(f), shown = sel ? by[sel] : f.slice(-histN).reverse();
     h += '<div class="hist-list" id="hist-list"><h3 class="hist-h">' + (sel ? fmtDate(sel) : 'Latest workouts') + '</h3>';
     shown.forEach(function (s) {
@@ -171,12 +172,14 @@
     mus: IC.target,
     easy: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6v12M15 6v12"/></svg>'
   };
+  /* each item is a title and the one thing to do; the reasoning opens on tap */
   function attentionCard(list) {
     var a = attention(list); if (!a.length) return '';
     var h = '<section class="card"><h3>Needs attention</h3><ul class="att">';
     a.forEach(function (x) {
-      h += '<li><span class="att-i" aria-hidden="true">' + ATT_IC[x.k] + '</span><span class="txt"><b>' + esc(x.t) + '</b><small>' + esc(x.d) + '</small>' +
-        (x.ex ? '<button class="btn quiet sm" type="button" data-act="lift" data-ex="' + esc(x.ex) + '">See its chart</button>' : '') + '</span></li>';
+      var id = x.k + (x.ex || ''), open = !!attOpen[id];
+      h += '<li><button class="att-row" type="button" data-act="att-open" data-id="' + esc(id) + '" aria-expanded="' + open + '"><span class="att-i" aria-hidden="true">' + ATT_IC[x.k] + '</span><span class="txt"><b>' + esc(x.t) + '</b><small>' + esc(x.s) + '</small></span><span class="att-go" aria-hidden="true">' + IC.right + '</span></button>' +
+        (open ? '<div class="att-more"><p>' + esc(x.d) + '</p>' + (x.ex ? '<button class="act" type="button" data-act="lift" data-ex="' + esc(x.ex) + '">See its chart</button>' : '') + '</div>' : '') + '</li>';
     });
     return h + '</ul></section>';
   }
