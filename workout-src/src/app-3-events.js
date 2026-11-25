@@ -409,6 +409,10 @@
       case 'pb-sort': state.ui.pbSort = a.dataset.v; saveLocal(); render(); break;
       case 'pb-all': pbAll = !pbAll; render(); break;
       case 'lift-info': liftInfo = !liftInfo; render(); break;
+      case 'trend-info': trendInfo = !trendInfo; render(); break;
+      case 'trend': state.ui.trend = a.dataset.v; saveLocal(); render(); enter(); break;
+      case 'mus-all': musAll = !musAll; render(); break;
+      case 'att-open': attOpen[a.dataset.id] = !attOpen[a.dataset.id]; render(); break;
       case 'ms-open': msSheet(+a.dataset.i); break;
       case 'sport': state.ui.sport = a.dataset.v; saveLocal(); render(); enter(); break;
       case 'rir': it = findItem(u); if (it && it.rows[i]) { it.rows[i].rir = +a.dataset.v; touchDraft(); render(); } break;

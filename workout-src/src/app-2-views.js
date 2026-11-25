@@ -522,8 +522,7 @@
       '<div class="cal-rows"><span>Mon</span><span></span><span>Wed</span><span></span><span>Fri</span><span></span><span>Sun</span></div><div class="cal-grid">' + h + '</div></div>';
   }
   function muscleBars(list) {
-    var ws = weekStart(today()), four = state.ui.musWin === 'four', from = four ? addDays(ws, -21) : ws, got = {}, h = '', plan = planTargets();
-    list.forEach(function (s) { if (s.date < from) return; (s.entries || []).forEach(function (en) { var e = exi(en.ex); if (e.log === 'cardio') return; Object.keys(e.muscles).forEach(function (mu) { got[mu] = (got[mu] || 0) + en.sets.length * e.muscles[mu] / (four ? 4 : 1); }); }); });
+    var md = musData(list), got = md.got, h = '', plan = md.plan;
     var rows = LIBRARY.MUSCLES.filter(function (m) { return plan[m.id] || got[m.id]; }), free = 10;
     if (!rows.length) return '<p class="sub">Add a session to your plan to get weekly targets.</p>';
     rows.forEach(function (m) { if (!plan[m.id]) free = Math.max(free, got[m.id] || 0); });
@@ -575,25 +574,31 @@
       tile('t-violet', IC.weight, cnt(Math.round(vol), 'short'), UW() + ' lifted') +
       tile('t-star', IC.star, cnt(prs), prs === 1 ? 'personal best' : 'personal bests') + '</div>';
     h += attentionCard(list);
+    var mdN = musData(list), nMus = LIBRARY.MUSCLES.filter(function (m) { return mdN.plan[m.id] || mdN.got[m.id]; }).length;
     h += '<section class="card"><h3>Hard sets per muscle</h3>' +
-      '<div class="seg" role="group" aria-label="Period"><button type="button" data-act="mus-win" data-v="week" aria-pressed="' + (state.ui.musWin !== 'four') + '">This week</button><button type="button" data-act="mus-win" data-v="four" aria-pressed="' + (state.ui.musWin === 'four') + '">Average of 4 weeks</button></div>' +
-      muscleFigure(list) + muscleBars(list) + '</section>';
+      '<div class="seg" role="group" aria-label="Period"><button type="button" data-act="mus-win" data-v="week" aria-pressed="' + (state.ui.musWin !== 'four') + '">Last 7 days</button><button type="button" data-act="mus-win" data-v="four" aria-pressed="' + (state.ui.musWin === 'four') + '">4-week average</button></div>' +
+      muscleFigure(list) + (musAll ? muscleBars(list) : '') + (nMus ? '<button class="act more" type="button" data-act="mus-all" aria-expanded="' + musAll + '">' + (musAll ? 'Hide the list' : 'All ' + nMus + ' muscles') + '</button>' : '') + '</section>';
     var wk = lastWeeks(10), vw = lastWeeks(10);
     list.forEach(function (s) { var k = weekStart(s.date); wk.forEach(function (w) { if (w.start === k) { if (isCore(s)) w.a++; else w.b++; } }); vw.forEach(function (w) { if (w.start === k) w.a += volOf(s); }); });
-    h += '<section class="card"><div class="spread"><h3>Sessions per week</h3><div class="legend"><span><i></i>Main</span><span><i class="x"></i>Extra</span></div></div><div class="chart" data-chart="wk">' +
-      colChart('wk', wk, { int: true, min: Math.max(5, goal + 1), target: goal, label: 'Sessions per week for the last 10 weeks', tip: function (w) { return '<b>Week of ' + fmtDate(w.start, true) + '</b><br>' + plural(w.a, 'main session') + (w.b ? ' + ' + w.b + ' extra' : ''); } }) + '</div></section>';
-    h += '<section class="card"><h3>Weight lifted per week</h3><p class="sub">Kilograms times reps, added up over every set.</p><div class="chart" data-chart="vol">' +
-      colChart('vol', vw, { label: 'Kilograms lifted per week for the last 10 weeks', fmt: function (t) { return t >= 1000 ? (t / 1000) + 'K' : t; }, tip: function (w) { return '<b>Week of ' + fmtDate(w.start, true) + '</b><br>' + compact(w.a) + ' ' + UW() + ' lifted'; } }) + '</div></section>';
     var durs = [], dayIx = {};
     list.forEach(function (s) { var dd = durOf(s); if (!dd) return; var o = dayIx[s.date]; if (!o) { o = dayIx[s.date] = { date: s.date, d: 0, names: [] }; durs.push(o); } o.d += dd; o.names.push(s.name || 'Workout'); });
     durs = durs.slice(-24);
-    h += '<section class="card"><div class="spread"><h3>Workout length</h3>' + (durs.length ? '<span class="pill">average ' + fmtDur(durs.reduce(function (a, x) { return a + x.d; }, 0) / durs.length) + '</span>' : '') + '</div>';
-    h += durs.length ? '<p class="sub">Minutes from start to finish, added up when a day has more than one workout. The line is orange for short days and turns green at 60 minutes.</p><div class="chart" data-chart="dur">' + lineChart('dur', durs.map(function (x) { return { x: x.date, y: Math.round(x.d / 60), tip: '<b>' + fmtDate(x.date) + '</b><br>' + esc(x.names.join(' + ')) + ' · ' + fmtDur(x.d) }; }), null, { scale: [30, 60] }) + '</div>' : '<p class="sub">The clock at the top of a workout records how long it took. Your next finished workout shows up here.</p>';
+    /* one card for the three weekly trends; what each shows is behind the info button */
+    var tr = state.ui.trend === 'vol' || state.ui.trend === 'dur' ? state.ui.trend : 'wk';
+    h += '<section class="card"><div class="spread" style="align-items:center"><h3>Trends</h3><button class="info-btn" type="button" data-act="trend-info" aria-expanded="' + trendInfo + '" aria-label="What this chart shows">i</button></div>' +
+      '<div class="seg" role="group" aria-label="Which trend"><button type="button" data-act="trend" data-v="wk" aria-pressed="' + (tr === 'wk') + '">Sessions</button><button type="button" data-act="trend" data-v="vol" aria-pressed="' + (tr === 'vol') + '">' + (isLb() ? 'Pounds' : 'Kilograms') + '</button><button type="button" data-act="trend" data-v="dur" aria-pressed="' + (tr === 'dur') + '">Length</button></div>';
+    if (trendInfo) h += '<p class="note">' + (tr === 'wk' ? 'Sessions per week for the last 10 weeks. The dashed line is your weekly goal; sessions that do not count toward it are shown as extra.' : tr === 'vol' ? 'Weight lifted per week: weight times reps, added up over every set.' : 'Minutes from start to finish, added up when a day has more than one workout. The line is orange for short days and turns green at 60 minutes.') + '</p>';
+    if (tr === 'wk') h += '<div class="chart" data-chart="wk">' +
+      colChart('wk', wk, { int: true, min: Math.max(5, goal + 1), target: goal, label: 'Sessions per week for the last 10 weeks', tip: function (w) { return '<b>Week of ' + fmtDate(w.start, true) + '</b><br>' + plural(w.a, 'main session') + (w.b ? ' + ' + w.b + ' extra' : ''); } }) + '</div>' +
+      (wk.some(function (w) { return w.b; }) ? '<div class="legend"><span><i></i>Main</span><span><i class="x"></i>Extra</span></div>' : '');
+    else if (tr === 'vol') h += '<div class="chart" data-chart="vol">' +
+      colChart('vol', vw, { label: 'Weight lifted per week for the last 10 weeks', fmt: function (t) { return t >= 1000 ? (t / 1000) + 'K' : t; }, tip: function (w) { return '<b>Week of ' + fmtDate(w.start, true) + '</b><br>' + compact(w.a) + ' ' + UW() + ' lifted'; } }) + '</div>';
+    else h += durs.length ? '<div class="chart" data-chart="dur">' + lineChart('dur', durs.map(function (x) { return { x: x.date, y: Math.round(x.d / 60), tip: '<b>' + fmtDate(x.date) + '</b><br>' + esc(x.names.join(' + ')) + ' · ' + fmtDur(x.d) }; }), null, { scale: [30, 60] }) + '</div><div class="pills"><span class="pill">average ' + fmtDur(durs.reduce(function (a, x) { return a + x.d; }, 0) / durs.length) + '</span></div>' : '<p class="sub">Your next finished workout shows up here.</p>';
     h += '</section>';
-    h += '<section class="card"><div><h3>Milestones</h3><p class="sub">The colour is the level you have reached, the ring is how close the next one is. Tap one to see every level.</p></div>' + badgesHtml(list) + '</section>';
+    h += '<section class="card"><h3>Milestones</h3>' + badgesHtml(list) + '</section>';
     return h;
   }
-  var liftInfo = false;
+  var liftInfo = false, trendInfo = false, musAll = false, attOpen = {};
   function modeSeg() {
     var mode = state.ui.liftMode === 'e1rm' ? 'e1rm' : 'max';
     return '<div class="seg" role="group" aria-label="What to show for weighted lifts"><button type="button" data-act="lift-mode" data-v="max" aria-pressed="' + (mode === 'max') + '">Top weight</button><button type="button" data-act="lift-mode" data-v="e1rm" aria-pressed="' + (mode === 'e1rm') + '">Est. 1-rep max</button></div>';
@@ -835,6 +840,8 @@
   }
   function searchBox(id, val) { return '<div class="search">' + IC.search + '<input id="' + id + '" type="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Search ' + allEx().length + ' exercises" value="' + esc(val) + '" aria-label="Search exercises"></div>'; }
   function libraryView() {
+    /* once, the list moves to "In my plan": the exercises you train are a short list and the rest is one tap or a search away */
+    if (!state.ui.libPlan) { state.ui.libPlan = 1; if (routineList().length) state.ui.lib = 'mine'; saveLocal(); }
     var f = state.ui.lib || 'all', h = searchBox('lib-q', libQ) + chipsHtml(f, 'lib', [['mine', 'In my plan']]);
     if (f === 'mine' && !libQ) {
       routineList().forEach(function (r) {

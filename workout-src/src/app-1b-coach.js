@@ -122,7 +122,7 @@
       var e = s.e, it = s.it, top = bestSet(e, s.last.sets, 'top'), swap = it.swap || e.swap, tip;
       if (top.w > 0) tip = 'Try ' + (e.log === 'bw' ? '+' : '') + fmt(r2(top.w + wStep(e, top.w))) + ' ' + UW() + ' for sets of ' + it.lo + (swap ? ', or swap it for a few weeks: ' + swap.charAt(0).toLowerCase() + swap.slice(1) + '.' : ', or swap it for a similar exercise for a few weeks.');
       else tip = 'Add a little weight or slow the lowering' + (swap ? ', or swap it for a few weeks: ' + swap.charAt(0).toLowerCase() + swap.slice(1) + '.' : '.');
-      out.push({ k: 'stall', ex: it.ex, t: e.name + ' has stalled', d: setsText(e, s.last.sets) + ' last time, and no better set in the last ' + NUM_WORDS[Math.min(s.n, 12)].toLowerCase() + ' sessions. ' + tip });
+      out.push({ k: 'stall', ex: it.ex, t: e.name + ' has stalled', s: top.w > 0 ? 'Try ' + (e.log === 'bw' ? '+' : '') + fmt(r2(top.w + wStep(e, top.w))) + ' ' + UW() + ' for sets of ' + it.lo : 'Add a little weight or slow the lowering', d: setsText(e, s.last.sets) + ' last time, and no better set in the last ' + NUM_WORDS[Math.min(s.n, 12)].toLowerCase() + ' sessions. ' + tip });
     });
     var from = addDays(ws, -28), plan = planTargets(), got = {}, weeks = {};
     list.forEach(function (s) {
@@ -133,7 +133,7 @@
       var behind = LIBRARY.MUSCLES.filter(function (m) { return plan[m.id] >= 4 && (got[m.id] || 0) < 0.7 * plan[m.id]; }).sort(function (a, b) { return (got[a.id] || 0) / plan[a.id] - (got[b.id] || 0) / plan[b.id]; }).slice(0, 3);
       if (behind.length) {
         var names = behind.map(function (m) { return m.name; }), title = names.length === 1 ? names[0] + (/s$/.test(names[0]) ? ' are' : ' is') : names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1].toLowerCase() + ' are';
-        out.push({ k: 'mus', t: title + ' behind your plan', d: behind.map(function (m) { return m.name + ' ' + fmt(Math.round((got[m.id] || 0) * 10) / 10) + ' of ' + fmt(Math.round(plan[m.id] * 10) / 10); }).join(', ') + ' sets a week, averaged over the last four weeks.' });
+        out.push({ k: 'mus', t: title + ' behind your plan', s: behind.map(function (m) { return m.name + ' ' + fmt(Math.round((got[m.id] || 0) * 10) / 10) + ' of ' + fmt(Math.round(plan[m.id] * 10) / 10); }).join(' · ') + ' sets a week', d: behind.map(function (m) { return m.name + ' ' + fmt(Math.round((got[m.id] || 0) * 10) / 10) + ' of ' + fmt(Math.round(plan[m.id] * 10) / 10); }).join(', ') + ' sets a week, averaged over the last four weeks.' });
       }
     }
     var wk = {}, vals = [], run = 0;
@@ -141,7 +141,7 @@
     for (i = 1; i <= 12; i++) vals.push(wk[addDays(ws, -7 * i)] || 0);
     var nz = vals.filter(Boolean).sort(function (a, b) { return a - b; }), med = nz.length ? nz[Math.floor(nz.length / 2)] : 0;
     for (i = 0; i < vals.length; i++) { if (vals[i] > 0 && vals[i] >= 0.7 * med) run++; else break; }
-    if (run >= 7) out.push({ k: 'easy', t: NUM_WORDS[Math.min(run, 12)] + (run >= 12 ? ' or more' : '') + ' weeks without an easy week', d: 'Consider one lighter week: the same exercises with about half the sets. It gives joints and tendons time to catch up.' });
+    if (run >= 7) out.push({ k: 'easy', t: NUM_WORDS[Math.min(run, 12)] + (run >= 12 ? ' or more' : '') + ' weeks without an easy week', s: 'Plan one lighter week', d: 'Consider one lighter week: the same exercises with about half the sets. It gives joints and tendons time to catch up.' });
     return out;
   }
 

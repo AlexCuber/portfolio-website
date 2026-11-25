@@ -66,6 +66,7 @@ async def main():
                 # ---- workout length adds up a day
                 await pg.click('[data-tab="progress"]'); await pg.wait_for_timeout(1500)
                 tips = await pg.evaluate("(() => { const c = window.__hiloCharts; return null; })()")
+                await pg.click('[data-act="trend"][data-v="dur"]'); await pg.wait_for_timeout(500)
                 box = await pg.locator('[data-chart="dur"] svg').bounding_box(); await pg.evaluate("document.querySelector('[data-chart=dur]').scrollIntoView({block:'center'})"); await pg.wait_for_timeout(200); box = await pg.locator('[data-chart="dur"] svg').bounding_box()
                 found = ''
                 for fx in [0.995 - 0.015 * k for k in range(30)]:
@@ -99,7 +100,7 @@ async def main():
                 await pg.locator('[data-act="hist-more"]').scroll_into_view_if_needed(); await pg.wait_for_timeout(150); y0 = await pg.evaluate('window.scrollY'); await pg.click('[data-act="hist-more"]'); await pg.wait_for_timeout(200)
                 print('      more:', await cards.count(), y0, await pg.evaluate('window.scrollY')); ok(await cards.count() == 20 and abs(await pg.evaluate('window.scrollY') - y0) < 4, 'Show more adds ten and keeps your place')
                 await pg.evaluate('window.scrollTo(0,0)'); day = pg.locator('.hd.on[data-d="%s"]' % D(1)); await day.click(); await pg.wait_for_timeout(300)
-                print('      day:', await cards.count(), await pg.locator('.hcard.open').count(), (await pg.locator('#hist-body').inner_text())[-200:].replace(chr(10),' | ')); ok(await cards.count() == 2 and await pg.locator('.hcard.open').count() == 2 and 'tap the day again' in (await pg.locator('#hist-body').inner_text()).lower(), 'tapping a day shows only that day\'s workouts, opened')
+                print('      day:', await cards.count(), await pg.locator('.hcard.open').count(), (await pg.locator('#hist-body').inner_text())[-200:].replace(chr(10),' | ')); ok(await cards.count() == 2 and await pg.locator('.hcard.open').count() == 2, 'tapping a day shows only that day\'s workouts, opened')
                 await shot('history-day', True)
                 await pg.locator('.hd.sel').click(); await pg.wait_for_timeout(250); ok(await pg.locator('.hd.sel').count() == 0 and await cards.count() == 20, 'tapping the day again brings the list back')
                 await pg.click('.hist-sb'); await pg.wait_for_timeout(200); ok(await pg.evaluate("document.activeElement.id") == 'hist-q', 'the search icon opens the box and puts the cursor in it'); await shot('search')

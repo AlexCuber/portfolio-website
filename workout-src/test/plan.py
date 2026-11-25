@@ -65,6 +65,7 @@ async def main():
                     await pg.click('[data-act="plan-edit"]'); await pg.wait_for_timeout(250); lst = await names('.card .list .plan-row .txt b'); await pg.click('[data-act="plan-done"]'); await pg.wait_for_timeout(250); check('order survives a reload', lst[:6] == ['Upper A', 'Arms and abs', 'Upper B', 'Lower B', 'Day 5 (optional)', 'Lower A'], lst[:6])
                 # muscle targets follow the plan: abs target = 6 (plan) + 3 (plank in the new session)
                 await pg.click('[data-tab="progress"]'); await pg.wait_for_timeout(300)
+                await pg.click('[data-act="mus-all"]'); await pg.wait_for_timeout(250)
                 txt = await pg.inner_text('.mus'); flat = ' '.join(txt.split())
                 check('muscle targets follow the plan (abs 6 + 3, biceps 12 + 3)', 'Abs 0 / 9' in flat and '/ 15' in flat, flat[:200])
                 # remove the own session, then delete it for good (two taps)
