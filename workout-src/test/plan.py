@@ -62,7 +62,7 @@ async def main():
                     stt = await pg.evaluate("JSON.stringify(window.__store['state/settings'].settings.planOrder)"); print('   stored order', stt)
                 else:
                     await pg.reload(); await pg.wait_for_timeout(400)
-                    lst = await names(); check('order survives a reload', lst[:6] == ['Upper A', 'Arms and abs', 'Upper B', 'Lower B', 'Day 5 (optional)', 'Lower A'], lst[:6])
+                    await pg.click('[data-act="plan-edit"]'); await pg.wait_for_timeout(250); lst = await names('.card .list .plan-row .txt b'); await pg.click('[data-act="plan-done"]'); await pg.wait_for_timeout(250); check('order survives a reload', lst[:6] == ['Upper A', 'Arms and abs', 'Upper B', 'Lower B', 'Day 5 (optional)', 'Lower A'], lst[:6])
                 # muscle targets follow the plan: abs target = 6 (plan) + 3 (plank in the new session)
                 await pg.click('[data-tab="progress"]'); await pg.wait_for_timeout(300)
                 txt = await pg.inner_text('.mus'); flat = ' '.join(txt.split())

@@ -1044,3 +1044,31 @@ button.link { appearance: none; background: none; border: 0; padding: 12px 8px; 
 body.in-workout .toast { bottom: calc(92px + var(--safe-b)); }
 .btn.quiet { min-height: 44px; }
 @media (max-width: 350px) { .sets.hp .field input { font-size: 1.3rem; padding: 0 2px; } }
+
+/* ---- Train (T1 to T5, N4): the week as dots and a count, the weigh-in strip, other sessions as a row, two pills at the end ---- */
+.week { align-items: center; }
+.week .days { min-width: 0; }
+.week-n { text-align: center; line-height: 1; padding-left: 4px; }
+.week-n b { font-family: var(--font-display); font-size: var(--t-d1); font-weight: 800; }
+.week-n b i { font-style: normal; color: var(--muted); }
+.week-n.hit b { color: var(--green-ink); }
+.week-n span { display: block; margin-top: 3px; font-size: var(--t-cap); font-weight: 600; color: var(--ink-2); white-space: nowrap; }
+.day { font-size: var(--t-cap); }
+.card.weigh { padding-top: 12px; padding-bottom: 12px; gap: 10px; }
+.weigh-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.weigh-t { display: flex; align-items: baseline; gap: 8px; min-width: 0; flex-wrap: wrap; }
+.weigh-t b { font-size: var(--t-lead); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.weigh-t small { font-size: var(--t-label); color: var(--ink-2); white-space: nowrap; }
+.weigh-t small.late { color: var(--hot-ink); font-weight: 600; }
+.weigh-form { display: flex; flex-direction: column; gap: 14px; }
+.field.big input { height: 64px; font-size: var(--t-d1); }
+.sess-row { display: flex; gap: 8px; overflow-x: auto; margin: 0 -16px; padding: 2px 16px 4px; scrollbar-width: none; scroll-snap-type: x proximity; }
+.sess-row::-webkit-scrollbar { display: none; }
+.sess { appearance: none; border: 0; background: var(--surface-2); border-radius: 16px; padding: 10px 6px 9px; flex: 1 0 96px; max-width: 150px; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; color: var(--ink); font: inherit; scroll-snap-align: start; }
+.sess:active { filter: brightness(0.96); }
+.sess .avatar { margin-bottom: 5px; }
+.sess b { font-size: var(--t-label); font-weight: 700; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sess small { font-size: var(--t-cap); color: var(--ink-2); white-space: nowrap; }
+.train-more { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+.train-more .act { min-height: 40px; padding: 0 16px; }
+.train-more .act::before { inset: -3px 0; }
