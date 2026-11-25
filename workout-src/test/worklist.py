@@ -108,7 +108,7 @@ try:
         c, pg = page(few); d = draft(pg); u = d['items'][0]['u']
         ok(pg.locator('p.note').count() == 1 and pg.locator('.exc.cur .unit-hint').count() == 1, 'a log with two workouts shows the tip about grey numbers and the body-weight hint')
         tick(pg, u, 0); ok(pg.locator('p.note').count() == 0, 'the grey-numbers tip goes at the first tick')
-        pg.evaluate("document.querySelector('[data-act=\"discard\"]').click()"); pg.wait_for_timeout(200); pg.evaluate("document.querySelector('[data-act=\"discard\"]').click()"); pg.wait_for_timeout(400)
+        pg.evaluate("document.querySelector('[data-act=\"discard\"]').click()"); pg.wait_for_timeout(400)
         pg.evaluate("document.querySelector('[data-act=\"start\"][data-key=\"upperB\"]').click()"); pg.wait_for_timeout(500)
         ok(pg.locator('p.note').count() == 0, 'and does not come back in the next workout')
         c.close()

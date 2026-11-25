@@ -59,7 +59,7 @@ async def main():
             t = await pg.locator('.sheet').inner_text(); ok('Each side: 45 + 2.5 lb' in t and '45 lb bar' in t, 'plates in pounds for 140 lb: 45 + 2.5 a side on a 45 lb bar')
             wl = await pg.locator('.warm-list li').all_inner_texts(); ok(len(wl) >= 3 and 'Empty bar' in wl[0], 'the first exercise of a workout gets the full ramp, starting with the empty bar: %s' % [x.replace('\n', ' | ') for x in wl])
             await pg.screenshot(path=os.path.join(SH, 'S-help-lb.png')); await pg.click('.sheet [data-act="sheet-x"]')
-            await pg.click('[data-act="discard"]'); await pg.wait_for_timeout(100); await pg.click('[data-act="discard"]'); await pg.wait_for_timeout(200)
+            await pg.click('[data-act="discard"]'); await pg.wait_for_timeout(200)
             await pg.click('[data-tab="progress"]'); await pg.click('[data-act="prog"][data-v="body"]'); await pg.wait_for_timeout(500)
             t = await pg.locator('#body-form').inner_text(); ok('Weight, lb' in t and 'Waist, in' in t, 'the body form asks for lb and inches')
             await pg.fill('#bw-weight', '170'); await pg.click('#body-form button[type=submit]'); await pg.wait_for_timeout(200); ok(await pg.evaluate(LS + ".body['%s'].weight" % datetime.date.today().isoformat()) == 170, 'a body weight of 170 lb is accepted')
@@ -161,7 +161,7 @@ async def main():
                 got = [float(await pg.get_attribute('#w-%s-0' % u, 'placeholder')), int(await pg.get_attribute('#r-%s-1' % u, 'placeholder'))]; hint = await pg.locator('#x-%s .last-hint' % u).last.inner_text()
                 top = all(s['r'] >= items[0]['hi'] for s in prev[:items[0]['sets']])
                 ok(got[0] == prev[0]['w'] + 2.5 and ('3 or more reps left' in hint or top), 'three or more left on every set raises the next target by 2.5 kg: %s' % hint)
-                await pg.click('[data-act="discard"]'); await pg.wait_for_timeout(100); await pg.click('[data-act="discard"]'); await pg.wait_for_timeout(300)
+                await pg.click('[data-act="discard"]'); await pg.wait_for_timeout(300)
                 # ================= countdown =================
                 await pg.click('[data-act="start"][data-key="day5"]'); await pg.wait_for_timeout(400)
                 its = await pg.evaluate(LS + ".draft.items.map(i=>({u:i.u,ex:i.ex}))"); sp = [x for x in its if x['ex'] == 'side-plank'][0]['u']; ca = [x for x in its if x['ex'] == 'zone-2-cardio'][0]['u']

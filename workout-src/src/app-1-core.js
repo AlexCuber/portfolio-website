@@ -52,6 +52,27 @@
     try { localStorage.setItem(LS, JSON.stringify(state)); if (saveFail) { saveFail = false; saveWarn(); } return true; }
     catch (e) { if (!saveFail) { saveFail = true; saveWarn(); } return false; }
   }
+  /* ---- a safety net inside the phone (N2). The bin keeps deleted workouts, and a discarded workout that had sets, for
+     30 days; it lives with the log but is not part of a backup. The weekly copy is a second, older copy of the log under
+     its own key, for the day the log itself cannot be read. ---- */
+  var COPY = 'hitit-copy-v1', BIN_DAYS = 30;
+  function binList() {
+    var cut = Date.now() - BIN_DAYS * 864e5, b = (state.bin || []).filter(function (x) { return x && x.at > cut; });
+    if (b.length !== (state.bin || []).length) state.bin = b;
+    return b;
+  }
+  function binAdd(o) { o.at = Date.now(); state.bin = binList().filter(function (x) { return !(o.doc && x.doc && x.doc.id === o.doc.id) && !(o.draft && x.draft); }); state.bin.push(o); return o; }
+  function binTake(o) { state.bin = binList().filter(function (x) { return x !== o; }); }
+  function copyInfo() { try { var c = JSON.parse(localStorage.getItem(COPY)); return c && c.at && c.data && c.data.sessions ? c : null; } catch (e) { return null; } }
+  /* once a week, when the log opened fine. A copy with many more workouts than the log has now is left alone:
+     it may be the only place they still are. */
+  function weeklyCopy() {
+    if (loadFail != null) return;
+    var n = Object.keys(state.sessions).length; if (!n) return;
+    var c = copyInfo(); if (c && Date.now() - c.at < 7 * 864e5) return;
+    if (c && c.n >= 4 && n < c.n / 2) return;
+    try { localStorage.setItem(COPY, JSON.stringify({ at: Date.now(), n: n, data: { app: 'workout-log', v: 2, sessions: state.sessions, body: state.body, routines: state.routines, custom: state.custom, settings: state.settings } })); } catch (e) {}
+  }
   function saveWarn() { var el = document.getElementById('savewarn'); if (el) el.hidden = !saveFail; document.body.classList.toggle('save-fail', saveFail); }
   /* puts the unreadable text aside under its own key, then lets saving start again */
   function keepRescue() {
@@ -123,7 +144,7 @@
         var rs = r[5].data();
         if ((rs.updatedAt || 0) > (state.settingsAt || 0)) { state.settings = Object.assign({}, DEF_SET, rs.settings || {}); state.settingsAt = rs.updatedAt; applyTheme(); }
       }
-      keepRescue(); saveLocal(); flushDirty(); refreshSync(); syncSettled = true;
+      keepRescue(); saveLocal(); flushDirty(); refreshSync(); syncSettled = true; weeklyCopy();
       if (!isTyping() && !editor && !picker) render();
     }, function () { refreshSync(); settle(); });
   }
@@ -133,7 +154,7 @@
   }
   function isTyping() { var a = document.activeElement; return !!(a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.tagName === 'SELECT')); }
   /* the first answer from Claude's storage is in (or there will be none): only now is an empty log known to be empty */
-  function settle() { if (syncSettled) return; syncSettled = true; if (!isTyping() && !editor && !picker) render(); }
+  function settle() { if (syncSettled) return; syncSettled = true; weeklyCopy(); if (!isTyping() && !editor && !picker) render(); }
   function connect(tries) {
     if (STANDALONE) { refreshSync(); return; }
     if (!(window.claude && typeof window.claude.use === 'function')) { refreshSync(); if ((tries || 0) < 5) setTimeout(function () { connect((tries || 0) + 1); }, 700); else settle(); return; }

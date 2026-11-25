@@ -34,7 +34,7 @@ async def main():
                 n = 0
                 while await pg.locator('#rest').is_visible() and n < 12: await pg.click('#rest [data-act="rest-sub"]'); await pg.wait_for_timeout(60); n += 1
                 ok(await pg.locator('#rest').is_hidden() and n == (t2 + 29) // 30, 'minus with under 30 seconds left ends the rest (%d taps from %s s)' % (n, t2))
-                await pg.click('[data-act="discard"]'); await pg.wait_for_timeout(100); await pg.click('[data-act="discard"]'); await pg.wait_for_timeout(300)
+                await pg.click('[data-act="discard"]'); await pg.wait_for_timeout(300)
                 # holds and cardio
                 await pg.click('[data-act="start"][data-key="day5"]'); await pg.wait_for_timeout(300)
                 its = await pg.evaluate("JSON.parse(localStorage.getItem('workout-log-v1')).draft.items.map(i=>({u:i.u,ex:i.ex}))"); sp = [x for x in its if x['ex'] == 'side-plank'][0]['u']; ca = [x for x in its if x['ex'] == 'zone-2-cardio'][0]['u']

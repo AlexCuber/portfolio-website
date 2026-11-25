@@ -139,14 +139,14 @@ async def main(only=None):
                 await pg.click('.hd.on[data-d="%s"]' % last['date']); await pg.wait_for_timeout(250)
                 await pg.click('.hcard.open [data-act="again"]'); await pg.wait_for_timeout(400)
                 d = await pg.evaluate(LS + ".draft"); ok(d and d['key'] == 'upperA' and len(d['items']) == len(PLAN['sessions']['upperA']['exercises']), '"Do this again" starts the same session')
-                await pg.click('[data-act="discard"]'); await pg.wait_for_timeout(150); await pg.click('[data-act="discard"]'); await pg.wait_for_timeout(300)
+                await pg.click('[data-act="discard"]'); await pg.wait_for_timeout(300)
                 # do this again: a workout whose exercises differ from the saved session keeps its own exercises
                 await pg.click('[data-tab="exercises"]'); await pg.wait_for_timeout(300)
                 await pg.click('[data-act="hist-search"]'); await pg.fill('#hist-q', 'day 5'); await pg.wait_for_timeout(200); await pg.locator('#hist-body .item').first.click(); await pg.wait_for_timeout(300)
                 ok(await pg.locator('.sheet [data-act="again"]').count() == 1, 'the workout sheet offers "Do this again" too')
                 await pg.click('.sheet [data-act="again"]'); await pg.wait_for_timeout(400)
                 d = await pg.evaluate(LS + ".draft"); ok(d and [i['ex'] for i in d['items']] == ['cable-lateral-raise'], 'repeating an older workout brings back the exercises done that day')
-                await pg.click('[data-act="discard"]'); await pg.wait_for_timeout(150); await pg.click('[data-act="discard"]'); await pg.wait_for_timeout(300)
+                await pg.click('[data-act="discard"]'); await pg.wait_for_timeout(300)
                 await pg.evaluate("document.getElementById('hist-q') && (document.getElementById('hist-q').value='')")
                 # ---- progress
                 await pg.click('[data-tab="progress"]'); await pg.wait_for_timeout(1800)
