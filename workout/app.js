@@ -1212,7 +1212,7 @@ var LIBRARY = (function () {
   }
   function historyOf(exId, list) {
     var out = [];
-    (list || finished()).forEach(function (s) { (s.entries || []).forEach(function (en) { if (en.ex === exId && en.sets && en.sets.length) out.push({ date: s.date, key: s.key, id: s.id, sets: en.sets, note: en.note, warm: en.warm }); }); });
+    (list || finished()).forEach(function (s) { (s.entries || []).forEach(function (en) { if (en.ex === exId && en.sets && en.sets.length) out.push({ date: s.date, key: s.key, id: s.id, sets: en.sets, note: en.note, warm: en.warm, easy: s.easy }); }); });
     return out;
   }
   function lastEntry(key, exId, excludeId) {
@@ -1328,24 +1328,45 @@ var LIBRARY = (function () {
   }
   function itemFrom(it, rows, note) {
     var e = exi(it.ex);
-    return { u: uid(), ex: it.ex, n: it.n || '', group: it.group || '', link: !!it.link, sets: it.sets, lo: it.lo, hi: it.hi, reps: it.reps || '', rir: it.rir || e.rir, rest: it.rest || '', restSec: it.link ? 10 : it.restSec, cue: it.cue || '', note: note || '', rows: rows };
+    return { u: uid(), ex: it.ex, n: it.n || '', group: it.group || '', link: !!it.link, sets: it.sets, lo: it.lo, hi: it.hi, reps: it.reps || '', rir: it.rir || e.rir, rest: it.rest || '', restSec: it.link ? 10 : it.restSec, cue: it.cue || '', note: note || '', rows: rows, plus: it.plus ? 1 : undefined };
   }
   /* Warm-up sets: kept in it.warm (and entry.warm once saved), apart from the working sets, so targets, records,
      set counts and weight lifted never see them. */
   function warmRows(sets) { return (sets || []).map(function (x) { return { w: fmt(x.w), r: fmt(x.r), d: true }; }); }
   function warmSets(it) { var out = []; (it.warm || []).forEach(function (x) { var r = num(x.r), w = num(x.w); if (x.d && r != null && r > 0) out.push({ w: w == null || w < 0 ? 0 : w, r: r }); }); return out; }
   function blankRows(n) { var r = []; for (var i = 0; i < n; i++) r.push({ w: '', r: '', d: false }); return r; }
+  /* ---- the training block (N1): 12 weeks in four phases, then the next block. Settings keep only where it starts
+     (block.start, a Monday; the week of the first workout when not set), an easy week taken early (block.easy, the Monday
+     of that week, which ends its block) and whether the push weeks add a set (block.plus). ---- */
+  var BLOCK_WEEKS = 12, PHASES = [['settle', 'Settle in', 1, 2, 'Sets as written. Stop the big lifts with 2 or 3 reps left while you find weights and positions.'], ['build', 'Build', 3, 6, 'Add reps, then weight.'], ['push', 'Push', 7, 11, 'If you are recovering well, one more set on up to four exercises. Take the last set of small exercises to failure.'], ['easy', 'Easy week', 12, 12, 'Half the sets, the same weights, 3 or 4 reps left. Then the next block starts.']];
+  var PLUS_EX = ['cable-lateral-raise', 'standing-calf-raise', 'pec-deck', 'triceps-pushdown'];
+  function blockInfo(day) {
+    var s = state.settings, b = s.block || {}; if (s.blockOff) return null;
+    var f = finished(), td = day || today(), ws = weekStart(td), start = b.start || (f.length ? weekStart(f[0].date) : ws), num = 1, guard = 0, early = false;
+    if (start > ws) start = ws;
+    while (guard++ < 400) {
+      var cut = b.easy && b.easy >= start && b.easy < addDays(start, 7 * BLOCK_WEEKS), end = cut ? addDays(b.easy, 7) : addDays(start, 7 * BLOCK_WEEKS);
+      if (ws < end) { early = !!cut && b.easy === ws; break; }
+      start = end; num++;
+    }
+    var wk = Math.round((toDate(ws) - toDate(start)) / 6048e5) + 1, easy = early || wk >= BLOCK_WEEKS, ph = easy ? PHASES[3] : PHASES.filter(function (p) { return wk >= p[2] && wk <= p[3]; })[0] || PHASES[1];
+    return { start: start, week: wk, weeks: BLOCK_WEEKS, num: num, easy: easy, early: early, phase: ph[0], name: ph[1], plus: !!b.plus && ph[0] === 'push' };
+  }
   function startDraft(key, from) {
     histMemo = null;
+    var blk = from || key === 'free' ? null : blockInfo();
     var r = key === 'free' ? null : getRoutine(key);
     var d = { v: 2, id: from ? from.id : uid(), key: key, name: from ? (from.name || (r ? shortName(r.name) : 'Workout')) : (r ? shortName(r.name) : 'Workout'), date: from ? from.date : today(),
       startedAt: from ? from.startedAt : Date.now(), notes: from ? (from.notes || '') : '', editing: !!from, dur: from ? durOf(from) : null, items: [] };
     var used = {};
     (r ? r.items : []).forEach(function (it, i) {
       var src = Object.assign({}, it, { n: it.n || String(i + 1) });
+      /* an easy week does half the sets; the push weeks add one to four chosen exercises when that is switched on */
+      if (blk && blk.easy && exi(it.ex).log !== 'cardio') src.sets = Math.max(1, Math.ceil(it.sets / 2));
+      else if (blk && blk.plus && PLUS_EX.indexOf(it.ex) >= 0) { src.sets = it.sets + 1; src.plus = 1; }
       var prev = from ? (from.entries || []).filter(function (en, j) { if (used[j]) return false; if (en.n === src.n && en.ex === it.ex) { used[j] = 1; return true; } return false; })[0] : null;
       /* as many rows as today's target has: the planned sets, plus any extra working sets done last time (two at most) */
-      var last = lastEntry(key, it.ex, d.id), tgN = !prev && last && last.key === key ? targetFor(it, exi(it.ex), last, exHist(it.ex)) : null, count = prev ? Math.max(prev.sets.length, it.sets) : Math.max(it.sets, tgN && tgN.sets ? Math.min(tgN.sets.length, it.sets + 2) : 0), rows = [];
+      var last = lastEntry(key, it.ex, d.id), tgN = !prev && last && last.key === key && !(blk && blk.easy) ? targetFor(src, exi(it.ex), last, exHist(it.ex)) : null, count = prev ? Math.max(prev.sets.length, it.sets) : Math.max(src.sets, tgN && tgN.sets ? Math.min(tgN.sets.length, src.sets + 2) : 0), rows = [];
       for (var k = 0; k < count; k++) { var ps = prev && prev.sets[k]; rows.push(ps ? rowFrom(exi(it.ex), ps) : { w: '', r: '', d: false }); }
       var ni = itemFrom(src, rows, prev ? prev.note : ''); if (prev && prev.warm) ni.warm = warmRows(prev.warm); d.items.push(ni);
     });
@@ -1353,6 +1374,7 @@ var LIBRARY = (function () {
       if (used[j]) return; var e = exi(en.ex, en.name);
       var xi = itemFrom({ ex: en.ex, n: en.n || 'x', sets: en.sets.length, lo: e.lo, hi: e.hi, restSec: e.restSec }, en.sets.map(function (x) { return rowFrom(e, x); }), en.note); if (en.warm) xi.warm = warmRows(en.warm); d.items.push(xi);
     });
+    if (blk && blk.easy) d.easy = true;
     state.draft = d; touchDraft(true); stopRest(); summary = null; editor = null;
     state.ui.tab = 'log'; state.ui.wmin = false; applyTheme(); wake();
     render(); window.scrollTo(0, 0);
@@ -1410,6 +1432,7 @@ var LIBRARY = (function () {
     if (!d.editing && entries.every(function (en) { return exi(en.ex).sport; })) { var mins = 0; entries.forEach(function (en) { en.sets.forEach(function (x) { mins += x.r; }); }); dur = Math.round(mins * 60); }
     var doc = { v: 2, id: d.id, key: d.key, name: d.name || (r ? shortName(r.name) : 'Workout'), date: d.date, startedAt: d.startedAt, finishedAt: d.editing ? (state.sessions[d.id] || {}).finishedAt || now : now,
       dur: dur, core: r ? r.core !== false : true, notes: d.notes || '', entries: entries, updatedAt: now };
+    if (d.easy || (d.editing && (state.sessions[d.id] || {}).easy)) doc.easy = true;
     var sameKey = before.filter(function (x) { return x.key === d.key; }), volRec = !d.editing && d.key !== 'free' && sameKey.length > 0 && volOf(doc) > Math.max.apply(null, sameKey.map(volOf)) + 1e-9;
     var wasFirst = !before.length, msBefore = milestones(before).filter(function (m) { return m.got; }).map(function (m) { return m.label + m.show; });
     state.sessions[d.id] = doc;
@@ -1478,10 +1501,19 @@ var LIBRARY = (function () {
      not normal: a break (C3), two sessions under the range (C2) and one bad day (C1).
      Returns { sets, text, short, up, step }; sets is null the first time. */
   function targetFor(it, e, last, hist) {
-    var t = targetCore(it, e, last, hist);
+    /* a workout from an easy week had half the sets and no push: build on the last normal one from the same session */
+    if (last && last.easy && hist) { var norm = hist.filter(function (x) { return !x.easy && x.key === last.key; }); if (norm.length) last = norm[norm.length - 1]; }
+    if (hist) hist = hist.filter(function (x) { return !x.easy; });
+    var d0 = state.draft, t = d0 && d0.easy && !d0.editing && last && last.sets && e.log !== 'cardio' && it.hi ? easyTarget(it, e, last) : targetCore(it, e, last, hist);
     /* for the "last time" column: the working sets the target is built on, and the lighter sets that were left out */
     if (t.sets && last && last.sets && e.log !== 'cardio' && it.hi) { var sp = workSplit(e, it, last.sets); if (sp.light.length) { t.shown = sp.work; t.light = sp.light; } }
     return t;
+  }
+  /* the easy week: the working weight and last time's reps, for the sets the week has. Nothing goes up. */
+  function easyTarget(it, e, last) {
+    var sp = workSplit(e, it, last.sets), out = sp.work.slice(0, it.sets || 1).map(function (x) { return { w: Math.min(x.w || 0, sp.W || x.w || 0), r: x.r }; });
+    while (out.length < (it.sets || 1)) out.push({ w: sp.W, r: it.lo });
+    return { sets: out, text: 'Easy week: half the sets at the same weight, and stop with 3 or 4 reps left.', short: 'Easy week · same weight, stop 3-4 reps short', up: false, back: true };
   }
   function targetCore(it, e, last, hist) {
     var h = hint(it, e, last);
@@ -1608,7 +1640,7 @@ var LIBRARY = (function () {
       r.items.forEach(function (it) {
         if (seen[it.ex]) return; seen[it.ex] = 1;
         var e = exi(it.ex); if (e.gone || (e.log !== 'wr' && e.log !== 'bw')) return;
-        var h = historyOf(it.ex, list); if (h.length < 4) return;
+        var h = historyOf(it.ex, list).filter(function (x) { return !x.easy; }); if (h.length < 4) return;
         var l4 = h.slice(-4); if (l4[3].date < addDays(t, -28)) return;
         var base = progressScore(e, l4[0].sets);
         if (!l4.slice(1).every(function (x) { return progressScore(e, x.sets) <= base + 1e-9; })) return;
@@ -1642,7 +1674,7 @@ var LIBRARY = (function () {
     for (i = 1; i <= 12; i++) vals.push(wk[addDays(ws, -7 * i)] || 0);
     var nz = vals.filter(Boolean).sort(function (a, b) { return a - b; }), med = nz.length ? nz[Math.floor(nz.length / 2)] : 0;
     for (i = 0; i < vals.length; i++) { if (vals[i] > 0 && vals[i] >= 0.7 * med) run++; else break; }
-    if (run >= 7) out.push({ k: 'easy', t: NUM_WORDS[Math.min(run, 12)] + (run >= 12 ? ' or more' : '') + ' weeks without an easy week', s: 'Plan one lighter week', d: 'Consider one lighter week: the same exercises with about half the sets. It gives joints and tendons time to catch up.' });
+    if (run >= 7 && !blockInfo()) out.push({ k: 'easy', t: NUM_WORDS[Math.min(run, 12)] + (run >= 12 ? ' or more' : '') + ' weeks without an easy week', s: 'Plan one lighter week', d: 'Consider one lighter week: the same exercises with about half the sets. It gives joints and tendons time to catch up.' });
     return out;
   }
 
@@ -2024,10 +2056,10 @@ var LIBRARY = (function () {
       n += day.filter(isCore).length;
       h += '<div class="day' + (day.length ? ' done' : '') + (day.length && day.every(allSport) ? ' out' : '') + (dt === today() ? ' today' : '') + '"><i>' + (day.length ? IC.check : '') + '</i>' + letters[i] + '</div>';
     }
-    var st = streakWeeks(f);
+    var st = streakWeeks(f), bi = routineList().length ? blockInfo() : null;
     return '<section class="card"><div class="week"><div class="days" role="img" aria-label="' + n + ' of ' + goal + ' sessions done this week">' + h + '</div>' +
       '<div class="week-n' + (n >= goal ? ' hit' : '') + '" aria-hidden="true"><b>' + n + '<i>/' + goal + '</i></b><span>this week</span></div></div>' +
-      (st >= 2 ? '<div class="pills"><span class="pill hot">' + IC.flame + st + ' weeks in a row</span></div>' : '') + '</section>';
+      (st >= 2 || bi ? '<div class="pills">' + (bi ? '<button class="pill blk' + (bi.easy ? ' easy' : '') + '" type="button" data-act="block-open">Week ' + bi.week + ' of ' + bi.weeks + ' · ' + bi.name + '</button>' : '') + (st >= 2 ? '<span class="pill hot">' + IC.flame + st + ' weeks in a row</span>' : '') + '</div>' : '') + '</section>';
   }
   /* Train: a slim strip for the weigh-in (T3, N4). It appears once a weight or a goal weight exists, goes when today is
      logged, and says so when the last weigh-in is four days old or the waist two weeks old (the plan's own rhythm). */
@@ -2191,7 +2223,7 @@ var LIBRARY = (function () {
     else if (lead) h += '<p class="sub">' + esc(lead) + '</p>';
     h +=
       (d.editing ? '<label class="dur-row">How long it took<span><input class="text-in" id="draft-dur" type="number" inputmode="numeric" min="0" max="600" step="1" placeholder="–" value="' + (d.dur ? Math.round(d.dur / 60) : '') + '">minutes</span></label>' : '') + '</section>';
-    if (!d.editing && d.items.length) h += '<div class="wtop">' + (r && r.warmup ? '<button class="act" type="button" data-act="warm-plan">Warm-up plan</button>' : '') + '<button class="act" type="button" data-act="notes-go">Workout notes</button></div>';
+    if (!d.editing && d.items.length) h += '<div class="wtop">' + (d.easy ? '<span class="pill blk easy">Easy week · half the sets</span>' : '') + (r && r.warmup ? '<button class="act" type="button" data-act="warm-plan">Warm-up plan</button>' : '') + '<button class="act" type="button" data-act="notes-go">Workout notes</button></div>';
     h += '<!--T-->';
     var anyPr = false, anyTarget = false, hintTip = '', cur = curItem(d), open = cur ? mates(d, cur) : [];
     histMemo = null;
@@ -2218,7 +2250,7 @@ var LIBRARY = (function () {
         '<button class="thumb" type="button" data-act="open-ex" data-ex="' + esc(it.ex) + '" data-u="' + it.u + '" aria-label="How to do ' + esc(e.name) + '">' + illoSvg(e.illo) + '</button>' +
         '<div><div class="exc-name">' + (it.n && it.n.charAt(0) !== 'x' ? '<span class="exc-n">' + esc(it.n) + '</span>' : '') + esc(e.name) + '</div><div class="exc-target">' + targetHtml(it, e) + '</div></div>' +
         '<button class="icon-btn" type="button" data-act="ex-menu" data-u="' + it.u + '" aria-label="More options for ' + esc(e.name) + '">' + IC.more + '</button></div>';
-      if (!d.editing && (hi.s || hi.t)) h += '<p class="why' + (hi.up ? ' up' : '') + '">' + esc(hi.s || hi.t) + '</p>';
+      if (!d.editing && (hi.s || hi.t)) h += '<p class="why' + (hi.up ? ' up' : '') + '">' + esc(hi.s || hi.t) + (it.plus ? ' · +1 set, push weeks' : '') + '</p>';
       if (last && last.note) h += '<p class="last-note">Last note: ' + esc(last.note) + '</p>';
       var prev = last && !e.sport && e.log !== 'cardio' ? (tg && tg.shown ? tg.shown : last.sets) : null;
       if (tg && tg.light && !d.editing) h += '<p class="last-note">Lighter last time, counted as warm-up: ' + esc(setsText(e, tg.light)) + '</p>';
@@ -2863,12 +2895,28 @@ var LIBRARY = (function () {
     openSheet(h, true);
   }
   function openPicker(mode, extra) { picker = Object.assign({ mode: mode, q: '', group: mode === 'lift' ? 'logged' : 'all', creating: false }, extra || {}); pickerSheet(); }
+  /* the training block: twelve weeks as a strip, the four phases, and the two things you can do with it */
+  function blockSheet() {
+    var bi = blockInfo(), b = state.settings.block || {}; if (!bi) { closeSheet(); return; }
+    var h = head('Training block', (bi.num > 1 ? 'Block ' + bi.num + ' · ' : '') + 'started ' + fmtDate(bi.start)), cells = '', i;
+    for (i = 1; i <= bi.weeks; i++) { var ph = bi.early && i === bi.week ? PHASES[3] : PHASES.filter(function (p) { return i >= p[2] && i <= p[3]; })[0]; cells += '<i class="bw ' + ph[0] + (i === bi.week ? ' now' : i < bi.week ? ' past' : '') + (bi.early && i > bi.week ? ' off' : '') + '">' + i + '</i>'; }
+    h += '<div class="bweeks" role="img" aria-label="Week ' + bi.week + ' of ' + bi.weeks + ', ' + bi.name + '">' + cells + '</div><ul class="bphases">';
+    PHASES.forEach(function (p) { h += '<li class="' + p[0] + (p[0] === bi.phase ? ' now' : '') + '"><i></i><span><b>' + p[1] + '</b><small>' + (p[2] === p[3] ? 'Week ' + p[2] : 'Weeks ' + p[2] + ' to ' + p[3]) + ' · ' + p[4] + '</small></span></li>'; });
+    h += '</ul>';
+    if (bi.phase === 'push' && routineList().some(function (r) { return r.items.some(function (it) { return PLUS_EX.indexOf(it.ex) >= 0; }); }))
+      h += '<div class="setting"><div><b>One more set in the push weeks</b><small>On lateral raises, calf raises, pec deck and pushdowns.</small></div><button class="switch" type="button" role="switch" data-act="block-plus" aria-checked="' + (b.plus ? 'true' : 'false') + '" aria-label="One more set in the push weeks"></button></div>';
+    h += bi.early ? '<button class="btn block" type="button" data-act="block-easy" data-v="0">Back to a normal week</button>' : bi.easy ? '' : '<button class="btn block" type="button" data-act="block-easy" data-v="1">Start the easy week now</button>';
+    if (!bi.easy) h += '<p class="foot">Take it early when two of these show up together: two sessions in a row go worse, a joint keeps aching, sleep or motivation drops. The next block starts the week after.</p>';
+    h += '<label class="fld">This block started in the week of<input id="block-start" type="date" value="' + bi.start + '" max="' + today() + '"></label>';
+    openSheet(h);
+  }
   function settingsSheet() {
     var s = state.settings, h = head('Settings');
     h += '<div class="setting stack"><div><b>Appearance</b><small>Automatic follows your phone.</small></div><div class="seg" role="group" aria-label="Appearance">' + [['auto', 'Automatic'], ['light', 'Light'], ['dark', 'Dark']].map(function (t) { return '<button type="button" data-act="theme" data-v="' + t[0] + '" aria-pressed="' + (s.theme === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div></div>';
     h += '<div class="setting stack"><div><b>Theme</b></div><div class="pal" role="group" aria-label="Theme">' + PALETTES.map(function (p) { return '<button type="button" data-act="palette" data-v="' + p[0] + '" aria-pressed="' + ((s.palette || '') === p[0]) + '"><span class="pal-sw" style="background-image:linear-gradient(135deg, ' + p[2] + ')" aria-hidden="true"></span><span>' + p[1] + '</span></button>'; }).join('') + '</div></div>';
     h += unitRow();
     h += '<div class="setting"><div><b>Sessions per week</b><small>Your weekly goal.</small></div><div class="stepper"><button type="button" data-act="goal" data-d="-1" aria-label="One fewer">−</button><b>' + s.weeklyGoal + '</b><button type="button" data-act="goal" data-d="1" aria-label="One more">+</button></div></div>';
+    h += '<div class="setting"><div><b>Training block</b><small>Twelve weeks that end in an easy week.</small></div><button class="switch" type="button" role="switch" data-act="block-toggle" aria-checked="' + (s.blockOff ? 'false' : 'true') + '" aria-label="Training block"></button></div>';
     function sw(key, title, sub) { return '<div class="setting"><div><b>' + title + '</b><small>' + sub + '</small></div><button class="switch" type="button" role="switch" data-act="toggle" data-k="' + key + '" aria-checked="' + (s[key] ? 'true' : 'false') + '" aria-label="' + title + '"></button></div>'; }
     h += sw('autoRest', 'Start the rest timer', 'When you tick a set.') + sw('sound', 'Sound when rest ends', 'A short beep. Your phone must not be on silent.') + sw('awake', 'Keep the screen on', 'During a workout, where the phone allows it.') + sw('outCore', 'Count runs, rides and swims toward the weekly goal', 'Off, they still show in the week and in History, in their own colour.') + sw('rir', 'Ask for reps left in the tank', 'After each set, tap how many more reps you had in you. Three or more on every set raises the next target.');
     h += '<div class="setting"><div><b>Goal body weight</b><small>Shown on the Body page. Leave empty for none.</small></div><div class="fld" style="width:96px"><input id="set-goalw" type="text" inputmode="decimal" autocomplete="off" value="' + (s.goalWeight != null ? fmt(s.goalWeight) : '') + '" placeholder="' + UW() + '" aria-label="Goal body weight in ' + UW() + '"></div></div>';
@@ -3729,6 +3777,12 @@ var LIBRARY = (function () {
       case 'delete-session': { var id = a.dataset.id; if (arm('del' + id, function () { if (!scrim.hidden) sessionSheet(id); })) { delete state.sessions[id]; mark('sessions/' + id); closeSheet(); render(); } break; }
       case 'settings': settingsSheet(); break;
       case 'theme': state.settings.theme = a.dataset.v; saveSettings(); applyTheme(); render(); settingsSheet(); break;
+      case 'block-open': blockSheet(); break;
+      case 'block-toggle': state.settings.blockOff = !state.settings.blockOff; saveSettings(); settingsSheet(); render(); break;
+      case 'block-plus': { var bp = blockInfo(); state.settings.block = Object.assign({}, state.settings.block, { start: bp.start, plus: !(state.settings.block || {}).plus }); saveSettings(); blockSheet(); break; }
+      case 'block-easy': {
+        if (wLive() && !state.draft.editing) { toast('Finish or discard the workout in progress first.'); break; }
+        var be = blockInfo(); state.settings.block = Object.assign({}, state.settings.block, { start: be.start, easy: a.dataset.v === '1' ? weekStart(today()) : null }); saveSettings(); render(); blockSheet(); break; }
       case 'goal': state.settings.weeklyGoal = Math.max(1, Math.min(7, (state.settings.weeklyGoal || 4) + (+a.dataset.d))); saveSettings(); settingsSheet(); render(); break;
       case 'toggle': state.settings[a.dataset.k] = !state.settings[a.dataset.k]; saveSettings(); if (a.dataset.k === 'sound' && state.settings.sound) { unlockAudio(); beep(); } wake(); if (a.dataset.k === 'rir' || a.dataset.k === 'outCore') render(); settingsSheet(); break;
       case 'backup-save': saveBackupFile(); break;
@@ -3899,6 +3953,7 @@ var LIBRARY = (function () {
   });
   document.addEventListener('change', function (ev) {
     var el = ev.target;
+    if (el.id === 'block-start' && el.value && el.value <= today()) { state.settings.block = Object.assign({}, state.settings.block, { start: weekStart(el.value), easy: null }); saveSettings(); render(); blockSheet(); return; }
     if (el.id === 'draft-date' && state.draft && el.value) { state.draft.date = el.value; state.draft.dateSet = true; touchDraft(); }
     if (el.id === 'draft-dur' && state.draft && state.draft.editing) { var mins = num(el.value); state.draft.dur = mins > 0 ? Math.round(Math.min(600, mins) * 60) : null; touchDraft(); }
     if (editor && el.id === 'ed-core') editor.core = el.checked;
