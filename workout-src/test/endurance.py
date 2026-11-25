@@ -154,7 +154,7 @@ async def main():
                 w = await pg.evaluate("[document.documentElement.scrollWidth, window.innerWidth]"); ok(w[0] <= w[1], '320 px wide, %s: nothing sticks out sideways' % name)
                 await pg.screenshot(path=os.path.join(SH, 'T-320-%s.png' % name), full_page=True)
             u = await pg.evaluate(LS + ".draft.items[0].u"); clip = await pg.evaluate("[...document.querySelectorAll('.set.sp input')].map(i => i.scrollWidth > i.clientWidth + 1)"); ok(not any(clip), 'the three fields show a half marathon (21.1, 118, 45) without cutting it off')
-            await pg.click('[data-act="discard"]'); await pg.wait_for_timeout(100); await pg.click('[data-act="discard"]'); await pg.wait_for_timeout(200)
+            await pg.click('[data-act="discard"]'); await pg.wait_for_timeout(200)
             await pg.click('[data-tab="progress"]'); await pg.click('[data-act="prog"][data-v="endur"]'); await pg.wait_for_timeout(900)
             w = await pg.evaluate("[document.documentElement.scrollWidth, window.innerWidth]"); ok(w[0] <= w[1], '320 px wide, Endurance page: nothing sticks out sideways')
             seg = await pg.evaluate("[...document.querySelectorAll('[data-act=prog]')].map(b => b.scrollWidth > b.clientWidth + 1)"); ok(not any(seg), 'the four Progress tabs fit at 320 px')

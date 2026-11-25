@@ -34,7 +34,15 @@
   }
   /* the same line for the workout card, where it must stay on one line: on a narrow phone the word "rest" is dropped */
   function targetHtml(it, e) { return esc(targetOf(it, e)).replace(' · rest ', ' · <span class="xs-hide">rest </span>'); }
+  /* a message with Undo on it for five seconds; undoing runs the function given */
+  var undoFn = null;
+  function undoToast(msg, fn) {
+    var el = document.getElementById('toast'); undoFn = fn;
+    el.innerHTML = '<span>' + esc(msg) + '</span><button type="button" data-act="undo">Undo</button>'; el.className = 'toast undo'; el.hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { el.hidden = true; undoFn = null; }, 5000);
+  }
   function toast(msg, rec) {
+    undoFn = null;
     var el = document.getElementById('toast'); el.textContent = msg; el.className = 'toast' + (rec ? ' rec' : ''); el.hidden = false;
     clearTimeout(toastTimer); toastTimer = setTimeout(function () { el.hidden = true; }, rec ? 3400 : 2600);
   }
@@ -340,7 +348,7 @@
     h += '<section class="card"><label class="label" for="draft-notes">Workout notes</label><textarea class="notes-in" id="draft-notes" data-f="notes" placeholder="Sleep, energy, anything worth remembering">' + esc(d.notes) + '</textarea>' +
       '<button class="btn primary block" type="button" data-act="finish-now" id="finish-btn"' + (draftCount() ? '' : ' disabled') + '>' + (d.editing ? 'Save changes' : 'Finish workout') + '</button>' +
       (d.editing ? '' : '<button class="btn quiet" type="button" data-act="clock">Change the date or start time</button>') +
-      '<button class="btn quiet danger" type="button" data-act="discard">' + (armed === 'discard' ? 'Tap again to discard' : (d.editing ? 'Cancel editing' : 'Discard workout')) + '</button></section>';
+      '<button class="btn quiet danger" type="button" data-act="discard">' + (d.editing ? 'Cancel editing' : 'Discard workout') + '</button></section>';
     return h;
   }
 
@@ -896,7 +904,7 @@
     var h = head(s.name || 'Workout', fmtDate(s.date) + ' · ' + countSets(s) + ' sets' + (du ? ' · ' + fmtDur(du) : '') + (vol ? ' · ' + compact(vol) + ' ' + UW() + ' lifted' : ''));
     (s.entries || []).forEach(function (en) { var e = exi(en.ex, en.name); h += '<div class="sess-entry"><b>' + esc(e.gone ? en.name : e.name) + '</b>' + (en.warm && en.warm.length ? '<span class="warm-l">Warm-up: ' + esc(setsText(e, en.warm)) + '</span>' : '') + '<span>' + esc(setsText(e, en.sets)) + '</span>' + rirLine(en.sets) + (en.note ? '<span>Note: ' + esc(en.note) + '</span>' : '') + '</div>'; });
     if (s.notes) h += '<p class="sub">Notes: ' + esc(s.notes) + '</p>';
-    h += '<div class="row"><button class="btn primary-sm" type="button" data-act="again" data-id="' + esc(id) + '"' + (state.draft ? ' disabled' : '') + '>Do this again</button><button class="btn" type="button" data-act="edit-session" data-id="' + esc(id) + '"' + (state.draft ? ' disabled' : '') + '>Edit</button><button class="btn danger" type="button" data-act="delete-session" data-id="' + esc(id) + '">' + (armed === 'del' + id ? 'Tap again to delete' : 'Delete') + '</button></div>';
+    h += '<div class="row"><button class="btn primary-sm" type="button" data-act="again" data-id="' + esc(id) + '"' + (state.draft ? ' disabled' : '') + '>Do this again</button><button class="btn" type="button" data-act="edit-session" data-id="' + esc(id) + '"' + (state.draft ? ' disabled' : '') + '>Edit</button><button class="btn danger" type="button" data-act="delete-session" data-id="' + esc(id) + '">Delete</button></div>';
     if (state.draft) h += '<p class="foot">Finish or discard the workout in progress before editing or repeating an older one.</p>';
     openSheet(h);
   }
@@ -950,6 +958,16 @@
     h += '<label class="fld">This block started in the week of<input id="block-start" type="date" value="' + bi.start + '" max="' + today() + '"></label>';
     openSheet(h);
   }
+  function binSheet() {
+    var b = binList().slice().reverse(), h = head('Deleted workouts', 'Kept for ' + BIN_DAYS + ' days');
+    if (!b.length) h += '<p class="empty">Nothing here.</p>';
+    h += '<ul class="list">';
+    b.forEach(function (o) {
+      var doc = o.doc, dr = o.draft, left = Math.max(1, Math.ceil(BIN_DAYS - (Date.now() - o.at) / 864e5)), n = doc ? countSets(doc) : dr.items.reduce(function (a, it) { return a + it.rows.filter(function (r) { return r.d; }).length; }, 0);
+      h += '<li class="plan-row"><span class="txt"><b>' + esc(doc ? doc.name || 'Workout' : (dr.name || 'Workout') + ', discarded') + '</b><small>' + fmtDate(doc ? doc.date : dr.date) + ' · ' + plural(n, 'set') + ' · ' + plural(left, 'day') + ' left</small></span><span class="mini"><button class="btn sm" type="button" data-act="bin-restore" data-at="' + o.at + '"' + (dr && state.draft ? ' disabled' : '') + '>Restore</button></span></li>';
+    });
+    openSheet(h + '</ul>');
+  }
   function settingsSheet() {
     var s = state.settings, h = head('Settings');
     h += '<div class="setting stack"><div><b>Appearance</b><small>Automatic follows your phone.</small></div><div class="seg" role="group" aria-label="Appearance">' + [['auto', 'Automatic'], ['light', 'Light'], ['dark', 'Dark']].map(function (t) { return '<button type="button" data-act="theme" data-v="' + t[0] + '" aria-pressed="' + (s.theme === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div></div>';
@@ -964,6 +982,9 @@
     h += '<div class="setting stack"><div><b>Backup</b><small>' + (STANDALONE ? 'Everything is stored on this phone only. ' + (function () { var b = backupState(); return b.at ? 'Last backup ' + fmtDate(iso(new Date(b.at))) + (b.fresh ? ', ' + plural(b.fresh, 'workout') + ' since then.' : ', nothing new since then.') : 'No backup made yet.'; })() + ' To bring a backup back, use Restore from file.' : 'Your log syncs through Claude. A backup lets you move it elsewhere.') + '</small></div>' +
       '<div class="row">' + (STANDALONE ? '<button class="btn sm" type="button" data-act="backup-save">Save backup file</button>' : '') + '<button class="btn sm" type="button" data-act="backup-show">Show backup text</button><label class="btn sm">Restore from file<input id="backup-file" type="file" accept=".json,application/json,text/plain" hidden></label></div>' +
       '<div id="backup-box" hidden><textarea class="backup" id="backup-text" spellcheck="false" aria-label="Backup text"></textarea><div class="row"><button class="btn sm" type="button" data-act="backup-copy">Copy</button><button class="btn sm" type="button" data-act="backup-restore">Restore from this text</button></div></div></div>';
+    var bn = binList(), cp = copyInfo();
+    if (bn.length || cp) h += '<div class="setting stack"><div><b>Safety net</b><small>' + (cp ? 'Weekly copy: ' + fmtDate(iso(new Date(cp.at))) + ', ' + plural(cp.n, 'workout') + '. ' : '') + (bn.length ? 'Deleted workouts are kept ' + BIN_DAYS + ' days.' : '') + '</small></div>' +
+      '<div class="row">' + (bn.length ? '<button class="btn sm" type="button" data-act="bin-open">Deleted workouts (' + bn.length + ')</button>' : '') + (cp ? '<button class="btn sm" type="button" data-act="copy-restore">' + (armed === 'copy' ? 'Tap again to restore' : 'Restore copy') + '</button>' : '') + '</div></div>';
     h += '<p class="foot">Hitit · ' + allEx().length + ' exercises · ' + Object.keys(state.sessions).length + ' workouts saved</p>';
     openSheet(h);
   }

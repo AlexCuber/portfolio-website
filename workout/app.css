@@ -2508,3 +2508,7 @@ body.in-workout .toast { bottom: calc(92px + var(--safe-b)); }
 .bphases b { display: block; font-size: var(--t-body); }
 .bphases small { display: block; font-size: var(--t-label); color: var(--ink-2); line-height: 1.4; }
 .bphases li:not(.now) b { font-weight: 600; color: var(--ink-2); }
+
+/* ---- undo (W8): the message carries a button for five seconds ---- */
+.toast.undo { pointer-events: auto; display: flex; align-items: center; gap: 14px; padding: 6px 6px 6px 16px; white-space: nowrap; }
+.toast.undo button { appearance: none; border: 0; border-radius: 999px; min-height: 44px; padding: 0 18px; font: inherit; font-weight: 700; background: var(--lime); color: var(--lime-ink); }

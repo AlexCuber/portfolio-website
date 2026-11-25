@@ -951,6 +951,27 @@ var LIBRARY = (function () {
     try { localStorage.setItem(LS, JSON.stringify(state)); if (saveFail) { saveFail = false; saveWarn(); } return true; }
     catch (e) { if (!saveFail) { saveFail = true; saveWarn(); } return false; }
   }
+  /* ---- a safety net inside the phone (N2). The bin keeps deleted workouts, and a discarded workout that had sets, for
+     30 days; it lives with the log but is not part of a backup. The weekly copy is a second, older copy of the log under
+     its own key, for the day the log itself cannot be read. ---- */
+  var COPY = 'hitit-copy-v1', BIN_DAYS = 30;
+  function binList() {
+    var cut = Date.now() - BIN_DAYS * 864e5, b = (state.bin || []).filter(function (x) { return x && x.at > cut; });
+    if (b.length !== (state.bin || []).length) state.bin = b;
+    return b;
+  }
+  function binAdd(o) { o.at = Date.now(); state.bin = binList().filter(function (x) { return !(o.doc && x.doc && x.doc.id === o.doc.id) && !(o.draft && x.draft); }); state.bin.push(o); return o; }
+  function binTake(o) { state.bin = binList().filter(function (x) { return x !== o; }); }
+  function copyInfo() { try { var c = JSON.parse(localStorage.getItem(COPY)); return c && c.at && c.data && c.data.sessions ? c : null; } catch (e) { return null; } }
+  /* once a week, when the log opened fine. A copy with many more workouts than the log has now is left alone:
+     it may be the only place they still are. */
+  function weeklyCopy() {
+    if (loadFail != null) return;
+    var n = Object.keys(state.sessions).length; if (!n) return;
+    var c = copyInfo(); if (c && Date.now() - c.at < 7 * 864e5) return;
+    if (c && c.n >= 4 && n < c.n / 2) return;
+    try { localStorage.setItem(COPY, JSON.stringify({ at: Date.now(), n: n, data: { app: 'workout-log', v: 2, sessions: state.sessions, body: state.body, routines: state.routines, custom: state.custom, settings: state.settings } })); } catch (e) {}
+  }
   function saveWarn() { var el = document.getElementById('savewarn'); if (el) el.hidden = !saveFail; document.body.classList.toggle('save-fail', saveFail); }
   /* puts the unreadable text aside under its own key, then lets saving start again */
   function keepRescue() {
@@ -1022,7 +1043,7 @@ var LIBRARY = (function () {
         var rs = r[5].data();
         if ((rs.updatedAt || 0) > (state.settingsAt || 0)) { state.settings = Object.assign({}, DEF_SET, rs.settings || {}); state.settingsAt = rs.updatedAt; applyTheme(); }
       }
-      keepRescue(); saveLocal(); flushDirty(); refreshSync(); syncSettled = true;
+      keepRescue(); saveLocal(); flushDirty(); refreshSync(); syncSettled = true; weeklyCopy();
       if (!isTyping() && !editor && !picker) render();
     }, function () { refreshSync(); settle(); });
   }
@@ -1032,7 +1053,7 @@ var LIBRARY = (function () {
   }
   function isTyping() { var a = document.activeElement; return !!(a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.tagName === 'SELECT')); }
   /* the first answer from Claude's storage is in (or there will be none): only now is an empty log known to be empty */
-  function settle() { if (syncSettled) return; syncSettled = true; if (!isTyping() && !editor && !picker) render(); }
+  function settle() { if (syncSettled) return; syncSettled = true; weeklyCopy(); if (!isTyping() && !editor && !picker) render(); }
   function connect(tries) {
     if (STANDALONE) { refreshSync(); return; }
     if (!(window.claude && typeof window.claude.use === 'function')) { refreshSync(); if ((tries || 0) < 5) setTimeout(function () { connect((tries || 0) + 1); }, 700); else settle(); return; }
@@ -1994,7 +2015,15 @@ var LIBRARY = (function () {
   }
   /* the same line for the workout card, where it must stay on one line: on a narrow phone the word "rest" is dropped */
   function targetHtml(it, e) { return esc(targetOf(it, e)).replace(' · rest ', ' · <span class="xs-hide">rest </span>'); }
+  /* a message with Undo on it for five seconds; undoing runs the function given */
+  var undoFn = null;
+  function undoToast(msg, fn) {
+    var el = document.getElementById('toast'); undoFn = fn;
+    el.innerHTML = '<span>' + esc(msg) + '</span><button type="button" data-act="undo">Undo</button>'; el.className = 'toast undo'; el.hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { el.hidden = true; undoFn = null; }, 5000);
+  }
   function toast(msg, rec) {
+    undoFn = null;
     var el = document.getElementById('toast'); el.textContent = msg; el.className = 'toast' + (rec ? ' rec' : ''); el.hidden = false;
     clearTimeout(toastTimer); toastTimer = setTimeout(function () { el.hidden = true; }, rec ? 3400 : 2600);
   }
@@ -2300,7 +2329,7 @@ var LIBRARY = (function () {
     h += '<section class="card"><label class="label" for="draft-notes">Workout notes</label><textarea class="notes-in" id="draft-notes" data-f="notes" placeholder="Sleep, energy, anything worth remembering">' + esc(d.notes) + '</textarea>' +
       '<button class="btn primary block" type="button" data-act="finish-now" id="finish-btn"' + (draftCount() ? '' : ' disabled') + '>' + (d.editing ? 'Save changes' : 'Finish workout') + '</button>' +
       (d.editing ? '' : '<button class="btn quiet" type="button" data-act="clock">Change the date or start time</button>') +
-      '<button class="btn quiet danger" type="button" data-act="discard">' + (armed === 'discard' ? 'Tap again to discard' : (d.editing ? 'Cancel editing' : 'Discard workout')) + '</button></section>';
+      '<button class="btn quiet danger" type="button" data-act="discard">' + (d.editing ? 'Cancel editing' : 'Discard workout') + '</button></section>';
     return h;
   }
 
@@ -2856,7 +2885,7 @@ var LIBRARY = (function () {
     var h = head(s.name || 'Workout', fmtDate(s.date) + ' · ' + countSets(s) + ' sets' + (du ? ' · ' + fmtDur(du) : '') + (vol ? ' · ' + compact(vol) + ' ' + UW() + ' lifted' : ''));
     (s.entries || []).forEach(function (en) { var e = exi(en.ex, en.name); h += '<div class="sess-entry"><b>' + esc(e.gone ? en.name : e.name) + '</b>' + (en.warm && en.warm.length ? '<span class="warm-l">Warm-up: ' + esc(setsText(e, en.warm)) + '</span>' : '') + '<span>' + esc(setsText(e, en.sets)) + '</span>' + rirLine(en.sets) + (en.note ? '<span>Note: ' + esc(en.note) + '</span>' : '') + '</div>'; });
     if (s.notes) h += '<p class="sub">Notes: ' + esc(s.notes) + '</p>';
-    h += '<div class="row"><button class="btn primary-sm" type="button" data-act="again" data-id="' + esc(id) + '"' + (state.draft ? ' disabled' : '') + '>Do this again</button><button class="btn" type="button" data-act="edit-session" data-id="' + esc(id) + '"' + (state.draft ? ' disabled' : '') + '>Edit</button><button class="btn danger" type="button" data-act="delete-session" data-id="' + esc(id) + '">' + (armed === 'del' + id ? 'Tap again to delete' : 'Delete') + '</button></div>';
+    h += '<div class="row"><button class="btn primary-sm" type="button" data-act="again" data-id="' + esc(id) + '"' + (state.draft ? ' disabled' : '') + '>Do this again</button><button class="btn" type="button" data-act="edit-session" data-id="' + esc(id) + '"' + (state.draft ? ' disabled' : '') + '>Edit</button><button class="btn danger" type="button" data-act="delete-session" data-id="' + esc(id) + '">Delete</button></div>';
     if (state.draft) h += '<p class="foot">Finish or discard the workout in progress before editing or repeating an older one.</p>';
     openSheet(h);
   }
@@ -2910,6 +2939,16 @@ var LIBRARY = (function () {
     h += '<label class="fld">This block started in the week of<input id="block-start" type="date" value="' + bi.start + '" max="' + today() + '"></label>';
     openSheet(h);
   }
+  function binSheet() {
+    var b = binList().slice().reverse(), h = head('Deleted workouts', 'Kept for ' + BIN_DAYS + ' days');
+    if (!b.length) h += '<p class="empty">Nothing here.</p>';
+    h += '<ul class="list">';
+    b.forEach(function (o) {
+      var doc = o.doc, dr = o.draft, left = Math.max(1, Math.ceil(BIN_DAYS - (Date.now() - o.at) / 864e5)), n = doc ? countSets(doc) : dr.items.reduce(function (a, it) { return a + it.rows.filter(function (r) { return r.d; }).length; }, 0);
+      h += '<li class="plan-row"><span class="txt"><b>' + esc(doc ? doc.name || 'Workout' : (dr.name || 'Workout') + ', discarded') + '</b><small>' + fmtDate(doc ? doc.date : dr.date) + ' · ' + plural(n, 'set') + ' · ' + plural(left, 'day') + ' left</small></span><span class="mini"><button class="btn sm" type="button" data-act="bin-restore" data-at="' + o.at + '"' + (dr && state.draft ? ' disabled' : '') + '>Restore</button></span></li>';
+    });
+    openSheet(h + '</ul>');
+  }
   function settingsSheet() {
     var s = state.settings, h = head('Settings');
     h += '<div class="setting stack"><div><b>Appearance</b><small>Automatic follows your phone.</small></div><div class="seg" role="group" aria-label="Appearance">' + [['auto', 'Automatic'], ['light', 'Light'], ['dark', 'Dark']].map(function (t) { return '<button type="button" data-act="theme" data-v="' + t[0] + '" aria-pressed="' + (s.theme === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div></div>';
@@ -2924,6 +2963,9 @@ var LIBRARY = (function () {
     h += '<div class="setting stack"><div><b>Backup</b><small>' + (STANDALONE ? 'Everything is stored on this phone only. ' + (function () { var b = backupState(); return b.at ? 'Last backup ' + fmtDate(iso(new Date(b.at))) + (b.fresh ? ', ' + plural(b.fresh, 'workout') + ' since then.' : ', nothing new since then.') : 'No backup made yet.'; })() + ' To bring a backup back, use Restore from file.' : 'Your log syncs through Claude. A backup lets you move it elsewhere.') + '</small></div>' +
       '<div class="row">' + (STANDALONE ? '<button class="btn sm" type="button" data-act="backup-save">Save backup file</button>' : '') + '<button class="btn sm" type="button" data-act="backup-show">Show backup text</button><label class="btn sm">Restore from file<input id="backup-file" type="file" accept=".json,application/json,text/plain" hidden></label></div>' +
       '<div id="backup-box" hidden><textarea class="backup" id="backup-text" spellcheck="false" aria-label="Backup text"></textarea><div class="row"><button class="btn sm" type="button" data-act="backup-copy">Copy</button><button class="btn sm" type="button" data-act="backup-restore">Restore from this text</button></div></div></div>';
+    var bn = binList(), cp = copyInfo();
+    if (bn.length || cp) h += '<div class="setting stack"><div><b>Safety net</b><small>' + (cp ? 'Weekly copy: ' + fmtDate(iso(new Date(cp.at))) + ', ' + plural(cp.n, 'workout') + '. ' : '') + (bn.length ? 'Deleted workouts are kept ' + BIN_DAYS + ' days.' : '') + '</small></div>' +
+      '<div class="row">' + (bn.length ? '<button class="btn sm" type="button" data-act="bin-open">Deleted workouts (' + bn.length + ')</button>' : '') + (cp ? '<button class="btn sm" type="button" data-act="copy-restore">' + (armed === 'copy' ? 'Tap again to restore' : 'Restore copy') + '</button>' : '') + '</div></div>';
     h += '<p class="foot">Hitit · ' + allEx().length + ' exercises · ' + Object.keys(state.sessions).length + ' workouts saved</p>';
     openSheet(h);
   }
@@ -3312,6 +3354,7 @@ var LIBRARY = (function () {
   function lostView() {
     return '<section class="setup-top"><h2>Your log could not be opened</h2><p class="sub">The log saved on this ' + (STANDALONE ? 'phone' : 'device') + ' is still there, but it could not be read. Nothing has been changed or deleted.</p></section>' +
       '<section class="card lost"><button class="btn primary block" type="button" data-act="lost-retry">Try again</button>' +
+      (function () { var c = copyInfo(); return c ? '<button class="btn block" type="button" data-act="copy-restore" data-now="1">Use the copy from ' + fmtDate(iso(new Date(c.at))) + ' (' + plural(c.n, 'workout') + ')</button>' : ''; })() +
       '<label class="btn block">Restore from a backup file<input id="backup-file" type="file" accept=".json,application/json,text/plain" hidden></label>' +
       '<button class="btn block" type="button" data-act="lost-save">Save the unreadable log as a file</button></section>' +
       '<p class="foot setup-foot"><button class="link" type="button" data-act="lost-new">' + (lostArm ? 'Tap again to start a new log' : 'Start a new log') + '</button></p>' +
@@ -3695,7 +3738,7 @@ var LIBRARY = (function () {
     if (ev.target === scrim) { closeSheet(); return; }
     var a = ev.target.closest('[data-act]'); if (!a) return;
     var act = a.dataset.act, d = state.draft, u = a.dataset.u, i = +a.dataset.i, it, e;
-    if (['discard', 'delete-session', 'finish', 'ed-reset', 'plan-del', 'custom-del', 'unit'].indexOf(act) < 0) armed = null;
+    if (['discard', 'delete-session', 'finish', 'ed-reset', 'plan-del', 'custom-del', 'unit', 'copy-restore'].indexOf(act) < 0) armed = null;
     switch (act) {
       case 'start': if (!state.draft) startDraft(a.dataset.key); else toast('Finish or discard the workout in progress first.'); break;
       case 'go-workout': state.ui.wmin = false; if (state.ui.tab !== 'log') go('log', true); else { saveLocal(); render(); window.scrollTo(0, 0); } break;
@@ -3749,20 +3792,34 @@ var LIBRARY = (function () {
       case 'warm-plan': { var wr = d && d.key !== 'free' ? getRoutine(d.key) : null; if (wr && wr.warmup) openSheet(head('Warm-up') + (wr.focus ? '<p class="sub">' + esc(wr.focus) + '</p>' : '') + '<p class="sheet-p">' + esc(wr.warmup) + '</p>'); break; }
       case 'notes-go': { var dn = document.getElementById('draft-notes'); if (dn) { dn.scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' }); dn.focus({ preventScroll: true }); } break; }
       case 'del-row': it = findItem(u); if (it) {
-        if (a.dataset.w) { if (it.warm) { it.warm.splice(i, 1); if (!it.warm.length) delete it.warm; } }
-        else if (it.rows.length > 1) { it.rows.splice(i, 1); if (d.timer && d.timer.u === u) d.timer = null; }
-        delMode = null; touchDraft(); render(); } break;
+        var gone = null, wasW = !!a.dataset.w;
+        if (wasW) { if (it.warm) { gone = it.warm.splice(i, 1)[0]; if (!it.warm.length) delete it.warm; } }
+        else if (it.rows.length > 1) { gone = it.rows.splice(i, 1)[0]; if (d.timer && d.timer.u === u) d.timer = null; }
+        delMode = null; touchDraft(); render();
+        if (gone) undoToast('Set removed', function () { var x = findItem(u); if (!x) return; if (wasW) (x.warm = x.warm || []).splice(i, 0, gone); else x.rows.splice(i, 0, gone); touchDraft(); render(); }); } break;
       case 'warm-one': it = findItem(u); if (it) { e = exi(it.ex); var ww = workingWeight(it), sg = ww > 0 ? warmups(ww, e, !warmedUp(it)) : [], wn = (it.warm || []).length, s1 = sg[wn];
         (it.warm = it.warm || []).push({ w: s1 ? fmt(s1.w) : '', r: s1 ? String(s1.r) : '', d: false }); delMode = null; touchDraft(); render(); } break;
       case 'add-ex': openPicker('draft'); break;
       case 'ex-menu': menuSheet(u); break;
       case 'ex-replace': openPicker('replace', { u: u }); break;
       case 'ex-up': case 'ex-down': it = findItem(u); if (it) { var ix = d.items.indexOf(it); swapItems(d.items, ix, ix + (act === 'ex-up' ? -1 : 1)); touchDraft(); closeSheet(); render(); scrollToItem(u); } break;
-      case 'ex-remove': it = findItem(u); if (it) { d.items.splice(d.items.indexOf(it), 1); if (d.cur === u) d.cur = null; touchDraft(); closeSheet(); render(); } break;
+      case 'ex-remove': it = findItem(u); if (it) { var xi = d.items.indexOf(it), xc = d.cur, xit = it; d.items.splice(xi, 1); if (d.cur === u) d.cur = null; touchDraft(); closeSheet(); render();
+        undoToast(exi(xit.ex).name + ' removed', function () { var dd = state.draft; if (!dd) return; dd.items.splice(Math.min(xi, dd.items.length), 0, xit); dd.cur = xc; touchDraft(); render(); }); } break;
       case 'add-this': if (d && !d.editing) { var ni = newItem(a.dataset.ex); d.items.push(ni); touchDraft(); closeSheet(); go('log', true); scrollToItem(ni.u); toast('Added to your workout'); } break;
       case 'finish': if (d && draftCount()) { var p = draftProgress(); if (p.done >= p.all || arm('finish', chrome)) { tipsDone(); finishDraft(); } } break;
       case 'finish-now': if (d && draftCount()) { tipsDone(); finishDraft(); } break;
-      case 'discard': if (d && arm('discard', render)) { state.draft = null; stopRest(); touchDraft(true); applyTheme(); wake(); render(); window.scrollTo(0, 0); } break;
+      case 'discard': if (d) {
+        /* one tap, then five seconds to undo. A new workout that had sets also goes to the bin for 30 days. */
+        var dd0 = d, kept = !d.editing && draftProgress().done > 0 ? binAdd({ draft: d }) : null;
+        state.draft = null; stopRest(); touchDraft(true); applyTheme(); wake(); render(); window.scrollTo(0, 0);
+        if (!dd0.editing) undoToast('Workout discarded', function () { if (state.draft) return; if (kept) binTake(kept); state.draft = dd0; state.ui.tab = 'log'; state.ui.wmin = false; touchDraft(true); applyTheme(); wake(); render(); }); } break;
+      case 'undo': { var uf = undoFn; undoFn = null; document.getElementById('toast').hidden = true; if (uf) uf(); break; }
+      case 'bin-open': binSheet(); break;
+      case 'bin-restore': { var bo = binList().filter(function (x) { return String(x.at) === a.dataset.at; })[0]; if (!bo) break;
+        if (bo.doc) { state.sessions[bo.doc.id] = bo.doc; bo.doc.updatedAt = Date.now(); binTake(bo); mark('sessions/' + bo.doc.id); render(); if (binList().length) binSheet(); else closeSheet(); toast('Workout restored'); }
+        else if (!state.draft) { binTake(bo); state.draft = bo.draft; state.ui.tab = 'log'; state.ui.wmin = false; touchDraft(true); closeSheet(); applyTheme(); wake(); render(); window.scrollTo(0, 0); }
+        break; }
+      case 'copy-restore': { var cp0 = copyInfo(); if (!cp0) break; if (a.dataset.now || arm('copy', settingsSheet)) { restore(JSON.stringify(cp0.data)); } break; }
       case 'rest-skip': if (d && d.timer) timerStop(false); else stopRest(); break;
       case 'rest-sub':
         /* taking time off: when less than the step is left, the rest simply ends, and a hold or cardio count is logged as it stands */
@@ -3774,7 +3831,9 @@ var LIBRARY = (function () {
       case 'open-session': sessionSheet(a.dataset.id); break;
       case 'sheet-x': { var wasSummary = !!summary && !picker; closeSheet(); if (wasSummary) summary = null; break; }
       case 'edit-session': { var s2 = state.sessions[a.dataset.id]; if (s2 && !state.draft) { closeSheet(); startDraft(s2.key, s2); } break; }
-      case 'delete-session': { var id = a.dataset.id; if (arm('del' + id, function () { if (!scrim.hidden) sessionSheet(id); })) { delete state.sessions[id]; mark('sessions/' + id); closeSheet(); render(); } break; }
+      case 'delete-session': { var id = a.dataset.id, gd = state.sessions[id]; if (!gd) break;
+        var bo2 = binAdd({ doc: gd }); delete state.sessions[id]; mark('sessions/' + id); closeSheet(); render();
+        undoToast('Workout deleted', function () { binTake(bo2); state.sessions[id] = gd; gd.updatedAt = Date.now(); mark('sessions/' + id); render(); }); break; }
       case 'settings': settingsSheet(); break;
       case 'theme': state.settings.theme = a.dataset.v; saveSettings(); applyTheme(); render(); settingsSheet(); break;
       case 'block-open': blockSheet(); break;
@@ -3996,6 +4055,7 @@ var LIBRARY = (function () {
   render();
   enter();
   refreshSync();
+  if (syncSettled) weeklyCopy();
   connect();
   wake();
   setInterval(tickClock, 1000);

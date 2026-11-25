@@ -260,7 +260,7 @@
     if (ev.target === scrim) { closeSheet(); return; }
     var a = ev.target.closest('[data-act]'); if (!a) return;
     var act = a.dataset.act, d = state.draft, u = a.dataset.u, i = +a.dataset.i, it, e;
-    if (['discard', 'delete-session', 'finish', 'ed-reset', 'plan-del', 'custom-del', 'unit'].indexOf(act) < 0) armed = null;
+    if (['discard', 'delete-session', 'finish', 'ed-reset', 'plan-del', 'custom-del', 'unit', 'copy-restore'].indexOf(act) < 0) armed = null;
     switch (act) {
       case 'start': if (!state.draft) startDraft(a.dataset.key); else toast('Finish or discard the workout in progress first.'); break;
       case 'go-workout': state.ui.wmin = false; if (state.ui.tab !== 'log') go('log', true); else { saveLocal(); render(); window.scrollTo(0, 0); } break;
@@ -314,20 +314,34 @@
       case 'warm-plan': { var wr = d && d.key !== 'free' ? getRoutine(d.key) : null; if (wr && wr.warmup) openSheet(head('Warm-up') + (wr.focus ? '<p class="sub">' + esc(wr.focus) + '</p>' : '') + '<p class="sheet-p">' + esc(wr.warmup) + '</p>'); break; }
       case 'notes-go': { var dn = document.getElementById('draft-notes'); if (dn) { dn.scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' }); dn.focus({ preventScroll: true }); } break; }
       case 'del-row': it = findItem(u); if (it) {
-        if (a.dataset.w) { if (it.warm) { it.warm.splice(i, 1); if (!it.warm.length) delete it.warm; } }
-        else if (it.rows.length > 1) { it.rows.splice(i, 1); if (d.timer && d.timer.u === u) d.timer = null; }
-        delMode = null; touchDraft(); render(); } break;
+        var gone = null, wasW = !!a.dataset.w;
+        if (wasW) { if (it.warm) { gone = it.warm.splice(i, 1)[0]; if (!it.warm.length) delete it.warm; } }
+        else if (it.rows.length > 1) { gone = it.rows.splice(i, 1)[0]; if (d.timer && d.timer.u === u) d.timer = null; }
+        delMode = null; touchDraft(); render();
+        if (gone) undoToast('Set removed', function () { var x = findItem(u); if (!x) return; if (wasW) (x.warm = x.warm || []).splice(i, 0, gone); else x.rows.splice(i, 0, gone); touchDraft(); render(); }); } break;
       case 'warm-one': it = findItem(u); if (it) { e = exi(it.ex); var ww = workingWeight(it), sg = ww > 0 ? warmups(ww, e, !warmedUp(it)) : [], wn = (it.warm || []).length, s1 = sg[wn];
         (it.warm = it.warm || []).push({ w: s1 ? fmt(s1.w) : '', r: s1 ? String(s1.r) : '', d: false }); delMode = null; touchDraft(); render(); } break;
       case 'add-ex': openPicker('draft'); break;
       case 'ex-menu': menuSheet(u); break;
       case 'ex-replace': openPicker('replace', { u: u }); break;
       case 'ex-up': case 'ex-down': it = findItem(u); if (it) { var ix = d.items.indexOf(it); swapItems(d.items, ix, ix + (act === 'ex-up' ? -1 : 1)); touchDraft(); closeSheet(); render(); scrollToItem(u); } break;
-      case 'ex-remove': it = findItem(u); if (it) { d.items.splice(d.items.indexOf(it), 1); if (d.cur === u) d.cur = null; touchDraft(); closeSheet(); render(); } break;
+      case 'ex-remove': it = findItem(u); if (it) { var xi = d.items.indexOf(it), xc = d.cur, xit = it; d.items.splice(xi, 1); if (d.cur === u) d.cur = null; touchDraft(); closeSheet(); render();
+        undoToast(exi(xit.ex).name + ' removed', function () { var dd = state.draft; if (!dd) return; dd.items.splice(Math.min(xi, dd.items.length), 0, xit); dd.cur = xc; touchDraft(); render(); }); } break;
       case 'add-this': if (d && !d.editing) { var ni = newItem(a.dataset.ex); d.items.push(ni); touchDraft(); closeSheet(); go('log', true); scrollToItem(ni.u); toast('Added to your workout'); } break;
       case 'finish': if (d && draftCount()) { var p = draftProgress(); if (p.done >= p.all || arm('finish', chrome)) { tipsDone(); finishDraft(); } } break;
       case 'finish-now': if (d && draftCount()) { tipsDone(); finishDraft(); } break;
-      case 'discard': if (d && arm('discard', render)) { state.draft = null; stopRest(); touchDraft(true); applyTheme(); wake(); render(); window.scrollTo(0, 0); } break;
+      case 'discard': if (d) {
+        /* one tap, then five seconds to undo. A new workout that had sets also goes to the bin for 30 days. */
+        var dd0 = d, kept = !d.editing && draftProgress().done > 0 ? binAdd({ draft: d }) : null;
+        state.draft = null; stopRest(); touchDraft(true); applyTheme(); wake(); render(); window.scrollTo(0, 0);
+        if (!dd0.editing) undoToast('Workout discarded', function () { if (state.draft) return; if (kept) binTake(kept); state.draft = dd0; state.ui.tab = 'log'; state.ui.wmin = false; touchDraft(true); applyTheme(); wake(); render(); }); } break;
+      case 'undo': { var uf = undoFn; undoFn = null; document.getElementById('toast').hidden = true; if (uf) uf(); break; }
+      case 'bin-open': binSheet(); break;
+      case 'bin-restore': { var bo = binList().filter(function (x) { return String(x.at) === a.dataset.at; })[0]; if (!bo) break;
+        if (bo.doc) { state.sessions[bo.doc.id] = bo.doc; bo.doc.updatedAt = Date.now(); binTake(bo); mark('sessions/' + bo.doc.id); render(); if (binList().length) binSheet(); else closeSheet(); toast('Workout restored'); }
+        else if (!state.draft) { binTake(bo); state.draft = bo.draft; state.ui.tab = 'log'; state.ui.wmin = false; touchDraft(true); closeSheet(); applyTheme(); wake(); render(); window.scrollTo(0, 0); }
+        break; }
+      case 'copy-restore': { var cp0 = copyInfo(); if (!cp0) break; if (a.dataset.now || arm('copy', settingsSheet)) { restore(JSON.stringify(cp0.data)); } break; }
       case 'rest-skip': if (d && d.timer) timerStop(false); else stopRest(); break;
       case 'rest-sub':
         /* taking time off: when less than the step is left, the rest simply ends, and a hold or cardio count is logged as it stands */
@@ -339,7 +353,9 @@
       case 'open-session': sessionSheet(a.dataset.id); break;
       case 'sheet-x': { var wasSummary = !!summary && !picker; closeSheet(); if (wasSummary) summary = null; break; }
       case 'edit-session': { var s2 = state.sessions[a.dataset.id]; if (s2 && !state.draft) { closeSheet(); startDraft(s2.key, s2); } break; }
-      case 'delete-session': { var id = a.dataset.id; if (arm('del' + id, function () { if (!scrim.hidden) sessionSheet(id); })) { delete state.sessions[id]; mark('sessions/' + id); closeSheet(); render(); } break; }
+      case 'delete-session': { var id = a.dataset.id, gd = state.sessions[id]; if (!gd) break;
+        var bo2 = binAdd({ doc: gd }); delete state.sessions[id]; mark('sessions/' + id); closeSheet(); render();
+        undoToast('Workout deleted', function () { binTake(bo2); state.sessions[id] = gd; gd.updatedAt = Date.now(); mark('sessions/' + id); render(); }); break; }
       case 'settings': settingsSheet(); break;
       case 'theme': state.settings.theme = a.dataset.v; saveSettings(); applyTheme(); render(); settingsSheet(); break;
       case 'block-open': blockSheet(); break;
@@ -561,6 +577,7 @@
   render();
   enter();
   refreshSync();
+  if (syncSettled) weeklyCopy();
   connect();
   wake();
   setInterval(tickClock, 1000);

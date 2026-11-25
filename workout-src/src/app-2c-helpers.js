@@ -95,6 +95,7 @@
   function lostView() {
     return '<section class="setup-top"><h2>Your log could not be opened</h2><p class="sub">The log saved on this ' + (STANDALONE ? 'phone' : 'device') + ' is still there, but it could not be read. Nothing has been changed or deleted.</p></section>' +
       '<section class="card lost"><button class="btn primary block" type="button" data-act="lost-retry">Try again</button>' +
+      (function () { var c = copyInfo(); return c ? '<button class="btn block" type="button" data-act="copy-restore" data-now="1">Use the copy from ' + fmtDate(iso(new Date(c.at))) + ' (' + plural(c.n, 'workout') + ')</button>' : ''; })() +
       '<label class="btn block">Restore from a backup file<input id="backup-file" type="file" accept=".json,application/json,text/plain" hidden></label>' +
       '<button class="btn block" type="button" data-act="lost-save">Save the unreadable log as a file</button></section>' +
       '<p class="foot setup-foot"><button class="link" type="button" data-act="lost-new">' + (lostArm ? 'Tap again to start a new log' : 'Start a new log') + '</button></p>' +

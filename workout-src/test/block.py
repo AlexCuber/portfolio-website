@@ -47,7 +47,7 @@ try:
         pg.keyboard.press('Escape'); pg.evaluate("document.getElementById('scrim').click()"); pg.wait_for_timeout(300)
         start(pg); normal = dict(rows(pg)); why0 = pg.locator('.exc.cur .why').inner_text()
         ok('Easy week' not in pg.locator('#view').inner_text(), 'an ordinary week has no easy-week tag')
-        pg.evaluate("document.querySelector('[data-act=\"discard\"]').click()"); pg.wait_for_timeout(200); pg.evaluate("document.querySelector('[data-act=\"discard\"]').click()"); pg.wait_for_timeout(400)
+        pg.evaluate("document.querySelector('[data-act=\"discard\"]').click()"); pg.wait_for_timeout(400)
         # ---- the easy week, taken early
         pg.locator('.pill.blk').tap(); pg.wait_for_timeout(300); pg.locator('[data-act="block-easy"][data-v="1"]').tap(); pg.wait_for_timeout(400)
         ok(pg.locator('.bw.now').get_attribute('class').find('easy') >= 0 and pg.locator('[data-act="block-easy"][data-v="0"]').count() == 1, '"Start the easy week now" turns this week into the easy week and offers the way back')
