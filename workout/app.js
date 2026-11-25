@@ -1135,11 +1135,16 @@ var LIBRARY = (function () {
     return Math.max.apply(null, sets.map(function (s) { return s.w * (1 + s.r / 30); }));
   }
   /* what the progress screens plot for one workout: the heaviest weight used, or (mode 'e1rm') the estimated 1-rep max */
+  /* mode 'tot' is the work done that day: weight times reps added up over every set (reps, seconds or minutes added up when there is no weight) */
   function liftVal(e, sets, mode) {
     if (!sets || !sets.length) return null;
+    if (mode === 'tot') return sets.reduce(function (a, x) { return a + (e.log === 'wr' ? (x.w || 0) * (x.r || 0) : (x.r || 0)); }, 0);
     if (e.log === 'wr' && mode !== 'e1rm') return Math.max.apply(null, sets.map(function (s) { return s.w || 0; }));
     return metric(e, sets);
   }
+  function liftModeNow() { var m = state.ui.liftMode; return m === 'e1rm' || m === 'tot' ? m : 'max'; }
+  /* numbers on the lifts screens: one decimal, and a thousands separator or K once totals get large */
+  function big(v) { return v >= 1000 ? compact(v) : fmt(Math.round(v * 10) / 10); }
   function liftLabel(e, mode) { return e.log === 'wr' && mode !== 'e1rm' ? 'Top weight (' + UW() + ')' : metricLabel(e); }
   function bestSet(e, sets, mode) {
     if (e.log === 'wr' && mode !== 'e1rm') return sets.reduce(function (a, x) { return x.w > a.w || (x.w === a.w && x.r > a.r) ? x : a; });
@@ -2164,9 +2169,10 @@ var LIBRARY = (function () {
     var W = chartW(), H = 190, m = { l: 36, r: 46, t: 14, b: 24 };
     if (!pts.length) return '<p class="sub">No entries yet.</p>';
     var extra = (opt && opt.extra) || [], xs = pts.map(function (p) { return toDate(p.x).getTime(); }), ys = pts.map(function (p) { return p.y; }), all = (trend ? ys.concat(trend) : ys).concat(extra.map(function (p) { return p.y; }));
+    var bars = !!(opt && opt.bars), bp = bars ? 12 : 0; if (bars) all.push(0);
     var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs), ticks = niceTicks(Math.min.apply(null, all), Math.max.apply(null, all), 3);
     var y0 = ticks[0], y1 = ticks[ticks.length - 1];
-    function X(v) { return x1 === x0 ? m.l + (W - m.l - m.r) / 2 : m.l + (v - x0) / (x1 - x0) * (W - m.l - m.r); }
+    function X(v) { return x1 === x0 ? m.l + (W - m.l - m.r) / 2 : m.l + bp + (v - x0) / (x1 - x0) * (W - m.l - m.r - 2 * bp); }
     function Y(v) { return H - m.b - (v - y0) / (y1 - y0) * (H - m.t - m.b); }
     var lineY = trend || ys, last = lineY[lineY.length - 1], stops = '', ga = H - m.b, gb = m.t, k;
     opt = opt || {};
@@ -2180,7 +2186,15 @@ var LIBRARY = (function () {
       '<mask id="' + id + '-m" maskUnits="userSpaceOnUse" x="0" y="0" width="' + W + '" height="' + H + '"><rect x="0" y="0" width="' + W + '" height="' + H + '" fill="url(#' + id + '-f)"/></mask></defs>';
     ticks.forEach(function (t) { s += '<line class="grid" x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + Y(t) + '" y2="' + Y(t) + '"/><text x="' + (m.l - 6) + '" y="' + (Y(t) + 4) + '" text-anchor="end">' + (opt && opt.fmt ? opt.fmt(t) : fmt(t)) + '</text>'; });
     var P = pts.map(function (p, i) { return [X(xs[i]), Y(p.y)]; }), Lp = lineY.map(function (v, i) { return [X(xs[i]), Y(v)]; });
-    if (Lp.length > 1) {
+    /* opt.best is the index of the best entry: a dashed line at its height and a ring on it, in the record colour */
+    var hasBest = opt.best != null && P.length > 1 && P[opt.best], bw = 0;
+    if (hasBest) s += '<line class="bestline" x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + P[opt.best][1].toFixed(1) + '" y2="' + P[opt.best][1].toFixed(1) + '"/>';
+    if (bars) {
+      /* a total per day is a sum, so it is drawn as columns from zero; the latest is solid */
+      var gx = Infinity; P.forEach(function (p, i) { if (i) gx = Math.min(gx, p[0] - P[i - 1][0]); });
+      bw = Math.max(3, Math.min(20, (isFinite(gx) ? gx : 20) * 0.7));
+      P.forEach(function (p, i) { s += '<rect class="bar' + (i === P.length - 1 ? ' last' : '') + '" style="fill:url(#' + id + '-l)" x="' + (p[0] - bw / 2).toFixed(1) + '" y="' + p[1].toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + Math.max(0, Y(0) - p[1]).toFixed(1) + '" rx="' + Math.min(3, bw / 2) + '"/>'; });
+    } else if (Lp.length > 1) {
       var dstr = smoothPath(Lp);
       s += '<path class="area" style="fill:url(#' + id + '-l)" mask="url(#' + id + '-m)" d="' + dstr + ' L' + Lp[Lp.length - 1][0].toFixed(1) + ' ' + (H - m.b) + ' L' + Lp[0][0].toFixed(1) + ' ' + (H - m.b) + ' Z"/><path class="ln draw" pathLength="1" style="stroke:url(#' + id + '-l)" d="' + dstr + '"/>';
     }
@@ -2190,7 +2204,9 @@ var LIBRARY = (function () {
     if (trend) P.forEach(function (p) { s += '<circle class="dot2" r="2.6" cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '"/>'; });
     var e = Lp[Lp.length - 1];
     s += '<line class="cross" id="' + id + '-x" y1="' + m.t + '" y2="' + (H - m.b) + '" x1="0" x2="0" visibility="hidden"/><circle class="dot" id="' + id + '-d" r="4" cx="0" cy="0" visibility="hidden"/>';
-    s += '<circle class="halo" r="5" style="fill:url(#' + id + '-l)" cx="' + e[0] + '" cy="' + e[1] + '"/><circle class="dot end" r="5" style="fill:url(#' + id + '-l)" cx="' + e[0] + '" cy="' + e[1] + '"/><text class="val" x="' + (e[0] + 10) + '" y="' + (e[1] + 4) + '">' + (opt.fmt ? opt.fmt(last) : fmt(Math.round(last * 10) / 10)) + '</text>';
+    if (hasBest) s += '<circle class="bestdot" r="' + (bars ? 4.5 : 7.5) + '" cx="' + P[opt.best][0].toFixed(1) + '" cy="' + P[opt.best][1].toFixed(1) + '"/>';
+    if (!bars) s += '<circle class="halo" r="5" style="fill:url(#' + id + '-l)" cx="' + e[0] + '" cy="' + e[1] + '"/><circle class="dot end" r="5" style="fill:url(#' + id + '-l)" cx="' + e[0] + '" cy="' + e[1] + '"/>';
+    s += '<text class="val" x="' + (e[0] + (bars ? bw / 2 + 6 : 10)) + '" y="' + (e[1] + 4) + '">' + (opt.end ? opt.end(last) : opt.fmt ? opt.fmt(last) : fmt(Math.round(last * 10) / 10)) + '</text>';
     s += '<text x="' + P[0][0] + '" y="' + (H - 6) + '" text-anchor="' + (P.length > 1 ? 'start' : 'middle') + '">' + fmtDate(pts[0].x, true) + '</text>';
     if (P.length > 1) s += '<text x="' + e[0] + '" y="' + (H - 6) + '" text-anchor="end">' + fmtDate(pts[pts.length - 1].x, true) + '</text>';
     s += '</svg><div class="tip" id="' + id + '-t" hidden></div>';
@@ -2348,6 +2364,7 @@ var LIBRARY = (function () {
     Object.keys(show).forEach(function (id) { if (!rk[id]) delete show[id]; });
     var units = {}; rs.forEach(function (r) { units[metricUnit(r.e)] = 1; });
     var mixed = Object.keys(units).length > 1, pct = mixed || !!state.ui.liftPct, anyWr = rs.some(function (r) { return r.e.log === 'wr'; }), unit = pct ? '%' : metricUnit(rs[0].e);
+    if (!anyWr && mode === 'e1rm') mode = 'max';
     var sers = [];
     rs.forEach(function (r) {
       if (show[r.id] == null) return;
@@ -2359,10 +2376,9 @@ var LIBRARY = (function () {
       var on = show[r.id] != null;
       return '<button class="lchip" type="button" data-act="lift-line" data-g="' + esc(g) + '" data-ex="' + esc(r.id) + '" aria-pressed="' + on + '"><i' + (on ? ' style="background:var(--cat-' + (show[r.id] + 1) + ')"' : '') + '></i><span>' + esc(r.name) + '</span></button>';
     }).join('') + '</div>';
-    if (liftInfo) h += '<p class="note">One line per exercise, up to ' + LIFT_MAX + ' at a time. Tap a name to hide or show its line.' + (pct ? ' The change is measured from each exercise\'s first logged workout, so light and heavy lifts can be compared.' : '') + (mixed ? ' These exercises are measured in different units, so only the change can be shown.' : '') + ' Tap the graph to see a day.</p>';
+    if (liftInfo) h += '<p class="note">One line per exercise, up to ' + LIFT_MAX + ' at a time. Tap a name to hide or show its line.' + (pct ? ' The change is measured from each exercise\'s first logged workout, so light and heavy lifts can be compared.' : '') + (mixed ? ' These exercises are measured in different units, so only the change can be shown.' : '') + (mode === 'tot' ? ' Total is weight × reps added up over every set that day.' : '') + ' Tap the graph to see a day.</p>';
     h += sers.length ? '<div class="chart" data-chart="mus">' + multiChart('mus', sers, { pct: pct, unit: unit }) + '</div>' : '<p class="sub" style="padding:36px 0;text-align:center">Tap a name to show its line.</p>';
-    h += '<div class="opt-row">' + (anyWr ? modePills() : '') +
-      (mixed ? '<span class="opt-note">Change since the start, %</span>' : '<div class="mseg" role="group" aria-label="Scale"><button class="opt" type="button" data-act="lift-pct" data-v="0" aria-pressed="' + !pct + '" aria-label="Show the ' + (rs[0].e.log === 'wr' ? 'weight' : 'value') + ' in ' + esc(metricUnit(rs[0].e)) + '">' + esc(metricUnit(rs[0].e)) + '</button><button class="opt" type="button" data-act="lift-pct" data-v="1" aria-pressed="' + pct + '" aria-label="Show the change since the start in percent">%</button></div>') + '</div>';
+    h += '<div class="opt-row">' + modePills(anyWr) + (mixed ? '<span class="opt-note">Change since the start, %</span>' : pctPill(pct)) + '</div>';
     return h;
   }
   function multiChart(id, sers, opt) {
@@ -2372,15 +2388,15 @@ var LIBRARY = (function () {
     var x0 = Math.min.apply(null, ts), x1 = Math.max.apply(null, ts), ticks = niceTicks(Math.min.apply(null, all), Math.max.apply(null, all), 3), y0 = ticks[0], y1 = ticks[ticks.length - 1];
     function X(v) { return x1 === x0 ? m.l + (W - m.l - m.r) / 2 : m.l + (v - x0) / (x1 - x0) * (W - m.l - m.r); }
     function Y(v) { return H - m.b - (v - y0) / (y1 - y0) * (H - m.t - m.b); }
-    function val(p, e) { return opt.pct ? (p.y > 0 ? '+' : p.y < 0 ? '−' : '') + fmt(Math.abs(p.y)) + '% (' + fmt(Math.round(p.raw * 10) / 10) + ' ' + metricUnit(e) + ')' : fmt(Math.round(p.y * 10) / 10) + ' ' + metricUnit(e); }
+    function val(p, e) { return opt.pct ? (p.y > 0 ? '+' : p.y < 0 ? '−' : '') + fmt(Math.abs(p.y)) + '% (' + big(p.raw) + ' ' + metricUnit(e) + ')' : big(p.y) + ' ' + metricUnit(e); }
     var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Line chart comparing ' + sers.map(function (x) { return x.name; }).join(', ') + '">';
-    ticks.forEach(function (t) { s += '<line class="grid' + (opt.pct && t === 0 ? ' zero' : '') + '" x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + Y(t) + '" y2="' + Y(t) + '"/><text x="' + (m.l - 6) + '" y="' + (Y(t) + 4) + '" text-anchor="end">' + fmt(t) + (opt.pct ? '%' : '') + '</text>'; });
+    ticks.forEach(function (t) { s += '<line class="grid' + (opt.pct && t === 0 ? ' zero' : '') + '" x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + Y(t) + '" y2="' + Y(t) + '"/><text x="' + (m.l - 6) + '" y="' + (Y(t) + 4) + '" text-anchor="end">' + (t >= 1000 ? (t / 1000) + 'K' : fmt(t)) + (opt.pct ? '%' : '') + '</text>'; });
     s += '<line class="cross" id="' + id + '-x" y1="' + m.t + '" y2="' + (H - m.b) + '" x1="0" x2="0" visibility="hidden"/>';
     sers.forEach(function (se) {
       var P = se.pts.map(function (p) { return [X(p.t), Y(p.y)]; }), c = 'var(--cat-' + (se.slot + 1) + ')', e = P[P.length - 1];
       if (P.length > 1) s += '<path class="ln draw" pathLength="1" style="stroke:' + c + '" d="' + smoothPath(P) + '"/>';
       s += '<circle class="mdot" r="4.5" style="fill:' + c + '" cx="' + e[0].toFixed(1) + '" cy="' + e[1].toFixed(1) + '"/>';
-      var lp = se.pts[se.pts.length - 1]; ends.push({ x: e[0], y: e[1], t: opt.pct ? (lp.y > 0 ? '+' : lp.y < 0 ? '−' : '') + fmt(Math.abs(Math.round(lp.y))) + '%' : fmt(Math.round(lp.y * 10) / 10) });
+      var lp = se.pts[se.pts.length - 1]; ends.push({ x: e[0], y: e[1], t: opt.pct ? (lp.y > 0 ? '+' : lp.y < 0 ? '−' : '') + fmt(Math.abs(Math.round(lp.y))) + '%' : big(lp.y) });
     });
     /* one number at the end of each line, no unit; numbers that would sit on top of each other are spread apart */
     ends.sort(function (a, b) { return a.y - b.y; });
@@ -2399,19 +2415,79 @@ var LIBRARY = (function () {
     return s;
   }
   /* the small options under the Exercise progress graph: the same place in both views, metric on the left */
-  function modePills() {
-    var mode = state.ui.liftMode === 'e1rm' ? 'e1rm' : 'max';
-    return '<div class="mseg" role="group" aria-label="What to show for weighted lifts"><button class="opt" type="button" data-act="lift-mode" data-v="max" aria-pressed="' + (mode === 'max') + '">Top weight</button><button class="opt" type="button" data-act="lift-mode" data-v="e1rm" aria-pressed="' + (mode === 'e1rm') + '">Est. 1-rep max</button></div>';
+  function modePills(anyWr) {
+    var mode = liftModeNow(), opts = anyWr ? [['max', 'Top weight'], ['e1rm', 'Est. 1RM'], ['tot', 'Total']] : [['max', 'Best set'], ['tot', 'Total']];
+    if (!anyWr && mode === 'e1rm') mode = 'max';
+    return '<div class="mseg" role="group" aria-label="What to measure">' + opts.map(function (o) { return '<button class="opt" type="button" data-act="lift-mode" data-v="' + o[0] + '" aria-pressed="' + (mode === o[0]) + '">' + o[1] + '</button>'; }).join('') + '</div>';
+  }
+  function pctPill(on) { return '<button class="opt solo end" type="button" data-act="lift-pct" aria-pressed="' + on + '" aria-label="Show the change since the start in percent">%</button>'; }
+  /* every time an exercise beat its own best, oldest first; the first time an exercise is logged is not a record */
+  function recordEvents(list) {
+    var best = {}, out = [];
+    list.forEach(function (sn) {
+      (sn.entries || []).forEach(function (en) {
+        var e = exi(en.ex, en.name), mv = e.sport ? null : metric(e, en.sets); if (mv == null) return;
+        if (best[en.ex] != null && mv > best[en.ex] + 1e-9) out.push({ id: en.ex, e: e, name: e.gone ? en.name : e.name, date: sn.date, sets: en.sets });
+        if (best[en.ex] == null || mv > best[en.ex]) best[en.ex] = mv;
+      });
+    });
+    return out;
+  }
+  function bestNum(e, sets) {
+    var bs = bestSet(e, sets, 'e1rm');
+    return e.log === 'wr' ? '<b class="num">' + fmt(bs.w) + '<small>' + UW() + ' × ' + bs.r + '</small></b>' : '<b class="num">' + fmt(bs.r) + '<small>' + metricUnit(e) + '</small></b>';
+  }
+  /* Personal bests: when records were set (eight weeks), the newest ones, then every best as a tile */
+  var pbWeek = null, pbAll = false;
+  function bestsCard(list) {
+    var recs = records(list), ev = recordEvents(list), td = today(), weeks = lastWeeks(8), h = '', max = 1;
+    if (!recs.length) return '';
+    ev.forEach(function (x) { var k = weekStart(x.date); weeks.forEach(function (w) { if (w.start === k) w.a++; }); });
+    weeks.forEach(function (w) { if (w.a > max) max = w.a; });
+    if (pbWeek && !weeks.some(function (w) { return w.start === pbWeek; })) pbWeek = null;
+    var n4 = ev.filter(function (x) { return x.date >= addDays(td, -27); }).length;
+    h += '<section class="card"><h3>Personal bests</h3>';
+    h += '<p class="pb-head"><b class="num">' + n4 + '</b> ' + (n4 === 1 ? 'record' : 'records') + ' in the last four weeks</p>';
+    h += '<div class="pbweeks" role="group" aria-label="Records set in each of the last eight weeks">' + weeks.map(function (w, i) {
+      var ago = weeks.length - 1 - i;
+      return '<button class="pbw' + (w.a ? '' : ' none') + '" type="button" data-act="pb-week" data-v="' + w.start + '" aria-pressed="' + (pbWeek === w.start) + '" aria-label="Week of ' + fmtDate(w.start, true) + ', ' + plural(w.a, 'record') + '">' +
+        (w.a ? '<b>' + w.a + '</b>' : '') + '<i style="height:' + (w.a ? Math.max(12, Math.round(w.a / max * 100)) + '%' : '3px') + '"></i><span>' + (ago ? ago + 'w' : 'now') + '</span></button>';
+    }).join('') + '</div>';
+    var pick = ev.filter(function (x) { return pbWeek ? weekStart(x.date) === pbWeek : x.date >= addDays(td, -13); }), seen = {}, fresh = [];
+    for (var i = pick.length - 1; i >= 0; i--) if (!seen[pick[i].id]) { seen[pick[i].id] = 1; fresh.push(pick[i]); }
+    h += '<h4 class="pb-h">' + (pbWeek ? 'Week of ' + fmtDate(pbWeek, true) : 'New in the last two weeks') + '</h4>';
+    h += fresh.length ? '<div class="pb-row">' + fresh.map(function (x) { return '<button class="pb-new" type="button" data-act="lift" data-ex="' + esc(x.id) + '">' + bestNum(x.e, x.sets) + '<span>' + esc(x.name) + '</span><em>' + fmtDate(x.date, true) + '</em></button>'; }).join('') + '</div>'
+      : '<p class="sub">' + (pbWeek ? 'No records that week.' : 'No records in the last two weeks. The next one shows up here.') + '</p>';
+    var groups = [], by = {}, rk = {}; recs.forEach(function (r) { rk[r.id] = r; });
+    liftOrder(list, recs).forEach(function (id) { var g = rk[id].e.group || 'Other'; if (!by[g]) { by[g] = 1; groups.push(g); } });
+    var grp = by[state.ui.pbGrp] ? state.ui.pbGrp : '', sort = state.ui.pbSort === 'top' || state.ui.pbSort === 'gain' ? state.ui.pbSort : 'new';
+    function gain(r) { return r.n >= 2 && r.first > 0 && r.last > r.first ? (r.last - r.first) / r.first : -1; }
+    function heavy(r) { return r.e.log === 'wr' ? 1e6 + bestSet(r.e, r.sets, 'e1rm').w : r.best; }
+    var rs = recs.filter(function (r) { return !grp || (r.e.group || 'Other') === grp; }).sort(function (a, b) {
+      var d = sort === 'top' ? heavy(b) - heavy(a) : sort === 'gain' ? gain(b) - gain(a) : (a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
+      return d || (a.name < b.name ? -1 : 1);
+    }), total = rs.length;
+    h += '<h4 class="pb-h">Every best</h4>';
+    h += '<div class="chips" role="group" aria-label="Muscle group"><button class="chip" type="button" data-act="pb-grp" data-v="" aria-pressed="' + !grp + '">All</button>' + groups.map(function (g) { return '<button class="chip" type="button" data-act="pb-grp" data-v="' + esc(g) + '" aria-pressed="' + (g === grp) + '">' + esc(g) + '</button>'; }).join('') + '</div>';
+    h += '<div class="opt-row"><div class="mseg" role="group" aria-label="Order">' + [['new', 'Newest'], ['top', 'Heaviest'], ['gain', 'Biggest gain']].map(function (o) { return '<button class="opt" type="button" data-act="pb-sort" data-v="' + o[0] + '" aria-pressed="' + (sort === o[0]) + '">' + o[1] + '</button>'; }).join('') + '</div></div>';
+    if (!pbAll) rs = rs.slice(0, 6);
+    h += '<div class="pb-grid">' + rs.map(function (r) {
+      var isNew = r.prs > 0 && r.date >= addDays(td, -13), gn = gain(r);
+      return '<button class="pb-tile" type="button" data-act="lift" data-ex="' + esc(r.id) + '">' + (isNew ? '<i class="pb-badge">New</i>' : '') + bestNum(r.e, r.sets) + '<span>' + esc(r.name) + '</span><em>' + (sort === 'gain' && gn > 0 ? '+' + Math.round(gn * 100) + '% since the start' : fmtDate(r.date, true)) + '</em></button>';
+    }).join('') + '</div>';
+    if (total > 6) h += '<button class="opt solo" type="button" data-act="pb-all" style="align-self:flex-start">' + (pbAll ? 'Show fewer' : 'Show all ' + total) + '</button>';
+    return h + '</section>';
   }
   function liftsView(list) {
-    var h = '', mode = state.ui.liftMode === 'e1rm' ? 'e1rm' : 'max', recs = records(list, mode);
+    var h = '', mode = liftModeNow(), recs = records(list, mode === 'tot' ? 'max' : mode);
     var exId = state.ui.ex && historyOf(state.ui.ex, list).length ? state.ui.ex : null;
     if (!exId && recs.length) { var byDate = recs.slice().sort(function (a, b) { return a.lastDate < b.lastDate ? 1 : -1; }); exId = byDate[0].id; routineList().some(function (r) { return r.items.some(function (it) { if (historyOf(it.ex, list).length) { exId = it.ex; return true; } return false; }); }); }
     if (!exId) return '<p class="empty">Log a workout and your lifts appear here.</p>';
-    var e = exi(exId), hist = historyOf(exId, list), rec = recs.filter(function (r) { return r.id === exId; })[0], wr = e.log === 'wr', onGraph = state.ui.liftSets === 'graph', extra = [];
+    var e = exi(exId), hist = historyOf(exId, list), wr = e.log === 'wr', pct = !!state.ui.liftPct, em = wr ? mode : (mode === 'tot' ? 'tot' : 'max'), unit = metricUnit(e);
+    var onGraph = state.ui.liftSets === 'graph' && em !== 'tot' && !pct, extra = [];
     if (onGraph) hist.forEach(function (x) {
       var by = {};
-      x.sets.forEach(function (st) { var v = liftVal(e, [st], mode), k = String(Math.round(v * 100) / 100); (by[k] = by[k] || { v: v, sets: [] }).sets.push(st); });
+      x.sets.forEach(function (st) { var v = liftVal(e, [st], em), k = String(Math.round(v * 100) / 100); (by[k] = by[k] || { v: v, sets: [] }).sets.push(st); });
       Object.keys(by).forEach(function (k) { extra.push({ x: x.date, y: by[k].v, tip: '<b>' + fmtDate(x.date) + '</b><br>' + esc(setsText(e, by[k].sets)) }); });
     });
     var order = liftOrder(list, recs), at = order.indexOf(exId), byMus = state.ui.liftView === 'mus';
@@ -2419,29 +2495,29 @@ var LIBRARY = (function () {
       '<div class="seg" role="group" aria-label="What to compare"><button type="button" data-act="lift-view" data-v="one" aria-pressed="' + !byMus + '">One exercise</button><button type="button" data-act="lift-view" data-v="mus" aria-pressed="' + byMus + '">By muscle</button></div>';
     if (byMus) h += muscleLifts(list, recs, mode, e) + '</section>';
     else {
-    h += '<div class="lift-nav">' +
-      (order.length > 1 ? '<button class="icon-btn" type="button" data-act="lift" data-ex="' + esc(order[(at - 1 + order.length) % order.length]) + '" data-step="-1" aria-label="Previous exercise">' + IC.left + '</button>' : '') +
-      '<button class="btn lift-name" type="button" data-act="pick-lift" aria-label="' + esc(e.name) + ', choose another exercise"><span>' + esc(e.name) + '</span>' + (order.length > 1 ? '<small>' + (at + 1) + ' of ' + order.length + '</small>' : '') + '</button>' +
-      (order.length > 1 ? '<button class="icon-btn" type="button" data-act="lift" data-ex="' + esc(order[(at + 1) % order.length]) + '" data-step="1" aria-label="Next exercise">' + IC.right + '</button>' : '') + '</div>';
-    h += '' +
-      (liftInfo ? '<p class="note">' + (wr ? (mode === 'max' ? 'Top weight is the heaviest weight you used in each workout, in ' + UW() + '.' : 'Estimated 1-rep max (' + UW() + '), from the best set of each workout: weight × (1 + reps ÷ 30). It lets sets with different weights and reps be compared.') : esc(metricLabel(e)) + ' in each workout.') + ' Tap a point to see the sets.' + (onGraph ? ' Grey dots are the sets below the top one.' : '') + '</p>' : '') +
-      '<div class="chart" data-chart="exc">' + lineChart('exc', hist.map(function (x) { return { x: x.date, y: liftVal(e, x.sets, mode), tip: '<b>' + fmtDate(x.date) + '</b><br>' + esc(setsText(e, onGraph ? [bestSet(e, x.sets, mode)] : x.sets)) }; }), null, { up: true, extra: extra }) + '</div>';
-    if (rec) h += '<div class="pills"><span class="pill hot">Best set: ' + esc(setsText(e, [bestSet(e, rec.sets, mode)])) + ' · ' + fmtDate(rec.date, true) + '</span>' + (rec.n > 1 && rec.first > 0 && rec.last !== rec.first ? '<span class="pill' + (rec.last >= rec.first ? ' good' : '') + '">' + (rec.last >= rec.first ? '+' : '') + Math.round((rec.last - rec.first) / rec.first * 100) + '% since you started</span>' : '') + '</div>';
-    h += '<div class="opt-row">' + (wr ? modePills() : '') + '<button class="opt solo" type="button" data-act="lift-sets" data-v="' + (onGraph ? 'off' : 'graph') + '" aria-pressed="' + onGraph + '">All sets</button></div>';
-    h += '</section>';
+      h += '<div class="lift-nav">' +
+        (order.length > 1 ? '<button class="icon-btn" type="button" data-act="lift" data-ex="' + esc(order[(at - 1 + order.length) % order.length]) + '" data-step="-1" aria-label="Previous exercise">' + IC.left + '</button>' : '') +
+        '<button class="btn lift-name" type="button" data-act="pick-lift" aria-label="' + esc(e.name) + ', choose another exercise"><span>' + esc(e.name) + '</span>' + (order.length > 1 ? '<small>' + (at + 1) + ' of ' + order.length + '</small>' : '') + '</button>' +
+        (order.length > 1 ? '<button class="icon-btn" type="button" data-act="lift" data-ex="' + esc(order[(at + 1) % order.length]) + '" data-step="1" aria-label="Next exercise">' + IC.right + '</button>' : '') + '</div>';
+      /* the latest value and the best for each measure; tapping one puts it on the graph */
+      var ms = wr ? [['max', 'Top weight'], ['e1rm', 'Est. 1RM'], ['tot', 'Total']] : [['max', e.log === 'bw' ? 'Most reps' : e.log === 'time' ? 'Longest hold' : 'Longest'], ['tot', e.log === 'bw' ? 'Total reps' : 'Total time']];
+      h += '<div class="stats' + (ms.length === 2 ? ' two' : '') + '" role="group" aria-label="What to show on the graph">' + ms.map(function (q) {
+        var vs = hist.map(function (x) { return liftVal(e, x.sets, q[0]); }), lastV = vs[vs.length - 1], bestV = Math.max.apply(null, vs);
+        return '<button class="stat" type="button" data-act="lift-mode" data-v="' + q[0] + '" aria-pressed="' + (q[0] === em) + '"><small>' + q[1] + '</small><b class="num">' + big(lastV) + '<i>' + unit + '</i></b><span>best ' + big(bestV) + '</span></button>';
+      }).join('') + '</div>';
+      var vals = hist.map(function (x) { return liftVal(e, x.sets, em); }), first = null, bi = 0;
+      vals.forEach(function (v, i) { if (first == null && v > 0) first = v; if (v > vals[bi] + 1e-9) bi = i; });
+      function ch(v) { return first ? Math.round((v / first - 1) * 1000) / 10 : 0; }
+      function sg(v) { return (v > 0 ? '+' : v < 0 ? '−' : '') + fmt(Math.abs(Math.round(v))) + '%'; }
+      if (liftInfo) h += '<p class="note">' + (em === 'tot' ? 'Total is ' + (wr ? 'weight × reps' : 'the ' + unit) + ' added up over every set that day.' : wr ? (em === 'max' ? 'Top weight is the heaviest weight you used in each workout.' : 'Estimated 1-rep max, from the best set of each workout: weight × (1 + reps ÷ 30). It lets sets with different weights and reps be compared.') : esc(metricLabel(e)) + ' in each workout.') +
+        ' Each tile shows the latest workout and your best; tap one to graph it. The orange ring and dashed line mark the best.' + (pct ? ' % is the change since your first workout with this exercise.' : '') + ' Tap the graph to see the sets.' + (onGraph ? ' Grey dots are the sets below the top one.' : '') + '</p>';
+      h += '<div class="chart" data-chart="exc">' + lineChart('exc', hist.map(function (x, i) {
+        return { x: x.date, y: pct ? ch(vals[i]) : vals[i], tip: '<b>' + fmtDate(x.date) + '</b><br>' + esc(setsText(e, onGraph ? [bestSet(e, x.sets, em)] : x.sets)) + (em === 'tot' ? '<br>Total ' + big(vals[i]) + ' ' + unit : '') + (pct ? '<br>' + sg(ch(vals[i])) + ' since the start' : '') + (i === bi && vals.length > 1 ? '<br>Your best' : '') };
+      }), null, { up: true, extra: extra, bars: em === 'tot' && !pct, best: bi, fmt: pct ? function (t) { return fmt(t) + '%'; } : function (t) { return t >= 1000 ? (t / 1000) + 'K' : fmt(t); }, end: pct ? sg : big }) + '</div>';
+      h += '<div class="opt-row">' + (em !== 'tot' && !pct ? '<button class="opt solo" type="button" data-act="lift-sets" data-v="' + (onGraph ? 'off' : 'graph') + '" aria-pressed="' + onGraph + '">All sets</button>' : '') + pctPill(pct) + '</div>';
+      h += '</section>';
     }
-    var gains = recs.filter(function (r) { return r.n >= 2 && r.first > 0 && r.last > r.first; }).map(function (r) { return { r: r, pct: (r.last - r.first) / r.first }; }).sort(function (a, b) { return b.pct - a.pct; }).slice(0, 5);
-    if (gains.length) {
-      h += '<section class="card"><h3>Biggest gains</h3><p class="sub">First logged workout compared with the latest.</p><div>';
-      gains.forEach(function (g) { h += '<button class="rec" type="button" data-act="lift" data-ex="' + esc(g.r.id) + '"><span><b>' + esc(g.r.name) + '</b><small>' + fmt(Math.round(g.r.first * 10) / 10) + ' → ' + fmt(Math.round(g.r.last * 10) / 10) + ' ' + metricUnit(g.r.e) + '</small></span>' + spark(g.r.vals) + '<span class="gain">+' + Math.round(g.pct * 100) + '%</span></button>'; });
-      h += '</div></section>';
-    }
-    h += '<section class="card"><h3>Personal bests</h3>' + modeSeg() + '<div>';
-    recs.sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : (a.name < b.name ? -1 : 1); }).forEach(function (r) {
-      h += '<button class="rec" type="button" data-act="lift" data-ex="' + esc(r.id) + '"><span><b>' + esc(r.name) + '</b><small>' + esc(setsText(r.e, [bestSet(r.e, r.sets, mode)])) + ' · ' + fmtDate(r.date, true) + '</small></span>' + spark(r.vals) + '<span class="num">' + fmt(Math.round(r.best * 10) / 10) + '<small>' + metricUnit(r.e) + '</small></span></button>';
-    });
-    h += '</div></section>';
-    return h;
+    return h + bestsCard(list);
   }
   function measures() { var w = UW(), l = UL(); return [['weight', 'Weight', w], ['waist', 'Waist', l], ['chest', 'Chest', l], ['arm', 'Arm', l], ['thigh', 'Thigh', l]]; }
   function bodyView(demo) {
@@ -3476,8 +3552,12 @@ var LIBRARY = (function () {
       case 'lift-sets': state.ui.liftSets = a.dataset.v; saveLocal(); render(); enter(); break;
       case 'lift-view': state.ui.liftView = a.dataset.v; saveLocal(); render(); enter(); break;
       case 'lift-grp': state.ui.liftGrp = a.dataset.v; saveLocal(); render(); enter(); break;
-      case 'lift-pct': state.ui.liftPct = a.dataset.v === '1'; saveLocal(); render(); enter(); break;
+      case 'lift-pct': state.ui.liftPct = !state.ui.liftPct; saveLocal(); render(); enter(); break;
       case 'lift-line': liftLine(a.dataset.g, a.dataset.ex); break;
+      case 'pb-week': pbWeek = pbWeek === a.dataset.v ? null : a.dataset.v; render(); break;
+      case 'pb-grp': state.ui.pbGrp = a.dataset.v; pbAll = false; saveLocal(); render(); break;
+      case 'pb-sort': state.ui.pbSort = a.dataset.v; saveLocal(); render(); break;
+      case 'pb-all': pbAll = !pbAll; render(); break;
       case 'lift-info': liftInfo = !liftInfo; render(); break;
       case 'ms-open': msSheet(+a.dataset.i); break;
       case 'sport': state.ui.sport = a.dataset.v; saveLocal(); render(); enter(); break;
