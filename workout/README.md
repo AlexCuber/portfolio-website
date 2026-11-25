@@ -37,7 +37,8 @@ folder (the `workout` line in the root `.assetsignore`), so the app exists at on
 | `wrangler.jsonc` | The Worker: files only, address `workout.omaksimov.com`, no `workers.dev` copy |
 | `.assetsignore` | Keeps this README and the config out of the published files |
 
-There is no build step. Cloudflare publishes the folder as it is.
+The files here are built from `../workout-src` (see its README) and are not edited by hand. Cloudflare has no
+build step of its own: it publishes this folder as it is.
 
 ## Where the data lives
 

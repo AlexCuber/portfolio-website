@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hitit</title>
+<meta name="theme-color" content="#eef4f4">
+<!--PWA_HEAD-->
+<script>try{var s=(JSON.parse(localStorage.getItem('workout-log-v1'))||{}).settings||{},t=s.theme,p=s.palette;if(t==='light'||t==='dark')document.documentElement.setAttribute('data-app-theme',t);if(p&&/^[a-z]{3,12}$/.test(p))document.documentElement.setAttribute('data-palette',p)}catch(e){}</script>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="app">
+  <header class="bar" id="bar">
+    <div class="bar-l"><span class="bar-date" id="bar-date"></span><h1 id="bar-title">Today</h1></div>
+    <div class="bar-r">
+      <span class="sync" id="sync" data-s="local"><i></i><span id="sync-t">On this device only</span></span>
+      <button class="icon-btn" type="button" data-act="settings" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2.2"/><circle cx="8" cy="17" r="2.2"/></svg></button>
+    </div>
+  </header>
+  <header class="wbar" id="wbar" hidden>
+    <button class="wbar-min" type="button" data-act="wmin" aria-label="Minimise the workout and go to the rest of the app"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9.5l6 6 6-6"/></svg></button>
+    <button class="wbar-main" type="button" data-act="go-workout"><span class="wbar-name" id="wbar-name">Workout</span><span class="wbar-sub" id="wbar-sub"></span></button>
+    <button class="wbar-clock" type="button" id="wbar-clock" data-act="clock" aria-label="Workout time. Tap to change the date or start time.">0:00</button>
+    <button class="wbar-fin" type="button" id="wbar-fin" data-act="finish">Finish</button>
+    <div class="wbar-prog" id="wbar-prog" aria-hidden="true"></div>
+  </header>
+  <main id="view"></main>
+  <div class="rest" id="rest" hidden>
+    <svg viewBox="0 0 44 44" aria-hidden="true"><circle class="trk" cx="22" cy="22" r="18"/><circle class="arc" id="rest-arc" cx="22" cy="22" r="18"/></svg>
+    <div class="rest-main"><small id="rest-l">Rest</small><b id="rest-t">0:00</b></div>
+    <div class="rest-step" id="rest-step"><button type="button" data-act="rest-sub" aria-label="30 seconds less">−</button><span id="rest-by">30 s</span><button type="button" data-act="rest-add" aria-label="30 seconds more">+</button></div>
+    <button type="button" data-act="rest-skip">Skip</button>
+  </div>
+  <button class="wmini" id="wmini" type="button" data-act="go-workout" hidden>
+    <span class="wmini-up" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 14.5l6-6 6 6"/></svg></span>
+    <span class="wmini-main"><span class="wmini-top"><i id="wmini-dot" hidden></i><b id="wmini-a">Workout</b><span id="wmini-t">0:00</span></span><small id="wmini-s">Back to your workout</small></span>
+  </button>
+  <nav class="tabs" aria-label="Sections"><div class="tabs-in">
+    <button class="tab" type="button" data-tab="log" aria-label="Train"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9.5v5M6.5 7v10M17.5 7v10M21 9.5v5M6.5 12h11"/></svg></button>
+    <button class="tab" type="button" data-tab="progress" aria-label="Progress"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l5.5-5.5 4 4L20 8"/><path d="M15 8h5v5"/></svg></button>
+    <button class="tab" type="button" data-tab="exercises" aria-label="History and exercises"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5.5" width="16" height="14.5" rx="3.2"/><path d="M8 3.5v4M16 3.5v4M4 10.5h16"/></svg></button>
+  </div></nav>
+</div>
+<div class="scrim" id="scrim" hidden><div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="Details"></div></div>
+<canvas id="fx" aria-hidden="true"></canvas>
+<div class="toast" id="toast" role="status" hidden></div>
+<div class="savewarn" id="savewarn" role="alert" hidden><p><b>Not saved.</b> Your last changes could not be stored here.</p><div><button type="button" data-act="backup-save">Save backup file</button><button type="button" data-act="save-retry">Try again</button></div></div>
+<!--PWA_FLAG-->
+<script src="app.js"></script>
+</body>
+</html>
