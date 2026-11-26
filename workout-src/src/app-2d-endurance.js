@@ -20,7 +20,7 @@
   function outCard(f) {
     var ws = weekStart(today()), wk = {}, bits = [], tiles = outList(), h = '';
     if (outEdit) {
-      h += '<section class="card"><div class="plan-head"><div><h3>Endurance</h3><p class="sub">Each one starts a workout in one tap. Up to six fit here.</p></div><button class="btn quiet" type="button" data-act="out-edit" data-v="0">Done</button></div>';
+      h += '<section class="card"><div class="plan-head"><div><h3>Endurance</h3></div><button class="btn quiet" type="button" data-act="out-edit" data-v="0">Done</button></div>';
       if (tiles.length) {
         h += '<ul class="list">';
         tiles.forEach(function (id, i) {
@@ -86,7 +86,7 @@
     h += '<section class="card"><div><h3>Distance per week</h3><p class="sub">' + D(total) + ' ' + u + ' in ' + mmss(mins) + ' so far.</p></div><div class="chart out" data-chart="ew">' +
       colChart('ew', weeks, { label: 'Distance per week for the last 12 weeks, in ' + u, tip: function (w) { return '<b>Week of ' + fmtDate(w.start, true) + '</b><br>' + D(w.a) + ' ' + u; } }) + '</div></section>';
     var pts = log.filter(function (x) { return x.dist > 0 && x.dmin > 0; }).map(function (x) { return { x: x.date, y: paceVal(e, x.dist, x.dmin), tip: '<b>' + fmtDate(x.date) + '</b><br>' + distText(e, x.dist) + ' in ' + mmss(x.dmin) + '<br>' + paceText(e, x.dist, x.dmin) }; });
-    if (pts.length > 1) h += '<section class="card"><div><h3>' + (cur === 'ride' ? 'Speed' : 'Pace') + '</h3><p class="sub">' + (cur === 'ride' ? 'Average speed of each ride, in ' + paceUnit(e) + '. Higher is faster.' : 'Average pace of each ' + word + ', per ' + (sw ? '100 ' + u : u) + '. Lower is faster.') + '</p></div><div class="chart out" data-chart="ep">' +
+    if (pts.length > 1) h += '<section class="card"><div><h3>' + (cur === 'ride' ? 'Speed' : 'Pace') + '</h3><p class="sub">' + (cur === 'ride' ? paceUnit(e) + ' · higher is faster' : 'per ' + (sw ? '100 ' + u : u) + ' · lower is faster') + '</p></div><div class="chart out" data-chart="ep">' +
       lineChart('ep', pts, null, { out: true, fmt: function (v) { return paceFmt(e, v); } }) + '</div></section>';
     h += '<section class="card"><h3>Bests</h3><ul class="list">' +
       '<li><button class="item" type="button" data-act="open-session" data-id="' + esc(longest.id) + '"><span class="txt"><b>Longest ' + word + '</b><small>' + fmtDate(longest.date) + '</small></span><span class="num">' + esc(distText(e, longest.dist)) + '</span></button></li>' +

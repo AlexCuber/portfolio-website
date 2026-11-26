@@ -546,7 +546,7 @@
     d.items.forEach(function (it) {
       var e = exi(it.ex), sets = rowSets(it); if (!sets.length) return;
       var en = { n: it.n, ex: it.ex, name: e.name, note: it.note || '', sets: sets }, wm = warmSets(it); if (wm.length) en.warm = wm; entries.push(en);
-      if (!d.editing) { var rc = recordsOf(it.ex, sets, d.id), tags = recordTags(e, rc, sets); if (e.sport && paceRecord(e, sets, d.id)) { var so = sumSets(sets); tags.push('fastest pace yet, ' + paceText(e, so.dist, so.dmin)); recEx[it.ex] = 'Fastest pace'; } if (tags.length) { prs.push({ name: e.name, tags: tags }); if (rc.w) recEx[it.ex] = 'Record weight'; else if (rc.b && e.sport) recEx[it.ex] = 'Longest yet'; else if (rc.b && e.log !== 'wr') recEx[it.ex] = 'Best yet'; } }
+      if (!d.editing) { var rc = recordsOf(it.ex, sets, d.id), tags = recordTags(e, rc, sets); if (e.sport && paceRecord(e, sets, d.id)) { var so = sumSets(sets); tags.push('fastest pace yet, ' + paceText(e, so.dist, so.dmin)); recEx[it.ex] = 'Fastest pace'; } if (tags.length) { prs.push({ name: e.name, tags: tags, top: e.sport || e.log === 'cardio' ? '' : setsText(e, [bestSet(e, sets, 'e1rm')]) }); if (rc.w) recEx[it.ex] = 'Record weight'; else if (rc.b && e.sport) recEx[it.ex] = 'Longest yet'; else if (rc.b && e.log !== 'wr') recEx[it.ex] = 'Best yet'; } }
     });
     if (!entries.length) return;
     var now = Date.now(), dur = d.editing ? d.dur : (function () { var x = (now - d.startedAt) / 1000; return x >= 60 && x <= 18000 ? Math.round(x) : null; })();
