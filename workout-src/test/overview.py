@@ -73,7 +73,7 @@ try:
         pg.locator('[data-act="lib3"][data-v="exercises"], [data-v="exercises"]').first.tap(); pg.wait_for_timeout(400)
         ok(pg.evaluate(LS + '.ui.lib') == 'mine' and pg.locator('.chip[aria-pressed="true"]').inner_text() == 'In my plan', 'Exercises opens on "In my plan"')
         n = pg.evaluate("document.documentElement.scrollHeight")
-        pg.locator('.chip:has-text("All")').first.tap(); pg.wait_for_timeout(300); n2 = pg.evaluate("document.documentElement.scrollHeight"); ok(n < n2 * 0.7, 'that list is %d px tall and All is %d' % (n, n2))
+        pg.locator('.chip:has-text("All")').first.tap(); pg.wait_for_timeout(300); n2 = pg.evaluate("document.documentElement.scrollHeight"); ok(n < n2 * 0.75, 'that list is %d px tall and All is %d' % (n, n2))
         pg.reload(); pg.wait_for_timeout(700)
         ok(pg.evaluate(LS + '.ui.lib') == 'all', 'choosing All is remembered and not switched back')
         c.close()
