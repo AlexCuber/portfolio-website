@@ -1140,3 +1140,4 @@ body.in-workout .toast { bottom: calc(92px + var(--safe-b)); }
 .setting { padding: 10px 0; }
 .wbar-clock { min-height: 44px; }
 .card > .act { align-self: flex-start; }
+.btn.quiet { min-width: 44px; }
