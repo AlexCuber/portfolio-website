@@ -298,7 +298,29 @@
     if (!sets || !sets.length) return null;
     if (e.sport) return sumSets(sets).dist; /* an outing counts by how far it went */
     if (e.log === 'cardio' || e.log === 'time' || e.log === 'bw') return Math.max.apply(null, sets.map(function (s) { return s.r; }));
-    return Math.max.apply(null, sets.map(function (s) { return s.w * (1 + s.r / 30); }));
+    return Math.max.apply(null, sets.map(est1));
+  }
+  /* estimated 1-rep max of one set. The formula is only fair up to about 12 reps: 9 kg × 20 would read as 15 kg.
+     Past 12 the estimate stops growing, and more reps count only as a tie-break at the same weight. */
+  var EST_REPS = 12;
+  function est1(s) { var r = s.r || 0; return (s.w || 0) * (1 + Math.min(r, EST_REPS) / 30) + (r > EST_REPS ? (r - EST_REPS) * 1e-4 : 0); }
+  /* an exercise trained past 12 reps: its plan range goes over 12, or, outside the plan, its usual range does */
+  function hiRep(e) {
+    if (e.log !== 'wr') return false; var hi = null;
+    routineList().forEach(function (r) { r.items.forEach(function (it) { if (it.ex === e.id && it.hi != null) hi = Math.max(hi || 0, it.hi); }); });
+    return (hi != null ? hi : e.hi || 0) > EST_REPS;
+  }
+  /* most reps at the day's heaviest weight */
+  function topReps(sets) { var w = Math.max.apply(null, sets.map(function (s) { return s.w || 0; })); return Math.max.apply(null, sets.filter(function (s) { return (s.w || 0) === w; }).map(function (s) { return s.r || 0; })); }
+  /* ---- C10: a set logged with three or more reps left counts as half a hard set ---- */
+  function hardN(sets) { return (sets || []).reduce(function (a, x) { return a + (x.rir === 3 ? 0.5 : 1); }, 0); }
+  /* ---- C8: body weight counts in the weight lifted for pull-ups, chin-ups and dips ---- */
+  var BW_LIFTS = { 'pull-up': 1, 'chin-up': 1, 'dip': 1 };
+  function bwAt(date) {
+    if (state.settings.bwVol === false) return 0;
+    var ks = Object.keys(state.body).filter(function (k) { return state.body[k].weight != null; }).sort(), k = null;
+    for (var i = 0; i < ks.length; i++) { if (ks[i] <= date) k = ks[i]; else { if (!k) k = ks[i]; break; } }
+    return k ? state.body[k].weight : 0;
   }
   /* what the progress screens plot for one workout: the heaviest weight used, or (mode 'e1rm') the estimated 1-rep max */
   /* mode 'tot' is the work done that day: weight times reps added up over every set (reps, seconds or minutes added up when there is no weight) */
@@ -406,7 +428,7 @@
   function lastDone(key) { var f = finished(); for (var i = f.length - 1; i >= 0; i--) if (f[i].key === key) return f[i]; return null; }
   function countSets(s) { return (s.entries || []).reduce(function (a, en) { return a + (exi(en.ex).log === 'cardio' ? 0 : en.sets.length); }, 0); }
   /* weight lifted in a workout: every set, warm-up sets included (they count here and in an exercise's Total, nowhere else) */
-  function volOf(s) { var v = 0; (s.entries || []).forEach(function (en) { var e = exi(en.ex); if (e.log !== 'wr' && e.log !== 'bw') return; en.sets.concat(en.warm || []).forEach(function (x) { v += (x.w || 0) * x.r; }); }); return v; }
+  function volOf(s) { var v = 0, bw = null; (s.entries || []).forEach(function (en) { var e = exi(en.ex); if (e.log !== 'wr' && e.log !== 'bw') return; var add = 0; if (BW_LIFTS[en.ex]) { if (bw == null) bw = bwAt(s.date || today()); add = bw; } en.sets.concat(en.warm || []).forEach(function (x) { v += ((x.w || 0) + add) * x.r; }); }); return v; }
   function durOf(s) { if (s.dur != null) return s.dur; if (!s.startedAt || !s.finishedAt) return null; var d = (s.finishedAt - s.startedAt) / 1000; return d >= 300 && d <= 18000 ? d : null; }
   function weeksWith(list) { var w = {}; list.forEach(function (s) { var k = weekStart(s.date); (w[k] = w[k] || []).push(s); }); return w; }
   function streakWeeks(list) {
@@ -428,7 +450,7 @@
   }
   function milestones(list) {
     var n = list.length, vol = 0, sets = 0, prs = 0;
-    list.forEach(function (s) { vol += volOf(s); sets += countSets(s); });
+    list.forEach(function (s) { vol += volOf(s); (s.entries || []).forEach(function (en) { if (exi(en.ex).log !== 'cardio') sets += hardN(en.sets); }); }); sets = Math.floor(sets);
     records(list).forEach(function (r) { prs += r.prs; });
     var st = streakWeeks(list), gw = goalWeeks(list), t = vol * KGF() / 1000;
     function step(v, steps) { for (var i = 0; i < steps.length; i++) if (v < steps[i]) return { goal: steps[i], prev: i ? steps[i - 1] : 0, got: i }; return { goal: steps[steps.length - 1], prev: steps[steps.length - 1], got: steps.length }; }

@@ -759,7 +759,7 @@
     var onGraph = state.ui.liftSets === 'graph' && em !== 'tot' && !pct, extra = [];
     if (onGraph) hist.forEach(function (x) {
       var by = {};
-      x.sets.forEach(function (st) { var v = liftVal(e, [st], em), k = String(Math.round(v * 100) / 100); (by[k] = by[k] || { v: v, sets: [] }).sets.push(st); });
+      x.sets.forEach(function (st) { var v = wr && em === 'e1rm' && hiRep(e) ? st.r : liftVal(e, [st], em), k = String(Math.round(v * 100) / 100); (by[k] = by[k] || { v: v, sets: [] }).sets.push(st); });
       Object.keys(by).forEach(function (k) { extra.push({ x: x.date, y: by[k].v, tip: '<b>' + fmtDate(x.date) + '</b><br>' + esc(setsText(e, by[k].sets)) }); });
     });
     var order = liftOrder(list, recs), at = order.indexOf(exId), byMus = state.ui.liftView === 'mus';
@@ -772,16 +772,18 @@
         '<button class="btn lift-name" type="button" data-act="pick-lift" aria-label="' + esc(e.name) + ', choose another exercise"><span>' + esc(e.name) + '</span>' + (order.length > 1 ? '<small>' + (at + 1) + ' of ' + order.length + '</small>' : '') + '</button>' +
         (order.length > 1 ? '<button class="icon-btn" type="button" data-act="lift" data-ex="' + esc(order[(at + 1) % order.length]) + '" data-step="1" aria-label="Next exercise">' + IC.right + '</button>' : '') + '</div>';
       /* the latest value and the best for each measure; tapping one puts it on the graph */
-      var ms = wr ? [['max', 'Top weight'], ['e1rm', 'Est. 1RM'], ['tot', 'Total']] : [['max', e.log === 'bw' ? 'Most reps' : e.log === 'time' ? 'Longest hold' : 'Longest'], ['tot', e.log === 'bw' ? 'Total reps' : 'Total time']];
+      var hi = hiRep(e), reps = hi && em === 'e1rm';
+      function oneVal(x, q) { return hi && q === 'e1rm' ? topReps(x.sets) : liftVal(e, x.sets, q, x.warm); }
+      var ms = wr ? [['max', 'Top weight'], ['e1rm', hi ? 'Best reps' : 'Est. 1RM'], ['tot', 'Total']] : [['max', e.log === 'bw' ? 'Most reps' : e.log === 'time' ? 'Longest hold' : 'Longest'], ['tot', e.log === 'bw' ? 'Total reps' : 'Total time']];
       h += '<div class="stats' + (ms.length === 2 ? ' two' : '') + '" role="group" aria-label="What to show on the graph">' + ms.map(function (q) {
-        var vs = hist.map(function (x) { return liftVal(e, x.sets, q[0], x.warm); }), lastV = vs[vs.length - 1], bestV = Math.max.apply(null, vs);
-        return '<button class="stat" type="button" data-act="lift-mode" data-v="' + q[0] + '" aria-pressed="' + (q[0] === em) + '"><small>' + q[1] + '</small><b class="num">' + big(lastV) + '<i>' + unit + '</i></b><span>best ' + big(bestV) + '</span></button>';
+        var vs = hist.map(function (x) { return oneVal(x, q[0]); }), lastV = vs[vs.length - 1], bestV = Math.max.apply(null, vs);
+        return '<button class="stat" type="button" data-act="lift-mode" data-v="' + q[0] + '" aria-pressed="' + (q[0] === em) + '"><small>' + q[1] + '</small><b class="num">' + big(lastV) + '<i>' + (hi && q[0] === 'e1rm' ? 'reps' : unit) + '</i></b><span>best ' + big(bestV) + '</span></button>';
       }).join('') + '</div>';
-      var vals = hist.map(function (x) { return liftVal(e, x.sets, em, x.warm); }), first = null, bi = 0;
+      var vals = hist.map(function (x) { return oneVal(x, em); }), first = null, bi = 0;
       vals.forEach(function (v, i) { if (first == null && v > 0) first = v; if (v > vals[bi] + 1e-9) bi = i; });
       function ch(v) { return first ? Math.round((v / first - 1) * 1000) / 10 : 0; }
       function sg(v) { return (v > 0 ? '+' : v < 0 ? '−' : '') + fmt(Math.abs(Math.round(v))) + '%'; }
-      if (liftInfo) h += '<p class="note">' + (em === 'tot' ? 'Total is ' + (wr ? 'weight × reps' : 'the ' + unit) + ' added up over every set that day.' : wr ? (em === 'max' ? 'Top weight is the heaviest weight you used in each workout.' : 'Estimated 1-rep max, from the best set of each workout: weight × (1 + reps ÷ 30). It lets sets with different weights and reps be compared.') : esc(metricLabel(e)) + ' in each workout.') +
+      if (liftInfo) h += '<p class="note">' + (em === 'tot' ? 'Total is ' + (wr ? 'weight × reps' : 'the ' + unit) + ' added up over every set that day.' : wr ? (em === 'max' ? 'Top weight is the heaviest weight you used in each workout.' : reps ? 'Best reps is the most reps at the heaviest weight of each workout. This exercise is trained past 12 reps, where an estimated 1-rep max stops meaning much.' : 'Estimated 1-rep max, from the best set of each workout: weight × (1 + reps ÷ 30), counting reps up to 12. It lets sets with different weights and reps be compared.') : esc(metricLabel(e)) + ' in each workout.') +
         ' Each tile shows the latest workout and your best; tap one to graph it. The orange ring and dashed line mark the best.' + (pct ? ' % is the change since your first workout with this exercise.' : '') + ' Tap the graph to see the sets.' + (onGraph ? ' Grey dots are the sets below the top one.' : '') + '</p>';
       h += '<div class="chart" data-chart="exc">' + lineChart('exc', hist.map(function (x, i) {
         return { x: x.date, y: pct ? ch(vals[i]) : vals[i], tip: '<b>' + fmtDate(x.date) + '</b><br>' + esc(setsText(e, onGraph ? [bestSet(e, x.sets, em)] : x.sets)) + (em === 'tot' ? '<br>Total ' + big(vals[i]) + ' ' + unit : '') + (pct ? '<br>' + sg(ch(vals[i])) + ' since the start' : '') + (i === bi && vals.length > 1 ? '<br>Your best' : '') };
@@ -994,6 +996,7 @@
     h += unitRow();
     h += '<div class="setting"><div><b>Sessions per week</b></div><div class="stepper"><button type="button" data-act="goal" data-d="-1" aria-label="One fewer">−</button><b>' + s.weeklyGoal + '</b><button type="button" data-act="goal" data-d="1" aria-label="One more">+</button></div></div>';
     h += sw('outCore', 'Count runs, rides and swims', 'Toward the weekly goal. Off, they still show in the week and in History.');
+    h += '<div class="setting"><div><b>Count body weight in pull-ups and dips</b></div><button class="switch" type="button" role="switch" data-act="bwvol" aria-checked="' + (s.bwVol === false ? 'false' : 'true') + '" aria-label="Count body weight in pull-ups, chin-ups and dips"></button></div>';
     h += '<div class="setting"><div><b>Training block</b></div><button class="switch" type="button" role="switch" data-act="block-toggle" aria-checked="' + (s.blockOff ? 'false' : 'true') + '" aria-label="Training block"></button></div>';
     h += grp('During a workout');
     h += sw('autoRest', 'Start the rest timer') + sw('sound', 'Sound when rest ends', 'Your phone must not be on silent.') + sw('awake', 'Keep the screen on') + sw('rir', 'Ask for reps left in the tank');

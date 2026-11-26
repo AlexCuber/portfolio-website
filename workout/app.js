@@ -1197,7 +1197,29 @@ var LIBRARY = (function () {
     if (!sets || !sets.length) return null;
     if (e.sport) return sumSets(sets).dist; /* an outing counts by how far it went */
     if (e.log === 'cardio' || e.log === 'time' || e.log === 'bw') return Math.max.apply(null, sets.map(function (s) { return s.r; }));
-    return Math.max.apply(null, sets.map(function (s) { return s.w * (1 + s.r / 30); }));
+    return Math.max.apply(null, sets.map(est1));
+  }
+  /* estimated 1-rep max of one set. The formula is only fair up to about 12 reps: 9 kg × 20 would read as 15 kg.
+     Past 12 the estimate stops growing, and more reps count only as a tie-break at the same weight. */
+  var EST_REPS = 12;
+  function est1(s) { var r = s.r || 0; return (s.w || 0) * (1 + Math.min(r, EST_REPS) / 30) + (r > EST_REPS ? (r - EST_REPS) * 1e-4 : 0); }
+  /* an exercise trained past 12 reps: its plan range goes over 12, or, outside the plan, its usual range does */
+  function hiRep(e) {
+    if (e.log !== 'wr') return false; var hi = null;
+    routineList().forEach(function (r) { r.items.forEach(function (it) { if (it.ex === e.id && it.hi != null) hi = Math.max(hi || 0, it.hi); }); });
+    return (hi != null ? hi : e.hi || 0) > EST_REPS;
+  }
+  /* most reps at the day's heaviest weight */
+  function topReps(sets) { var w = Math.max.apply(null, sets.map(function (s) { return s.w || 0; })); return Math.max.apply(null, sets.filter(function (s) { return (s.w || 0) === w; }).map(function (s) { return s.r || 0; })); }
+  /* ---- C10: a set logged with three or more reps left counts as half a hard set ---- */
+  function hardN(sets) { return (sets || []).reduce(function (a, x) { return a + (x.rir === 3 ? 0.5 : 1); }, 0); }
+  /* ---- C8: body weight counts in the weight lifted for pull-ups, chin-ups and dips ---- */
+  var BW_LIFTS = { 'pull-up': 1, 'chin-up': 1, 'dip': 1 };
+  function bwAt(date) {
+    if (state.settings.bwVol === false) return 0;
+    var ks = Object.keys(state.body).filter(function (k) { return state.body[k].weight != null; }).sort(), k = null;
+    for (var i = 0; i < ks.length; i++) { if (ks[i] <= date) k = ks[i]; else { if (!k) k = ks[i]; break; } }
+    return k ? state.body[k].weight : 0;
   }
   /* what the progress screens plot for one workout: the heaviest weight used, or (mode 'e1rm') the estimated 1-rep max */
   /* mode 'tot' is the work done that day: weight times reps added up over every set (reps, seconds or minutes added up when there is no weight) */
@@ -1305,7 +1327,7 @@ var LIBRARY = (function () {
   function lastDone(key) { var f = finished(); for (var i = f.length - 1; i >= 0; i--) if (f[i].key === key) return f[i]; return null; }
   function countSets(s) { return (s.entries || []).reduce(function (a, en) { return a + (exi(en.ex).log === 'cardio' ? 0 : en.sets.length); }, 0); }
   /* weight lifted in a workout: every set, warm-up sets included (they count here and in an exercise's Total, nowhere else) */
-  function volOf(s) { var v = 0; (s.entries || []).forEach(function (en) { var e = exi(en.ex); if (e.log !== 'wr' && e.log !== 'bw') return; en.sets.concat(en.warm || []).forEach(function (x) { v += (x.w || 0) * x.r; }); }); return v; }
+  function volOf(s) { var v = 0, bw = null; (s.entries || []).forEach(function (en) { var e = exi(en.ex); if (e.log !== 'wr' && e.log !== 'bw') return; var add = 0; if (BW_LIFTS[en.ex]) { if (bw == null) bw = bwAt(s.date || today()); add = bw; } en.sets.concat(en.warm || []).forEach(function (x) { v += ((x.w || 0) + add) * x.r; }); }); return v; }
   function durOf(s) { if (s.dur != null) return s.dur; if (!s.startedAt || !s.finishedAt) return null; var d = (s.finishedAt - s.startedAt) / 1000; return d >= 300 && d <= 18000 ? d : null; }
   function weeksWith(list) { var w = {}; list.forEach(function (s) { var k = weekStart(s.date); (w[k] = w[k] || []).push(s); }); return w; }
   function streakWeeks(list) {
@@ -1327,7 +1349,7 @@ var LIBRARY = (function () {
   }
   function milestones(list) {
     var n = list.length, vol = 0, sets = 0, prs = 0;
-    list.forEach(function (s) { vol += volOf(s); sets += countSets(s); });
+    list.forEach(function (s) { vol += volOf(s); (s.entries || []).forEach(function (en) { if (exi(en.ex).log !== 'cardio') sets += hardN(en.sets); }); }); sets = Math.floor(sets);
     records(list).forEach(function (r) { prs += r.prs; });
     var st = streakWeeks(list), gw = goalWeeks(list), t = vol * KGF() / 1000;
     function step(v, steps) { for (var i = 0; i < steps.length; i++) if (v < steps[i]) return { goal: steps[i], prev: i ? steps[i - 1] : 0, got: i }; return { goal: steps[steps.length - 1], prev: steps[steps.length - 1], got: steps.length }; }
@@ -1681,7 +1703,7 @@ var LIBRARY = (function () {
     var from = addDays(ws, -28), plan = planTargets(), got = {}, weeks = {};
     list.forEach(function (s) {
       if (s.date < from || s.date >= ws) return; weeks[weekStart(s.date)] = 1;
-      (s.entries || []).forEach(function (en) { var e = exi(en.ex); if (e.log === 'cardio') return; Object.keys(e.muscles).forEach(function (mu) { got[mu] = (got[mu] || 0) + en.sets.length * e.muscles[mu] / 4; }); });
+      (s.entries || []).forEach(function (en) { var e = exi(en.ex); if (e.log === 'cardio') return; Object.keys(e.muscles).forEach(function (mu) { got[mu] = (got[mu] || 0) + hardN(en.sets) * e.muscles[mu] / 4; }); });
     });
     if (Object.keys(weeks).length >= 3) {
       var behind = LIBRARY.MUSCLES.filter(function (m) { return plan[m.id] >= 4 && (got[m.id] || 0) < 0.7 * plan[m.id]; }).sort(function (a, b) { return (got[a.id] || 0) / plan[a.id] - (got[b.id] || 0) / plan[b.id]; }).slice(0, 3);
@@ -2740,7 +2762,7 @@ var LIBRARY = (function () {
     var onGraph = state.ui.liftSets === 'graph' && em !== 'tot' && !pct, extra = [];
     if (onGraph) hist.forEach(function (x) {
       var by = {};
-      x.sets.forEach(function (st) { var v = liftVal(e, [st], em), k = String(Math.round(v * 100) / 100); (by[k] = by[k] || { v: v, sets: [] }).sets.push(st); });
+      x.sets.forEach(function (st) { var v = wr && em === 'e1rm' && hiRep(e) ? st.r : liftVal(e, [st], em), k = String(Math.round(v * 100) / 100); (by[k] = by[k] || { v: v, sets: [] }).sets.push(st); });
       Object.keys(by).forEach(function (k) { extra.push({ x: x.date, y: by[k].v, tip: '<b>' + fmtDate(x.date) + '</b><br>' + esc(setsText(e, by[k].sets)) }); });
     });
     var order = liftOrder(list, recs), at = order.indexOf(exId), byMus = state.ui.liftView === 'mus';
@@ -2753,16 +2775,18 @@ var LIBRARY = (function () {
         '<button class="btn lift-name" type="button" data-act="pick-lift" aria-label="' + esc(e.name) + ', choose another exercise"><span>' + esc(e.name) + '</span>' + (order.length > 1 ? '<small>' + (at + 1) + ' of ' + order.length + '</small>' : '') + '</button>' +
         (order.length > 1 ? '<button class="icon-btn" type="button" data-act="lift" data-ex="' + esc(order[(at + 1) % order.length]) + '" data-step="1" aria-label="Next exercise">' + IC.right + '</button>' : '') + '</div>';
       /* the latest value and the best for each measure; tapping one puts it on the graph */
-      var ms = wr ? [['max', 'Top weight'], ['e1rm', 'Est. 1RM'], ['tot', 'Total']] : [['max', e.log === 'bw' ? 'Most reps' : e.log === 'time' ? 'Longest hold' : 'Longest'], ['tot', e.log === 'bw' ? 'Total reps' : 'Total time']];
+      var hi = hiRep(e), reps = hi && em === 'e1rm';
+      function oneVal(x, q) { return hi && q === 'e1rm' ? topReps(x.sets) : liftVal(e, x.sets, q, x.warm); }
+      var ms = wr ? [['max', 'Top weight'], ['e1rm', hi ? 'Best reps' : 'Est. 1RM'], ['tot', 'Total']] : [['max', e.log === 'bw' ? 'Most reps' : e.log === 'time' ? 'Longest hold' : 'Longest'], ['tot', e.log === 'bw' ? 'Total reps' : 'Total time']];
       h += '<div class="stats' + (ms.length === 2 ? ' two' : '') + '" role="group" aria-label="What to show on the graph">' + ms.map(function (q) {
-        var vs = hist.map(function (x) { return liftVal(e, x.sets, q[0], x.warm); }), lastV = vs[vs.length - 1], bestV = Math.max.apply(null, vs);
-        return '<button class="stat" type="button" data-act="lift-mode" data-v="' + q[0] + '" aria-pressed="' + (q[0] === em) + '"><small>' + q[1] + '</small><b class="num">' + big(lastV) + '<i>' + unit + '</i></b><span>best ' + big(bestV) + '</span></button>';
+        var vs = hist.map(function (x) { return oneVal(x, q[0]); }), lastV = vs[vs.length - 1], bestV = Math.max.apply(null, vs);
+        return '<button class="stat" type="button" data-act="lift-mode" data-v="' + q[0] + '" aria-pressed="' + (q[0] === em) + '"><small>' + q[1] + '</small><b class="num">' + big(lastV) + '<i>' + (hi && q[0] === 'e1rm' ? 'reps' : unit) + '</i></b><span>best ' + big(bestV) + '</span></button>';
       }).join('') + '</div>';
-      var vals = hist.map(function (x) { return liftVal(e, x.sets, em, x.warm); }), first = null, bi = 0;
+      var vals = hist.map(function (x) { return oneVal(x, em); }), first = null, bi = 0;
       vals.forEach(function (v, i) { if (first == null && v > 0) first = v; if (v > vals[bi] + 1e-9) bi = i; });
       function ch(v) { return first ? Math.round((v / first - 1) * 1000) / 10 : 0; }
       function sg(v) { return (v > 0 ? '+' : v < 0 ? '−' : '') + fmt(Math.abs(Math.round(v))) + '%'; }
-      if (liftInfo) h += '<p class="note">' + (em === 'tot' ? 'Total is ' + (wr ? 'weight × reps' : 'the ' + unit) + ' added up over every set that day.' : wr ? (em === 'max' ? 'Top weight is the heaviest weight you used in each workout.' : 'Estimated 1-rep max, from the best set of each workout: weight × (1 + reps ÷ 30). It lets sets with different weights and reps be compared.') : esc(metricLabel(e)) + ' in each workout.') +
+      if (liftInfo) h += '<p class="note">' + (em === 'tot' ? 'Total is ' + (wr ? 'weight × reps' : 'the ' + unit) + ' added up over every set that day.' : wr ? (em === 'max' ? 'Top weight is the heaviest weight you used in each workout.' : reps ? 'Best reps is the most reps at the heaviest weight of each workout. This exercise is trained past 12 reps, where an estimated 1-rep max stops meaning much.' : 'Estimated 1-rep max, from the best set of each workout: weight × (1 + reps ÷ 30), counting reps up to 12. It lets sets with different weights and reps be compared.') : esc(metricLabel(e)) + ' in each workout.') +
         ' Each tile shows the latest workout and your best; tap one to graph it. The orange ring and dashed line mark the best.' + (pct ? ' % is the change since your first workout with this exercise.' : '') + ' Tap the graph to see the sets.' + (onGraph ? ' Grey dots are the sets below the top one.' : '') + '</p>';
       h += '<div class="chart" data-chart="exc">' + lineChart('exc', hist.map(function (x, i) {
         return { x: x.date, y: pct ? ch(vals[i]) : vals[i], tip: '<b>' + fmtDate(x.date) + '</b><br>' + esc(setsText(e, onGraph ? [bestSet(e, x.sets, em)] : x.sets)) + (em === 'tot' ? '<br>Total ' + big(vals[i]) + ' ' + unit : '') + (pct ? '<br>' + sg(ch(vals[i])) + ' since the start' : '') + (i === bi && vals.length > 1 ? '<br>Your best' : '') };
@@ -2975,6 +2999,7 @@ var LIBRARY = (function () {
     h += unitRow();
     h += '<div class="setting"><div><b>Sessions per week</b></div><div class="stepper"><button type="button" data-act="goal" data-d="-1" aria-label="One fewer">−</button><b>' + s.weeklyGoal + '</b><button type="button" data-act="goal" data-d="1" aria-label="One more">+</button></div></div>';
     h += sw('outCore', 'Count runs, rides and swims', 'Toward the weekly goal. Off, they still show in the week and in History.');
+    h += '<div class="setting"><div><b>Count body weight in pull-ups and dips</b></div><button class="switch" type="button" role="switch" data-act="bwvol" aria-checked="' + (s.bwVol === false ? 'false' : 'true') + '" aria-label="Count body weight in pull-ups, chin-ups and dips"></button></div>';
     h += '<div class="setting"><div><b>Training block</b></div><button class="switch" type="button" role="switch" data-act="block-toggle" aria-checked="' + (s.blockOff ? 'false' : 'true') + '" aria-label="Training block"></button></div>';
     h += grp('During a workout');
     h += sw('autoRest', 'Start the rest timer') + sw('sound', 'Sound when rest ends', 'Your phone must not be on silent.') + sw('awake', 'Keep the screen on') + sw('rir', 'Ask for reps left in the tank');
@@ -3073,7 +3098,7 @@ var LIBRARY = (function () {
      Both windows end today and are always full, so the numbers mean the same on a Monday as on a Sunday. */
   function musData(list) {
     var four = state.ui.musWin === 'four', from = addDays(today(), four ? -27 : -6), got = {};
-    list.forEach(function (s) { if (s.date < from) return; (s.entries || []).forEach(function (en) { var e = exi(en.ex); if (e.log === 'cardio') return; Object.keys(e.muscles).forEach(function (mu) { got[mu] = (got[mu] || 0) + en.sets.length * e.muscles[mu] / (four ? 4 : 1); }); }); });
+    list.forEach(function (s) { if (s.date < from) return; (s.entries || []).forEach(function (en) { var e = exi(en.ex); if (e.log === 'cardio') return; Object.keys(e.muscles).forEach(function (mu) { got[mu] = (got[mu] || 0) + hardN(en.sets) * e.muscles[mu] / (four ? 4 : 1); }); }); });
     return { got: got, plan: planTargets(), four: four };
   }
   function muscleFigure(list) {
@@ -3906,6 +3931,7 @@ var LIBRARY = (function () {
         if (wv == null || wv < (lbw ? 66 : 30) || wv > (lbw ? 550 : 250)) { toast('Enter your weight in ' + UW() + '.'); document.getElementById('weigh-in').focus(); break; }
         var wd = today(); state.body[wd] = Object.assign({}, state.body[wd] || {}, { date: wd, weight: wv, updatedAt: Date.now() }); mark('body/' + wd); closeSheet(); render(); toast('Saved'); break; }
       case 'weigh-body': state.ui.tab = 'progress'; state.ui.prog = 'body'; saveLocal(); render(); window.scrollTo(0, 0); break;
+      case 'bwvol': state.settings.bwVol = state.settings.bwVol === false; saveSettings(); render(); settingsSheet(); break;
       case 'body-all': bodyAll = !bodyAll; render(); break;
       case 'goal-open': goalSheet(); break;
       case 'sum-all': sumAll = !sumAll; openSummary(); break;

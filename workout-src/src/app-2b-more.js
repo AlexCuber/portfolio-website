@@ -42,7 +42,7 @@
      Both windows end today and are always full, so the numbers mean the same on a Monday as on a Sunday. */
   function musData(list) {
     var four = state.ui.musWin === 'four', from = addDays(today(), four ? -27 : -6), got = {};
-    list.forEach(function (s) { if (s.date < from) return; (s.entries || []).forEach(function (en) { var e = exi(en.ex); if (e.log === 'cardio') return; Object.keys(e.muscles).forEach(function (mu) { got[mu] = (got[mu] || 0) + en.sets.length * e.muscles[mu] / (four ? 4 : 1); }); }); });
+    list.forEach(function (s) { if (s.date < from) return; (s.entries || []).forEach(function (en) { var e = exi(en.ex); if (e.log === 'cardio') return; Object.keys(e.muscles).forEach(function (mu) { got[mu] = (got[mu] || 0) + hardN(en.sets) * e.muscles[mu] / (four ? 4 : 1); }); }); });
     return { got: got, plan: planTargets(), four: four };
   }
   function muscleFigure(list) {
