@@ -405,6 +405,7 @@
         if (wv == null || wv < (lbw ? 66 : 30) || wv > (lbw ? 550 : 250)) { toast('Enter your weight in ' + UW() + '.'); document.getElementById('weigh-in').focus(); break; }
         var wd = today(); state.body[wd] = Object.assign({}, state.body[wd] || {}, { date: wd, weight: wv, updatedAt: Date.now() }); mark('body/' + wd); closeSheet(); render(); toast('Saved'); break; }
       case 'weigh-body': state.ui.tab = 'progress'; state.ui.prog = 'body'; saveLocal(); render(); window.scrollTo(0, 0); break;
+      case 'bwvol': state.settings.bwVol = state.settings.bwVol === false; saveSettings(); render(); settingsSheet(); break;
       case 'body-all': bodyAll = !bodyAll; render(); break;
       case 'goal-open': goalSheet(); break;
       case 'sum-all': sumAll = !sumAll; openSummary(); break;

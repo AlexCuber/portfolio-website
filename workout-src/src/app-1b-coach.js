@@ -211,7 +211,7 @@
     var from = addDays(ws, -28), plan = planTargets(), got = {}, weeks = {};
     list.forEach(function (s) {
       if (s.date < from || s.date >= ws) return; weeks[weekStart(s.date)] = 1;
-      (s.entries || []).forEach(function (en) { var e = exi(en.ex); if (e.log === 'cardio') return; Object.keys(e.muscles).forEach(function (mu) { got[mu] = (got[mu] || 0) + en.sets.length * e.muscles[mu] / 4; }); });
+      (s.entries || []).forEach(function (en) { var e = exi(en.ex); if (e.log === 'cardio') return; Object.keys(e.muscles).forEach(function (mu) { got[mu] = (got[mu] || 0) + hardN(en.sets) * e.muscles[mu] / 4; }); });
     });
     if (Object.keys(weeks).length >= 3) {
       var behind = LIBRARY.MUSCLES.filter(function (m) { return plan[m.id] >= 4 && (got[m.id] || 0) < 0.7 * plan[m.id]; }).sort(function (a, b) { return (got[a.id] || 0) / plan[a.id] - (got[b.id] || 0) / plan[b.id]; }).slice(0, 3);
