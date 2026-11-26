@@ -21,7 +21,7 @@ async def main():
             d = await dl.value; path = '/tmp/hilo-bk.json'; await d.save_as(path); data = json.load(open(path))
             check('backup file holds every workout', d.suggested_filename.startswith('hitit-backup-') and len(data['sessions']) == len(sd['sessions']), d.suggested_filename)
             await pg.wait_for_timeout(200); check('reminder gone after saving', await pg.query_selector('.backup-card') is None)
-            await pg.click('[data-act="settings"]'); await pg.wait_for_timeout(300); t = await pg.inner_text('#sheet'); check('settings show the last backup', 'Last backup' in t and 'nothing new since then' in t)
+            await pg.click('[data-act="settings"]'); await pg.wait_for_timeout(300); t = await pg.inner_text('#sheet .bk-st'); check('settings show the last backup', t == 'Last backup today', t)
             await pg.screenshot(path=os.path.join(SH, 'L-backup-settings.png'))
             # wipe everything, as after a reinstall, then restore from the file
             await pg.evaluate("localStorage.clear(); localStorage.setItem('noseed', '1')"); await pg.reload(); await pg.wait_for_timeout(300)

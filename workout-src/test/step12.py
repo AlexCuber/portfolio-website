@@ -167,7 +167,7 @@ async def main(only=None):
                 box = await pg.locator('[data-chart="goal"] svg').bounding_box()
                 await pg.touchscreen.tap(box['x'] + box['width'] * 0.3, box['y'] + box['height'] * 0.5); await pg.wait_for_timeout(200)
                 ok(await pg.locator('#goal-t').is_visible() and '7-day average' in await pg.locator('#goal-t').inner_text(), 'tapping the goal chart shows the value')
-                await pg.click('[data-act="settings"]'); await pg.wait_for_timeout(300)
+                await pg.click('#view .card [data-act="goal-open"]'); await pg.wait_for_timeout(300)
                 await pg.fill('#set-goalr', '0.5'); await pg.dispatch_event('#set-goalr', 'change'); await pg.wait_for_timeout(200)
                 ok(await pg.evaluate(LS + ".settings.goalRate") == 0.5, 'the target pace is a setting')
                 await shot('settings'); await pg.evaluate("document.querySelector('#scrim').click()"); await pg.wait_for_timeout(200)

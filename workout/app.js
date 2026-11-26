@@ -1445,7 +1445,7 @@ var LIBRARY = (function () {
     d.items.forEach(function (it) {
       var e = exi(it.ex), sets = rowSets(it); if (!sets.length) return;
       var en = { n: it.n, ex: it.ex, name: e.name, note: it.note || '', sets: sets }, wm = warmSets(it); if (wm.length) en.warm = wm; entries.push(en);
-      if (!d.editing) { var rc = recordsOf(it.ex, sets, d.id), tags = recordTags(e, rc, sets); if (e.sport && paceRecord(e, sets, d.id)) { var so = sumSets(sets); tags.push('fastest pace yet, ' + paceText(e, so.dist, so.dmin)); recEx[it.ex] = 'Fastest pace'; } if (tags.length) { prs.push({ name: e.name, tags: tags }); if (rc.w) recEx[it.ex] = 'Record weight'; else if (rc.b && e.sport) recEx[it.ex] = 'Longest yet'; else if (rc.b && e.log !== 'wr') recEx[it.ex] = 'Best yet'; } }
+      if (!d.editing) { var rc = recordsOf(it.ex, sets, d.id), tags = recordTags(e, rc, sets); if (e.sport && paceRecord(e, sets, d.id)) { var so = sumSets(sets); tags.push('fastest pace yet, ' + paceText(e, so.dist, so.dmin)); recEx[it.ex] = 'Fastest pace'; } if (tags.length) { prs.push({ name: e.name, tags: tags, top: e.sport || e.log === 'cardio' ? '' : setsText(e, [bestSet(e, sets, 'e1rm')]) }); if (rc.w) recEx[it.ex] = 'Record weight'; else if (rc.b && e.sport) recEx[it.ex] = 'Longest yet'; else if (rc.b && e.log !== 'wr') recEx[it.ex] = 'Best yet'; } }
     });
     if (!entries.length) return;
     var now = Date.now(), dur = d.editing ? d.dur : (function () { var x = (now - d.startedAt) / 1000; return x >= 60 && x <= 18000 ? Math.round(x) : null; })();
@@ -2125,7 +2125,7 @@ var LIBRARY = (function () {
       return h + '</div></section>';
     }
     var off = offList();
-    h += '<section class="card"><div class="plan-head"><div><h3>Your plan</h3><p class="sub">Put the sessions in the order you train them. Next up follows this order.</p></div><button class="btn quiet" type="button" data-act="plan-done">Done</button></div>';
+    h += '<section class="card"><div class="plan-head"><div><h3>Your plan</h3><p class="sub">Next up follows this order.</p></div><button class="btn quiet" type="button" data-act="plan-done">Done</button></div>';
     if (list.length) {
       h += '<ul class="list">';
       list.forEach(function (x, i) {
@@ -2168,7 +2168,7 @@ var LIBRARY = (function () {
         '<button class="btn start block" type="button" data-act="start" data-key="' + esc(key) + '">' + IC.play + 'Start ' + esc(shortName(r.name)) + '</button></section>';
     }
     var bk = STANDALONE && !planEdit ? backupState() : null;
-    if (bk && bk.due) h += '<section class="card backup-card"><div><h3>Back up your log</h3><p class="sub">' + (bk.at ? plural(bk.fresh, 'workout') + ' since your last backup on ' + fmtDate(iso(new Date(bk.at))) + '.' : 'Your ' + plural(bk.n, 'workout') + ' are stored on this phone only.') + ' A backup file lets you bring everything back if the app is removed or the phone is reset.</p></div>' +
+    if (bk && bk.due) h += '<section class="card backup-card"><div><h3>Back up your log</h3><p class="sub">' + (bk.at ? plural(bk.fresh, 'workout') + ' since your last backup on ' + fmtDate(iso(new Date(bk.at))) + '.' : 'Your ' + plural(bk.n, 'workout') + ' are stored on this phone only.') + '</p></div>' +
       '<div class="row"><button class="btn sm primary-sm" type="button" data-act="backup-save">Save backup file</button><button class="btn sm quiet" type="button" data-act="backup-later">Later</button></div></section>';
     if (!planEdit) h += weighStrip();
     h += planCard();
@@ -2773,6 +2773,15 @@ var LIBRARY = (function () {
     return h + bestsCard(list);
   }
   function measures() { var w = UW(), l = UL(); return [['weight', 'Weight', w], ['waist', 'Waist', l], ['chest', 'Chest', l], ['arm', 'Arm', l], ['thigh', 'Thigh', l]]; }
+  var bodyAll = false;
+  /* the goal weight and the pace are set on the page that shows them */
+  function goalSheet() {
+    var s = state.settings;
+    openSheet(head('Body weight goal') +
+      '<div class="setting"><div><b>Goal weight</b><small>Empty for none.</small></div><div class="fld" style="width:96px"><input id="set-goalw" type="text" inputmode="decimal" autocomplete="off" value="' + (s.goalWeight != null ? fmt(s.goalWeight) : '') + '" placeholder="' + UW() + '" aria-label="Goal body weight in ' + UW() + '"></div></div>' +
+      '<div class="setting"><div><b>Pace</b><small>' + (isLb() ? 'Pounds' : 'Kilograms') + ' a week.</small></div><div class="fld" style="width:96px"><input id="set-goalr" type="text" inputmode="decimal" autocomplete="off" value="' + fmt(s.goalRate || (isLb() ? 0.5 : 0.25)) + '" placeholder="' + (isLb() ? '0.5' : '0.25') + '" aria-label="Target pace a week"></div></div>' +
+      '<button class="btn primary block" type="button" data-act="sheet-x">Done</button>');
+  }
   function bodyView(demo) {
     var MEASURES = measures(), body = demo ? demoBody() : state.body, ms = MEASURES.filter(function (m) { return m[0] === state.ui.measure; })[0] || MEASURES[0], key = ms[0], unit = ms[2], h = '';
     h += '<div class="chips" role="group" aria-label="Measurement">' + MEASURES.map(function (m) { return '<button class="chip" type="button" data-act="measure" data-v="' + m[0] + '" aria-pressed="' + (m[0] === key) + '">' + m[1] + '</button>'; }).join('') + '</div>';
@@ -2786,19 +2795,18 @@ var LIBRARY = (function () {
         '<div class="tile"><b>' + (days >= 7 ? (diff >= 0 ? '+' : '−') + fmt(Math.abs(Math.round(diff * 10) / 10)) : '–') + '</b><span>' + (days >= 7 ? 'change in ' + days + ' days' : 'change, needs a week of entries') + '</span></div>' +
         '<div class="tile"><b>' + (days >= 7 ? (diff >= 0 ? '+' : '−') + fmt(Math.abs(Math.round(diff / days * 7 * 100) / 100)) : '–') + '</b><span>' + unit + ' per week</span></div></div>';
     }
-    if (key === 'weight' && state.settings.goalWeight && pts.length && !demo) h += goalCard(pts, trend);
+    if (key === 'weight' && !demo) h += state.settings.goalWeight && pts.length ? goalCard(pts, trend) : '<button class="act goal-set" type="button" data-act="goal-open">' + (state.settings.goalWeight ? 'Goal ' + fmt(state.settings.goalWeight) + ' ' + UW() : 'Set a goal weight') + '</button>';
     h += '<section class="card"><div class="spread"><h3>' + ms[1] + '</h3>' + (pts.length > 1 ? '<div class="legend"><span><i class="dot-k"></i>Each entry</span><span><i style="height:2px;border-radius:0;width:14px"></i>7-day average</span></div>' : '') + '</div><div class="chart" data-chart="bw">' + lineChart('bw', pts, pts.length > 1 ? trend : null) + '</div></section>';
-    h += '<section class="card"><h3>Add a measurement</h3><form class="body-form" id="body-form"><label class="wide">Date<input id="bw-d" type="date" value="' + today() + '" max="' + today() + '"></label>' +
-      '<label>Weight, ' + UW() + '<input id="bw-weight" type="text" inputmode="decimal" autocomplete="off"></label><label>Waist, ' + UL() + '<input id="bw-waist" type="text" inputmode="decimal" autocomplete="off" placeholder="optional"></label>' +
-      '<label>Chest, ' + UL() + '<input id="bw-chest" type="text" inputmode="decimal" autocomplete="off" placeholder="optional"></label><label>Arm, ' + UL() + '<input id="bw-arm" type="text" inputmode="decimal" autocomplete="off" placeholder="optional"></label>' +
-      '<label>Thigh, ' + UL() + '<input id="bw-thigh" type="text" inputmode="decimal" autocomplete="off" placeholder="optional"></label><button class="btn" type="submit" style="align-self:end">Save</button></form>' +
-      '<p class="foot">Weigh in on 3–4 mornings a week and watch the average, not single days. Measure in the same spot each time.</p></section>';
     var all = Object.keys(state.body).sort().reverse();
     if (all.length && !demo) {
       h += '<section class="card"><h3>Entries</h3><table class="hist"><tbody>';
-      all.slice(0, 12).forEach(function (k) { var b = state.body[k], parts = []; MEASURES.forEach(function (m) { if (b[m[0]] != null) parts.push(m[1].toLowerCase() + ' ' + fmt(b[m[0]]) + ' ' + m[2]); }); h += '<tr><td>' + fmtDate(k) + '</td><td>' + esc(parts.join(' · ')) + '</td><td class="del"><button class="icon-btn" type="button" data-act="body-del" data-id="' + k + '" aria-label="Delete the entry for ' + fmtDate(k) + '">' + IC.x + '</button></td></tr>'; });
-      h += '</tbody></table></section>';
+      all.slice(0, bodyAll ? 60 : 3).forEach(function (k) { var b = state.body[k], parts = []; MEASURES.forEach(function (m) { if (b[m[0]] != null) parts.push(m[1].toLowerCase() + ' ' + fmt(b[m[0]]) + ' ' + m[2]); }); h += '<tr><td>' + fmtDate(k) + '</td><td>' + esc(parts.join(' · ')) + '</td><td class="del"><button class="icon-btn" type="button" data-act="body-del" data-id="' + k + '" aria-label="Delete the entry for ' + fmtDate(k) + '">' + IC.x + '</button></td></tr>'; });
+      h += '</tbody></table>' + (all.length > 3 ? '<button class="act" type="button" data-act="body-all">' + (bodyAll ? 'Show fewer' : 'Show all ' + all.length) + '</button>' : '') + '</section>';
     }
+    h += '<section class="card"><h3>Add a measurement</h3><form class="body-form" id="body-form"><label class="wide">Date<input id="bw-d" type="date" value="' + today() + '" max="' + today() + '"></label>' +
+      '<label>Weight, ' + UW() + '<input id="bw-weight" type="text" inputmode="decimal" autocomplete="off"></label><label>Waist, ' + UL() + '<input id="bw-waist" type="text" inputmode="decimal" autocomplete="off" placeholder="optional"></label>' +
+      '<label>Chest, ' + UL() + '<input id="bw-chest" type="text" inputmode="decimal" autocomplete="off" placeholder="optional"></label><label>Arm, ' + UL() + '<input id="bw-arm" type="text" inputmode="decimal" autocomplete="off" placeholder="optional"></label>' +
+      '<label>Thigh, ' + UL() + '<input id="bw-thigh" type="text" inputmode="decimal" autocomplete="off" placeholder="optional"></label><button class="btn" type="submit" style="align-self:end">Save</button></form></section>';
     return h;
   }
   function progressView() {
@@ -2811,7 +2819,13 @@ var LIBRARY = (function () {
   /* ================= exercises tab and picker ================= */
   var libQ = '';
   function matchEx(e, q) { if (!q) return true; var hay = (e.name + ' ' + e.equip + ' ' + e.group + ' ' + muscleNames(e).join(' ')).toLowerCase(); return q.toLowerCase().split(/\s+/).every(function (t) { return hay.indexOf(t) >= 0; }); }
+  function bestMap() {
+    var m = {};
+    finished().forEach(function (s) { (s.entries || []).forEach(function (en) { var e = exi(en.ex); if (!en.sets || !en.sets.length || e.sport || e.log === 'cardio') return; var b = bestSet(e, en.sets, 'e1rm'), v = metric(e, [b]); if (!m[en.ex] || v > m[en.ex].v) m[en.ex] = { v: v, t: setsText(e, [b]) }; }); });
+    return m;
+  }
   function libRows(filter, q, mode) {
+    var bests = mode ? {} : bestMap();
     var list = allEx().filter(function (e) { return matchEx(e, q) && (filter === 'all' || filter === 'logged' || e.group === filter); }), h = '';
     if (mode === 'tile') { var have = outList(), keep = picker && picker.i >= 0 ? have[picker.i] : null; list = list.filter(function (e) { return e.log === 'cardio' && (have.indexOf(e.id) < 0 || e.id === keep); }); }
     if (filter === 'logged') { var has = {}; finished().forEach(function (s) { (s.entries || []).forEach(function (en) { has[en.ex] = 1; }); }); list = list.filter(function (e) { return has[e.id]; }); }
@@ -2821,7 +2835,7 @@ var LIBRARY = (function () {
       if (!rows.length) return;
       h += '<div class="lib-head"><span>' + g + '</span><small>' + rows.length + '</small></div>';
       rows.forEach(function (e) {
-        h += '<button class="lib-row" type="button" data-act="' + (mode ? 'pick' : 'open-ex') + '" data-ex="' + esc(e.id) + '"><span class="thumb">' + illoSvg(e.illo) + '</span><span><b>' + esc(e.name) + '</b><small>' + esc(exSub(e)) + '</small></span>' + (mode ? '<span class="plus" aria-hidden="true">' + (mode === 'lift' ? '›' : '+') + '</span>' : '<span class="chev" aria-hidden="true">›</span>') + '</button>';
+        h += '<button class="lib-row" type="button" data-act="' + (mode ? 'pick' : 'open-ex') + '" data-ex="' + esc(e.id) + '"><span class="thumb">' + illoSvg(e.illo) + '</span><span><b>' + esc(e.name) + '</b><small>' + esc(exSub(e)) + '</small></span>' + (mode ? '<span class="plus" aria-hidden="true">' + (mode === 'lift' ? '›' : '+') + '</span>' : (bests[e.id] ? '<span class="lib-best">' + esc(bests[e.id].t) + '</span>' : '<span class="chev" aria-hidden="true">›</span>')) + '</button>';
       });
     });
     return h;
@@ -2835,18 +2849,19 @@ var LIBRARY = (function () {
     if (!state.ui.libPlan) { state.ui.libPlan = 1; if (routineList().length) state.ui.lib = 'mine'; saveLocal(); }
     var f = state.ui.lib || 'all', h = searchBox('lib-q', libQ) + chipsHtml(f, 'lib', [['mine', 'In my plan']]);
     if (f === 'mine' && !libQ) {
+      var gb = bestMap();
       routineList().forEach(function (r) {
         h += '<section class="card"><div><h2>' + esc(r.name) + '</h2>' + (r.focus ? '<p class="sub">' + esc(r.focus) + '</p>' : '') + '</div><div class="guide">';
         r.items.forEach(function (it) {
           var e = exi(it.ex);
           h += '<button class="g-item" type="button" data-act="open-ex" data-ex="' + esc(it.ex) + '" data-rk="' + esc(r.id) + '"><div class="illo">' + illoSvg(e.illo, null, true) + '</div><div><div class="g-name">' + (it.n ? '<span class="exc-n">' + esc(it.n) + '</span>' : '') + esc(e.name) + '</div>' +
-            (it.detail ? '<div class="g-detail">' + esc(it.detail) + '</div>' : '') + '<p class="g-cue">' + esc(it.cue || e.cue) + '</p><p class="g-meta">' + esc(targetOf(it, e)) + '</p></div></button>';
+            (it.detail ? '<div class="g-detail">' + esc(it.detail) + '</div>' : '') + '<p class="g-cue">' + esc(it.cue || e.cue) + '</p><p class="g-meta">' + esc(targetOf(it, e)) + '</p>' + (gb[it.ex] ? '<p class="g-best">Best ' + esc(gb[it.ex].t) + '</p>' : '') + '</div></button>';
         });
         h += '</div></section>';
       });
     } else h += '<div id="lib-list">' + libRows(f === 'mine' ? 'all' : f, libQ, null) + '</div>';
     h += '<button class="add-ex" type="button" data-act="create-ex">+ Create your own exercise</button>' +
-      '<p class="foot">Orange marks the muscles doing most of the work. The figures are simplified sketches of each movement.</p>';
+      '';
     return h;
   }
 
@@ -2907,7 +2922,7 @@ var LIBRARY = (function () {
       '<label class="fld">Workout date<input id="draft-date" type="date" value="' + esc(d.date) + '" max="' + today() + '"></label>' +
       '<label class="fld">Start time<input id="clock-t" type="time" value="' + pad(st.getHours()) + ':' + pad(st.getMinutes()) + '"></label>' +
       '<div class="row"><button class="btn" type="button" data-act="clock-set">Use this time</button><button class="btn" type="button" data-act="clock-now">Restart from now</button></div>' +
-      '<p class="foot">A workout is saved under the day of its first set unless you pick a date here. The clock keeps running if you close the app.</p>');
+      '');
   }
   function pickerSheet() {
     var p = picker, title = { draft: 'Add exercise', replace: 'Replace exercise', editor: 'Add exercise', lift: 'Choose exercise', tile: 'Choose a workout' }[p.mode], h = '';
@@ -2951,20 +2966,26 @@ var LIBRARY = (function () {
   }
   function settingsSheet() {
     var s = state.settings, h = head('Settings');
-    h += '<div class="setting stack"><div><b>Appearance</b><small>Automatic follows your phone.</small></div><div class="seg" role="group" aria-label="Appearance">' + [['auto', 'Automatic'], ['light', 'Light'], ['dark', 'Dark']].map(function (t) { return '<button type="button" data-act="theme" data-v="' + t[0] + '" aria-pressed="' + (s.theme === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div></div>';
+    function grp(t, side) { return '<div class="set-g"><h3>' + t + '</h3>' + (side || '') + '</div>'; }
+    function sw(key, title, sub) { return '<div class="setting"><div><b>' + title + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</div><button class="switch" type="button" role="switch" data-act="toggle" data-k="' + key + '" aria-checked="' + (s[key] ? 'true' : 'false') + '" aria-label="' + title + '"></button></div>'; }
+    h += grp('Look');
+    h += '<div class="setting stack"><div><b>Appearance</b></div><div class="seg" role="group" aria-label="Appearance">' + [['auto', 'Automatic'], ['light', 'Light'], ['dark', 'Dark']].map(function (t) { return '<button type="button" data-act="theme" data-v="' + t[0] + '" aria-pressed="' + (s.theme === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div></div>';
     h += '<div class="setting stack"><div><b>Theme</b></div><div class="pal" role="group" aria-label="Theme">' + PALETTES.map(function (p) { return '<button type="button" data-act="palette" data-v="' + p[0] + '" aria-pressed="' + ((s.palette || '') === p[0]) + '"><span class="pal-sw" style="background-image:linear-gradient(135deg, ' + p[2] + ')" aria-hidden="true"></span><span>' + p[1] + '</span></button>'; }).join('') + '</div></div>';
+    h += grp('Training');
     h += unitRow();
-    h += '<div class="setting"><div><b>Sessions per week</b><small>Your weekly goal.</small></div><div class="stepper"><button type="button" data-act="goal" data-d="-1" aria-label="One fewer">−</button><b>' + s.weeklyGoal + '</b><button type="button" data-act="goal" data-d="1" aria-label="One more">+</button></div></div>';
-    h += '<div class="setting"><div><b>Training block</b><small>Twelve weeks that end in an easy week.</small></div><button class="switch" type="button" role="switch" data-act="block-toggle" aria-checked="' + (s.blockOff ? 'false' : 'true') + '" aria-label="Training block"></button></div>';
-    function sw(key, title, sub) { return '<div class="setting"><div><b>' + title + '</b><small>' + sub + '</small></div><button class="switch" type="button" role="switch" data-act="toggle" data-k="' + key + '" aria-checked="' + (s[key] ? 'true' : 'false') + '" aria-label="' + title + '"></button></div>'; }
-    h += sw('autoRest', 'Start the rest timer', 'When you tick a set.') + sw('sound', 'Sound when rest ends', 'A short beep. Your phone must not be on silent.') + sw('awake', 'Keep the screen on', 'During a workout, where the phone allows it.') + sw('outCore', 'Count runs, rides and swims toward the weekly goal', 'Off, they still show in the week and in History, in their own colour.') + sw('rir', 'Ask for reps left in the tank', 'After each set, tap how many more reps you had in you. Three or more on every set raises the next target.');
-    h += '<div class="setting"><div><b>Goal body weight</b><small>Shown on the Body page. Leave empty for none.</small></div><div class="fld" style="width:96px"><input id="set-goalw" type="text" inputmode="decimal" autocomplete="off" value="' + (s.goalWeight != null ? fmt(s.goalWeight) : '') + '" placeholder="' + UW() + '" aria-label="Goal body weight in ' + UW() + '"></div></div>';
-    h += '<div class="setting"><div><b>Target pace</b><small>Kilograms a week toward your goal weight.</small></div><div class="fld" style="width:96px"><input id="set-goalr" type="text" inputmode="decimal" autocomplete="off" value="' + fmt(s.goalRate || (isLb() ? 0.5 : 0.25)) + '" placeholder="' + (isLb() ? '0.5' : '0.25') + '" aria-label="Target pace in ' + UW() + ' per week"></div></div>';
-    h += '<div class="setting stack"><div><b>Backup</b><small>' + (STANDALONE ? 'Everything is stored on this phone only. ' + (function () { var b = backupState(); return b.at ? 'Last backup ' + fmtDate(iso(new Date(b.at))) + (b.fresh ? ', ' + plural(b.fresh, 'workout') + ' since then.' : ', nothing new since then.') : 'No backup made yet.'; })() + ' To bring a backup back, use Restore from file.' : 'Your log syncs through Claude. A backup lets you move it elsewhere.') + '</small></div>' +
+    h += '<div class="setting"><div><b>Sessions per week</b></div><div class="stepper"><button type="button" data-act="goal" data-d="-1" aria-label="One fewer">−</button><b>' + s.weeklyGoal + '</b><button type="button" data-act="goal" data-d="1" aria-label="One more">+</button></div></div>';
+    h += sw('outCore', 'Count runs, rides and swims', 'Toward the weekly goal. Off, they still show in the week and in History.');
+    h += '<div class="setting"><div><b>Training block</b></div><button class="switch" type="button" role="switch" data-act="block-toggle" aria-checked="' + (s.blockOff ? 'false' : 'true') + '" aria-label="Training block"></button></div>';
+    h += grp('During a workout');
+    h += sw('autoRest', 'Start the rest timer') + sw('sound', 'Sound when rest ends', 'Your phone must not be on silent.') + sw('awake', 'Keep the screen on') + sw('rir', 'Ask for reps left in the tank');
+    /* the state of the backup is in the heading, orange when one is due (S4) */
+    var bs = backupState(), bdays = bs.at ? Math.floor((Date.now() - bs.at) / 864e5) : null, late = bs.due || (!bs.at && bs.n >= 3);
+    h += grp('Your data', STANDALONE ? '<span class="bk-st' + (late ? ' late' : '') + '">' + (bs.at ? 'Last backup ' + (bdays === 0 ? 'today' : bdays === 1 ? 'yesterday' : bdays + ' days ago') : 'No backup yet') + '</span>' : '<span class="bk-st">Synced through Claude</span>');
+    h += '<div class="setting stack">' +
       '<div class="row">' + (STANDALONE ? '<button class="btn sm" type="button" data-act="backup-save">Save backup file</button>' : '') + '<button class="btn sm" type="button" data-act="backup-show">Show backup text</button><label class="btn sm">Restore from file<input id="backup-file" type="file" accept=".json,application/json,text/plain" hidden></label></div>' +
       '<div id="backup-box" hidden><textarea class="backup" id="backup-text" spellcheck="false" aria-label="Backup text"></textarea><div class="row"><button class="btn sm" type="button" data-act="backup-copy">Copy</button><button class="btn sm" type="button" data-act="backup-restore">Restore from this text</button></div></div></div>';
     var bn = binList(), cp = copyInfo();
-    if (bn.length || cp) h += '<div class="setting stack"><div><b>Safety net</b><small>' + (cp ? 'Weekly copy: ' + fmtDate(iso(new Date(cp.at))) + ', ' + plural(cp.n, 'workout') + '. ' : '') + (bn.length ? 'Deleted workouts are kept ' + BIN_DAYS + ' days.' : '') + '</small></div>' +
+    if (bn.length || cp) h += '<div class="setting stack"><div><small>' + (cp ? 'Weekly copy: ' + fmtDate(iso(new Date(cp.at))) + ', ' + plural(cp.n, 'workout') + '. ' : '') + (bn.length ? 'Deleted workouts are kept ' + BIN_DAYS + ' days.' : '') + '</small></div>' +
       '<div class="row">' + (bn.length ? '<button class="btn sm" type="button" data-act="bin-open">Deleted workouts (' + bn.length + ')</button>' : '') + (cp ? '<button class="btn sm" type="button" data-act="copy-restore">' + (armed === 'copy' ? 'Tap again to restore' : 'Restore copy') + '</button>' : '') + '</div></div>';
     h += '<p class="foot">Hitit · ' + allEx().length + ' exercises · ' + Object.keys(state.sessions).length + ' workouts saved</p>';
     openSheet(h);
@@ -2974,6 +2995,7 @@ var LIBRARY = (function () {
     var doc = state.sessions[s.id], h = '<div class="done-hero"><span class="label">' + (s.edited ? 'Changes saved' : 'Workout complete') + '</span><div class="big gtext">' + esc(s.name) + '</div><p class="sub">' + (doc ? fmtDate(doc.date) : '') + '</p></div>';
     var c = s.cmp, dT = c && c.durDiff != null && s.dur ? (c.durDiff === 0 ? 'same as last time' : Math.abs(c.durDiff) + ' min ' + (c.durDiff < 0 ? 'shorter' : 'longer')) : '', dV = c && c.volPct != null ? (c.volPct === 0 ? 'same as last time' : (c.volPct > 0 ? 'up ' : 'down ') + Math.abs(c.volPct) + '%') : '';
     h += outTiles(doc, dT) || '<div class="tiles three"><div class="tile"><b>' + (s.dur ? fmtClock(s.dur) : '–') + '</b><span>time' + (dT ? '<em>' + dT + '</em>' : '') + '</span></div><div class="tile"><b>' + s.sets + '</b><span>sets</span></div><div class="tile"><b>' + compact(s.vol) + '</b><span>' + UW() + ' lifted' + (dV ? '<em>' + dV + '</em>' : '') + '</span></div></div>';
+    if (c && s.prs.length) h += '<div class="pills rec-row">' + s.prs.map(function (p) { return '<span class="pill hot">' + IC.star + esc(p.name) + (p.top ? ' <b>' + esc(p.top) + '</b>' : '') + '</span>'; }).join('') + '</div>';
     if (c) h += cmpHtml(s);
     else if (s.prs.length || s.volRec) {
       h += '<div><h3>' + (s.prs.length ? plural(s.prs.length, 'exercise') + ' with a record' : 'A record') + '</h3></div><div class="pr-list">';
@@ -2983,7 +3005,7 @@ var LIBRARY = (function () {
     }
     if (s.fresh && s.fresh.length) h += '<div class="pills">' + s.fresh.map(function (m) { return '<span class="pill hot">Milestone: ' + m.show + (m.unit === 't' ? ' t' : '') + ' ' + esc(m.label.toLowerCase()) + '</span>'; }).join('') + '</div>';
     var fun = !s.edited && funVolume(s.vol); if (fun) h += '<p class="done-fun">' + esc(fun) + '</p>';
-    if (s.offer === 'update') h += '<button class="btn block" type="button" data-act="sum-update">Update ' + esc(s.name) + ' to match today</button><p class="foot">You did different exercises from the saved session. Updating changes it for next time.</p>';
+    if (s.offer === 'update') h += '<button class="btn block" type="button" data-act="sum-update">Update ' + esc(s.name) + ' to match today</button>';
     if (s.offer === 'save') h += '<button class="btn block" type="button" data-act="sum-save">Save these exercises as a session</button>';
     h += '<button class="btn primary block" type="button" data-act="sheet-x">Done</button>';
     openSheet(h);
@@ -3163,12 +3185,13 @@ var LIBRARY = (function () {
     same: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>',
     'new': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg>'
   };
+  var sumAll = false;
   function cmpHtml(s) {
     var c = s.cmp; if (!c) return '';
     var doc = state.sessions[s.id], sporty = !!(doc && allSport(doc));
-    var h = '<div><h3>Compared with last time</h3><p class="sub">Your last ' + esc(s.name) + ' was on ' + fmtDate(c.date) + '.' + (c.n && !sporty ? ' ' + c.up + ' of ' + plural(c.n, 'exercise') + ' improved.' : '') + '</p></div><ul class="cmp">';
-    c.rows.forEach(function (r) { h += '<li><span class="txt"><b>' + esc(r.name) + '</b><small>' + esc(r.sets) + '</small></span><span class="delta ' + r.st + '">' + DELTA_IC[r.st] + esc(r.label) + '</span></li>'; });
-    h += '</ul>';
+    var down = c.rows.filter(function (r) { return r.st === 'down'; }).length, fold = !down && c.rows.length > 2 && !sumAll;
+    var h = '<div class="spread"><div><h3>' + (c.n && !sporty ? c.up + ' of ' + c.n + ' improved' : 'Compared with last time') + '</h3><p class="sub">Since ' + fmtDate(c.date) + '</p></div>' + (!down && c.rows.length > 2 ? '<button class="act" type="button" data-act="sum-all">' + (sumAll ? 'Hide' : 'Show all') + '</button>' : '') + '</div>';
+    if (!fold) { h += '<ul class="cmp">'; c.rows.forEach(function (r) { h += '<li><span class="txt"><b>' + esc(r.name) + '</b><small>' + esc(r.sets) + '</small></span><span class="delta ' + r.st + '">' + DELTA_IC[r.st] + esc(r.label) + '</span></li>'; }); h += '</ul>'; }
     if (s.volRec) h += '<div class="pills"><span class="pill hot">' + IC.star + 'Most weight lifted in ' + esc(/^[aeiou]/i.test(s.name) ? 'an ' : 'a ') + esc(s.name) + ' workout</span></div>';
     if (sporty) return h + '<p class="note"><b>Next time.</b> Match today, or go a little further.</p>';
     h += '<p class="note"><b>Next time.</b> ' + (c.next.length ? esc(c.next.slice(0, 3).join('. ')) + (c.next.length > 3 ? ', and ' + (c.next.length - 3) + ' more.' : '.') : 'The weights stay as they are. Aim for one more rep where you can.') + '</p>';
@@ -3249,12 +3272,12 @@ var LIBRARY = (function () {
     else txt = (g.far ? 'At your pace ' + goalT + ' is more than two years away. ' : 'At your pace you reach ' + goalT + ' around ' + aboutWhen(g.etaPace) + '. ') + (g.st === 'on' ? '' : target) +
       (g.st === 'fast' ? (g.dir > 0 ? ' Gaining faster than the target tends to add more fat than muscle.' : ' Losing faster than the target makes it harder to keep muscle.') : '');
     var pace = g.pace == null ? '–' : (g.pace >= 0 ? '+' : '−') + fmt(Math.abs(Math.round(g.pace * 100) / 100));
-    var h = '<section class="card"><div class="spread"><h3>Body weight goal</h3>' + (ST[1] ? '<span class="pill ' + ST[0] + '">' + ST[1] + '</span>' : '') + '</div>' +
-      '<div class="goal-head"><b>' + (g.st === 'done' ? fmt(Math.round(g.now * 10) / 10) + ' ' + UW() + '' : fmt(Math.round(g.left * 10) / 10) + ' ' + UW() + ' to ' + (g.dir > 0 ? 'gain' : 'lose')) + '</b><span>' + fmt(Math.round(g.now * 10) / 10) + ' ' + UW() + ' now, goal ' + goalT + (g.pace == null ? '' : ', ' + pace + ' ' + UW() + ' a week over the last ' + Math.round(g.days / 7) + ' weeks') + '</span></div>';
+    var h = '<section class="card"><div class="spread"><h3>Body weight goal</h3><span class="row">' + (ST[1] ? '<span class="pill ' + ST[0] + '">' + ST[1] + '</span>' : '') + '<button class="act" type="button" data-act="goal-open">Edit</button></span></div>' +
+      '<div class="goal-head"><b>' + (g.st === 'done' ? fmt(Math.round(g.now * 10) / 10) + ' ' + UW() + '' : fmt(Math.round(g.left * 10) / 10) + ' ' + UW() + ' to ' + (g.dir > 0 ? 'gain' : 'lose')) + '</b><span>7-day average ' + fmt(Math.round(g.now * 10) / 10) + ' ' + UW() + ', goal ' + goalT + (g.pace == null ? '' : ', ' + pace + ' ' + UW() + ' a week over the last ' + Math.round(g.days / 7) + ' weeks') + '</span></div>';
     if (g.st !== 'done') h += '<div class="chart" data-chart="goal">' + goalChart('goal', pts, trend, g) + '</div><div class="legend"><span><i class="ln-k"></i>7-day average</span>' + (g.etaPace ? '<span><i class="ln-k dash"></i>At your pace</span>' : '') + (g.etaRate ? '<span><i class="ln-k dash grey"></i>At the target pace</span>' : '') + '</div>';
     h += '<p class="sub">' + esc(txt) + '</p>';
     var wn = waistNote(state.body); if (wn) h += '<p class="note">' + esc(wn) + '</p>';
-    return h + '<p class="foot">“Now” is the average of your last seven days. The goal and the target pace are in settings.</p></section>';
+    return h + '</section>';
   }
 
 
@@ -3326,7 +3349,7 @@ var LIBRARY = (function () {
       });
       h += '</ul>';
     } else h += '<p class="sub">Nothing close enough in the library for the same muscles.</p>';
-    h += '<button class="btn block" type="button" data-act="ex-replace" data-u="' + u + '">Browse all exercises</button><p class="foot">Only today’s workout changes. The sets and rep range of this slot are kept. After the workout you can choose to update the saved session.</p>';
+    h += '<button class="btn block" type="button" data-act="ex-replace" data-u="' + u + '">Browse all exercises</button><p class="foot">Only today’s workout changes.</p>';
     openSheet(h);
   }
 
@@ -3369,7 +3392,7 @@ var LIBRARY = (function () {
   /* settings: switching units converts what is logged, so it asks once */
   function unitRow() {
     var s = state.settings, cur = s.unit === 'lb' ? 'lb' : 'kg', other = cur === 'kg' ? 'lb' : 'kg', n = Object.keys(state.sessions).length + Object.keys(state.body).length;
-    var h = '<div class="setting stack"><div><b>Units</b><small>' + (cur === 'lb' ? 'Pounds and inches.' : 'Kilograms and centimetres.') + '</small></div><div class="seg" role="group" aria-label="Units"><button type="button" data-act="unit" data-v="kg" aria-pressed="' + (cur === 'kg') + '">Kilograms</button><button type="button" data-act="unit" data-v="lb" aria-pressed="' + (cur === 'lb') + '">Pounds</button></div>';
+    var h = '<div class="setting stack"><div><b>Units</b></div><div class="seg" role="group" aria-label="Units"><button type="button" data-act="unit" data-v="kg" aria-pressed="' + (cur === 'kg') + '">Kilograms</button><button type="button" data-act="unit" data-v="lb" aria-pressed="' + (cur === 'lb') + '">Pounds</button></div>';
     if (armed === 'unit') h += '<p class="note">' + (state.draft ? 'Finish or discard the workout in progress first.' : 'This converts your ' + n + ' saved ' + (n === 1 ? 'entry' : 'entries') + ' to ' + (other === 'lb' ? 'pounds and inches' : 'kilograms and centimetres') + ', rounded to the nearest quarter. Tap ' + (other === 'lb' ? 'Pounds' : 'Kilograms') + ' again to go ahead.') + '</p>';
     return h + '</div>';
   }
@@ -3396,7 +3419,7 @@ var LIBRARY = (function () {
   function outCard(f) {
     var ws = weekStart(today()), wk = {}, bits = [], tiles = outList(), h = '';
     if (outEdit) {
-      h += '<section class="card"><div class="plan-head"><div><h3>Endurance</h3><p class="sub">Each one starts a workout in one tap. Up to six fit here.</p></div><button class="btn quiet" type="button" data-act="out-edit" data-v="0">Done</button></div>';
+      h += '<section class="card"><div class="plan-head"><div><h3>Endurance</h3></div><button class="btn quiet" type="button" data-act="out-edit" data-v="0">Done</button></div>';
       if (tiles.length) {
         h += '<ul class="list">';
         tiles.forEach(function (id, i) {
@@ -3462,7 +3485,7 @@ var LIBRARY = (function () {
     h += '<section class="card"><div><h3>Distance per week</h3><p class="sub">' + D(total) + ' ' + u + ' in ' + mmss(mins) + ' so far.</p></div><div class="chart out" data-chart="ew">' +
       colChart('ew', weeks, { label: 'Distance per week for the last 12 weeks, in ' + u, tip: function (w) { return '<b>Week of ' + fmtDate(w.start, true) + '</b><br>' + D(w.a) + ' ' + u; } }) + '</div></section>';
     var pts = log.filter(function (x) { return x.dist > 0 && x.dmin > 0; }).map(function (x) { return { x: x.date, y: paceVal(e, x.dist, x.dmin), tip: '<b>' + fmtDate(x.date) + '</b><br>' + distText(e, x.dist) + ' in ' + mmss(x.dmin) + '<br>' + paceText(e, x.dist, x.dmin) }; });
-    if (pts.length > 1) h += '<section class="card"><div><h3>' + (cur === 'ride' ? 'Speed' : 'Pace') + '</h3><p class="sub">' + (cur === 'ride' ? 'Average speed of each ride, in ' + paceUnit(e) + '. Higher is faster.' : 'Average pace of each ' + word + ', per ' + (sw ? '100 ' + u : u) + '. Lower is faster.') + '</p></div><div class="chart out" data-chart="ep">' +
+    if (pts.length > 1) h += '<section class="card"><div><h3>' + (cur === 'ride' ? 'Speed' : 'Pace') + '</h3><p class="sub">' + (cur === 'ride' ? paceUnit(e) + ' · higher is faster' : 'per ' + (sw ? '100 ' + u : u) + ' · lower is faster') + '</p></div><div class="chart out" data-chart="ep">' +
       lineChart('ep', pts, null, { out: true, fmt: function (v) { return paceFmt(e, v); } }) + '</div></section>';
     h += '<section class="card"><h3>Bests</h3><ul class="list">' +
       '<li><button class="item" type="button" data-act="open-session" data-id="' + esc(longest.id) + '"><span class="txt"><b>Longest ' + word + '</b><small>' + fmtDate(longest.date) + '</small></span><span class="num">' + esc(distText(e, longest.dist)) + '</span></button></li>' +
@@ -3883,6 +3906,9 @@ var LIBRARY = (function () {
         if (wv == null || wv < (lbw ? 66 : 30) || wv > (lbw ? 550 : 250)) { toast('Enter your weight in ' + UW() + '.'); document.getElementById('weigh-in').focus(); break; }
         var wd = today(); state.body[wd] = Object.assign({}, state.body[wd] || {}, { date: wd, weight: wv, updatedAt: Date.now() }); mark('body/' + wd); closeSheet(); render(); toast('Saved'); break; }
       case 'weigh-body': state.ui.tab = 'progress'; state.ui.prog = 'body'; saveLocal(); render(); window.scrollTo(0, 0); break;
+      case 'body-all': bodyAll = !bodyAll; render(); break;
+      case 'goal-open': goalSheet(); break;
+      case 'sum-all': sumAll = !sumAll; openSummary(); break;
       case 'body-del': delete state.body[a.dataset.id]; mark('body/' + a.dataset.id); render(); break;
       case 'lib': state.ui.lib = a.dataset.key; saveLocal(); render(); break;
       case 'pick-group': if (picker) { picker.group = a.dataset.key; pickerSheet(); } break;

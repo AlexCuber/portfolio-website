@@ -70,7 +70,7 @@ async def main():
                 await pg.click('[data-act="tick"][data-u="%s"][data-i="0"]' % u); await pg.fill('#d-%s-0' % u, '6'); await pg.fill('#r-%s-0' % u, '32'); await pg.fill('#s-%s-0' % u, ''); await pg.click('[data-act="tick"][data-u="%s"][data-i="0"]' % u); await pg.wait_for_timeout(150)
                 tt = await pg.locator('#toast').inner_text() if await pg.locator('#toast').count() else ''; ok('6 km' in tt and 'min' not in tt, 'the record toast speaks in distance: %s' % tt.replace('\n', ' '))
                 await finish(pg); t = await pg.locator('.sheet').inner_text()
-                ok('your last run was on' in t.lower() and ('Longest yet' in t or 'Fastest pace' in t), 'the summary compares with the last run and marks the record')
+                ok('compared with last time' in t.lower() and 'since ' in t.lower() and ('Longest yet' in t or 'Fastest pace' in t), 'the summary compares with the last run and marks the record')
                 ok('weights' not in t and 'go a little further' in t, 'and its closing line is about the run, not about weights')
                 await shot('summary2'); await pg.click('[data-act="sheet-x"]'); await pg.wait_for_timeout(250)
                 # ---- stopwatch on a ride
@@ -124,7 +124,7 @@ async def main():
                 box = await pg.locator('[data-chart="ep"] svg').bounding_box(); await pg.touchscreen.tap(box['x'] + box['width'] * 0.5, box['y'] + box['height'] * 0.5); await pg.wait_for_timeout(200)
                 ok(await pg.locator('#ep-t').is_visible() and '/km' in await pg.locator('#ep-t').inner_text(), 'tapping the pace chart shows that run')
                 await pg.click('[data-act="sport"][data-v="ride"]'); await pg.wait_for_timeout(900); t = await pg.locator('#view').inner_text()
-                ok('km/h' in t and 'Higher is faster' in t and '60 km' in t, 'rides read in km/h'); await shot('endurance-ride', True)
+                ok('km/h' in t and 'higher is faster' in t and '60 km' in t, 'rides read in km/h'); await shot('endurance-ride', True)
                 await pg.click('[data-act="sport"][data-v="swim"]'); await pg.wait_for_timeout(500)
                 ok('no swims logged yet' in (await pg.locator('#view').inner_text()).lower() and await pg.locator('[data-act="start"][data-key="out-swim"]').count() == 1, 'a sport with nothing logged explains itself and offers to log one'); await shot('endurance-empty')
                 await pg.click('[data-act="prog"][data-v="lifts"]'); await pg.wait_for_timeout(800); t = await pg.locator('#view').inner_text()

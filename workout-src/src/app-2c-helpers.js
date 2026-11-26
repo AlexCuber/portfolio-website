@@ -67,7 +67,7 @@
       });
       h += '</ul>';
     } else h += '<p class="sub">Nothing close enough in the library for the same muscles.</p>';
-    h += '<button class="btn block" type="button" data-act="ex-replace" data-u="' + u + '">Browse all exercises</button><p class="foot">Only today’s workout changes. The sets and rep range of this slot are kept. After the workout you can choose to update the saved session.</p>';
+    h += '<button class="btn block" type="button" data-act="ex-replace" data-u="' + u + '">Browse all exercises</button><p class="foot">Only today’s workout changes.</p>';
     openSheet(h);
   }
 
@@ -110,7 +110,7 @@
   /* settings: switching units converts what is logged, so it asks once */
   function unitRow() {
     var s = state.settings, cur = s.unit === 'lb' ? 'lb' : 'kg', other = cur === 'kg' ? 'lb' : 'kg', n = Object.keys(state.sessions).length + Object.keys(state.body).length;
-    var h = '<div class="setting stack"><div><b>Units</b><small>' + (cur === 'lb' ? 'Pounds and inches.' : 'Kilograms and centimetres.') + '</small></div><div class="seg" role="group" aria-label="Units"><button type="button" data-act="unit" data-v="kg" aria-pressed="' + (cur === 'kg') + '">Kilograms</button><button type="button" data-act="unit" data-v="lb" aria-pressed="' + (cur === 'lb') + '">Pounds</button></div>';
+    var h = '<div class="setting stack"><div><b>Units</b></div><div class="seg" role="group" aria-label="Units"><button type="button" data-act="unit" data-v="kg" aria-pressed="' + (cur === 'kg') + '">Kilograms</button><button type="button" data-act="unit" data-v="lb" aria-pressed="' + (cur === 'lb') + '">Pounds</button></div>';
     if (armed === 'unit') h += '<p class="note">' + (state.draft ? 'Finish or discard the workout in progress first.' : 'This converts your ' + n + ' saved ' + (n === 1 ? 'entry' : 'entries') + ' to ' + (other === 'lb' ? 'pounds and inches' : 'kilograms and centimetres') + ', rounded to the nearest quarter. Tap ' + (other === 'lb' ? 'Pounds' : 'Kilograms') + ' again to go ahead.') + '</p>';
     return h + '</div>';
   }

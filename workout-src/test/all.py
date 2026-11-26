@@ -14,7 +14,7 @@ def failed(rc, out):
         if m and m.group(2) != '[]': return True
     return False
 ROOT = os.path.dirname(os.path.abspath(__file__)); TOP = os.path.dirname(ROOT)
-TESTS = ['run.py basic', 'run.py editor', 'run.py migrate', 'run.py sync', 'safesave.py', 'worklist.py', 'train.py', 'overview.py', 'targets.py', 'block.py', 'undo.py', 'backup.py', 'offline.py', 'dates.py', 'plan.py', 'warmup.py',
+TESTS = ['run.py basic', 'run.py editor', 'run.py migrate', 'run.py sync', 'safesave.py', 'worklist.py', 'train.py', 'overview.py', 'targets.py', 'block.py', 'undo.py', 'sweep.py', 'backup.py', 'offline.py', 'dates.py', 'plan.py', 'warmup.py',
          'workout_nav.py', 'restbar.py', 'progbar.py', 'endurance.py', 'tiles_history.py', 'tod.py', 'lifts.py', 'liftnav.py', 'look.py', 'widths.py']
 want = sys.argv[1:]; bad = []; t00 = time.time()
 for t in TESTS:

@@ -146,7 +146,7 @@ async def flow_sync(ctx, shot):
     await pg.click('[data-act="sum-save"]'); await pg.wait_for_timeout(300); await pg.click('[data-act="sheet-x"]'); await pg.wait_for_timeout(200)
     await tab(pg, 'progress'); await pg.click('[data-act="prog"][data-v="body"]'); await pg.wait_for_timeout(200)
     await pg.fill('#bw-weight', '80.4'); await pg.fill('#bw-waist', '84'); await pg.click('#body-form button[type=submit]'); await pg.wait_for_timeout(300)
-    await pg.click('[data-act="settings"]') if await pg.query_selector('#bar:not([hidden]) [data-act="settings"]') else None
+    await pg.click('[data-act="goal-open"]'); await pg.wait_for_timeout(200)
     await pg.fill('#set-goalw', '85'); await pg.dispatch_event('#set-goalw', 'change'); await pg.click('[data-act="sheet-x"]'); await pg.wait_for_timeout(300)
     await shot(pg, 's-body')
     # edit a built-in session, then start it; open a saved workout, edit and save it

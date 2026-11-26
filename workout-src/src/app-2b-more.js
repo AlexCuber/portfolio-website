@@ -154,12 +154,13 @@
     same: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>',
     'new': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg>'
   };
+  var sumAll = false;
   function cmpHtml(s) {
     var c = s.cmp; if (!c) return '';
     var doc = state.sessions[s.id], sporty = !!(doc && allSport(doc));
-    var h = '<div><h3>Compared with last time</h3><p class="sub">Your last ' + esc(s.name) + ' was on ' + fmtDate(c.date) + '.' + (c.n && !sporty ? ' ' + c.up + ' of ' + plural(c.n, 'exercise') + ' improved.' : '') + '</p></div><ul class="cmp">';
-    c.rows.forEach(function (r) { h += '<li><span class="txt"><b>' + esc(r.name) + '</b><small>' + esc(r.sets) + '</small></span><span class="delta ' + r.st + '">' + DELTA_IC[r.st] + esc(r.label) + '</span></li>'; });
-    h += '</ul>';
+    var down = c.rows.filter(function (r) { return r.st === 'down'; }).length, fold = !down && c.rows.length > 2 && !sumAll;
+    var h = '<div class="spread"><div><h3>' + (c.n && !sporty ? c.up + ' of ' + c.n + ' improved' : 'Compared with last time') + '</h3><p class="sub">Since ' + fmtDate(c.date) + '</p></div>' + (!down && c.rows.length > 2 ? '<button class="act" type="button" data-act="sum-all">' + (sumAll ? 'Hide' : 'Show all') + '</button>' : '') + '</div>';
+    if (!fold) { h += '<ul class="cmp">'; c.rows.forEach(function (r) { h += '<li><span class="txt"><b>' + esc(r.name) + '</b><small>' + esc(r.sets) + '</small></span><span class="delta ' + r.st + '">' + DELTA_IC[r.st] + esc(r.label) + '</span></li>'; }); h += '</ul>'; }
     if (s.volRec) h += '<div class="pills"><span class="pill hot">' + IC.star + 'Most weight lifted in ' + esc(/^[aeiou]/i.test(s.name) ? 'an ' : 'a ') + esc(s.name) + ' workout</span></div>';
     if (sporty) return h + '<p class="note"><b>Next time.</b> Match today, or go a little further.</p>';
     h += '<p class="note"><b>Next time.</b> ' + (c.next.length ? esc(c.next.slice(0, 3).join('. ')) + (c.next.length > 3 ? ', and ' + (c.next.length - 3) + ' more.' : '.') : 'The weights stay as they are. Aim for one more rep where you can.') + '</p>';
@@ -240,10 +241,10 @@
     else txt = (g.far ? 'At your pace ' + goalT + ' is more than two years away. ' : 'At your pace you reach ' + goalT + ' around ' + aboutWhen(g.etaPace) + '. ') + (g.st === 'on' ? '' : target) +
       (g.st === 'fast' ? (g.dir > 0 ? ' Gaining faster than the target tends to add more fat than muscle.' : ' Losing faster than the target makes it harder to keep muscle.') : '');
     var pace = g.pace == null ? '–' : (g.pace >= 0 ? '+' : '−') + fmt(Math.abs(Math.round(g.pace * 100) / 100));
-    var h = '<section class="card"><div class="spread"><h3>Body weight goal</h3>' + (ST[1] ? '<span class="pill ' + ST[0] + '">' + ST[1] + '</span>' : '') + '</div>' +
-      '<div class="goal-head"><b>' + (g.st === 'done' ? fmt(Math.round(g.now * 10) / 10) + ' ' + UW() + '' : fmt(Math.round(g.left * 10) / 10) + ' ' + UW() + ' to ' + (g.dir > 0 ? 'gain' : 'lose')) + '</b><span>' + fmt(Math.round(g.now * 10) / 10) + ' ' + UW() + ' now, goal ' + goalT + (g.pace == null ? '' : ', ' + pace + ' ' + UW() + ' a week over the last ' + Math.round(g.days / 7) + ' weeks') + '</span></div>';
+    var h = '<section class="card"><div class="spread"><h3>Body weight goal</h3><span class="row">' + (ST[1] ? '<span class="pill ' + ST[0] + '">' + ST[1] + '</span>' : '') + '<button class="act" type="button" data-act="goal-open">Edit</button></span></div>' +
+      '<div class="goal-head"><b>' + (g.st === 'done' ? fmt(Math.round(g.now * 10) / 10) + ' ' + UW() + '' : fmt(Math.round(g.left * 10) / 10) + ' ' + UW() + ' to ' + (g.dir > 0 ? 'gain' : 'lose')) + '</b><span>7-day average ' + fmt(Math.round(g.now * 10) / 10) + ' ' + UW() + ', goal ' + goalT + (g.pace == null ? '' : ', ' + pace + ' ' + UW() + ' a week over the last ' + Math.round(g.days / 7) + ' weeks') + '</span></div>';
     if (g.st !== 'done') h += '<div class="chart" data-chart="goal">' + goalChart('goal', pts, trend, g) + '</div><div class="legend"><span><i class="ln-k"></i>7-day average</span>' + (g.etaPace ? '<span><i class="ln-k dash"></i>At your pace</span>' : '') + (g.etaRate ? '<span><i class="ln-k dash grey"></i>At the target pace</span>' : '') + '</div>';
     h += '<p class="sub">' + esc(txt) + '</p>';
     var wn = waistNote(state.body); if (wn) h += '<p class="note">' + esc(wn) + '</p>';
-    return h + '<p class="foot">“Now” is the average of your last seven days. The goal and the target pace are in settings.</p></section>';
+    return h + '</section>';
   }
