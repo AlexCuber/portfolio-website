@@ -441,6 +441,7 @@
       case 'lift-sets': state.ui.liftSets = a.dataset.v; saveLocal(); render(); enter(); break;
       case 'lift-view': state.ui.liftView = a.dataset.v; saveLocal(); render(); enter(); break;
       case 'lift-grp': state.ui.liftGrp = a.dataset.v; saveLocal(); render(); enter(); break;
+      case 'lift-range': state.ui.liftRange = a.dataset.v; saveLocal(); render(); enter(); break;
       case 'lift-pct': state.ui.liftPct = !state.ui.liftPct; saveLocal(); render(); enter(); break;
       case 'lift-line': liftLine(a.dataset.g, a.dataset.ex); break;
       case 'pb-week': pbWeek = pbWeek === a.dataset.v ? null : a.dataset.v; render(); break;

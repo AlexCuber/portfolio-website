@@ -474,8 +474,8 @@
     if (hasBest) s += '<circle class="bestdot" r="' + (bars ? 4.5 : 7.5) + '" cx="' + P[opt.best][0].toFixed(1) + '" cy="' + P[opt.best][1].toFixed(1) + '"/>';
     if (!bars) s += '<circle class="halo" r="5" style="fill:url(#' + id + '-l)" cx="' + e[0] + '" cy="' + e[1] + '"/><circle class="dot end" r="5" style="fill:url(#' + id + '-l)" cx="' + e[0] + '" cy="' + e[1] + '"/>';
     s += '<text class="val" x="' + (e[0] + (bars ? bw / 2 + 6 : 10)) + '" y="' + (e[1] + 4) + '">' + (opt.end ? opt.end(last) : opt.fmt ? opt.fmt(last) : fmt(Math.round(last * 10) / 10)) + '</text>';
-    s += '<text x="' + P[0][0] + '" y="' + (H - 6) + '" text-anchor="' + (P.length > 1 ? 'start' : 'middle') + '">' + fmtDate(pts[0].x, true) + '</text>';
-    if (P.length > 1) s += '<text x="' + e[0] + '" y="' + (H - 6) + '" text-anchor="end">' + fmtDate(pts[pts.length - 1].x, true) + '</text>';
+    s += '<text x="' + P[0][0] + '" y="' + (H - 6) + '" text-anchor="' + (P.length > 1 ? 'start' : 'middle') + '">' + axDate(pts[0].x, pts[pts.length - 1].x) + '</text>';
+    if (P.length > 1) s += '<text x="' + e[0] + '" y="' + (H - 6) + '" text-anchor="end">' + axDate(pts[pts.length - 1].x, pts[0].x) + '</text>';
     s += '</svg><div class="tip" id="' + id + '-t" hidden></div>';
     charts[id] = { type: 'line', P: P, pts: pts, W: W, XP: XP, extra: extra };
     return s;
@@ -516,21 +516,29 @@
   }
   function topSet(e, sets, mode) { return bestSet(e, sets, mode || 'e1rm'); }
   /* one square per day, greener the more sets were logged, like a contribution graph */
+  /* a date under a graph; the year is added when the graph runs across a new year */
+  function axDate(d, other) { return fmtDate(d, true) + (d.slice(0, 4) !== other.slice(0, 4) ? ' ' + d.slice(2, 4) : ''); }
+  var CAL_MIN = 26, CAL_MAX = 157, calX = null;
   function calendar(list) {
-    var W = 16, ws = weekStart(today()), start = addDays(ws, -7 * (W - 1)), sets = {}, h = '', months = '', lastM = -1;
+    var ws = weekStart(today()), sets = {}, h = '', months = '', lastM = -1, lastY = null;
     list.forEach(function (s) { sets[s.date] = (sets[s.date] || 0) + Math.max(1, countSets(s)); });
+    var first = list.length ? weekStart(list[0].date) : ws, W = Math.max(CAL_MIN, Math.min(CAL_MAX, Math.round((toDate(ws) - toDate(first)) / 6048e5) + 1));
+    var start = addDays(ws, -7 * (W - 1));
     for (var w = 0; w < W; w++) {
-      var wk = addDays(start, w * 7), mo = toDate(addDays(wk, 6)).getMonth();
-      months += '<span>' + (mo !== lastM ? MONTHS[mo] : '') + '</span>'; lastM = mo;
+      var wk = addDays(start, w * 7), end = toDate(addDays(wk, 6)), mo = end.getMonth(), yr = end.getFullYear();
+      /* the year is written at each January, and at the left edge of a strip that goes back past this year */
+      months += '<span>' + (mo !== lastM ? MONTHS[mo] + (lastY != null && yr !== lastY ? ' ' + String(yr).slice(2) : '') : '') + '</span>'; lastM = mo; lastY = yr;
       for (var d = 0; d < 7; d++) {
         var dt = addDays(wk, d), n = sets[dt] || 0, lv = n >= 20 ? 4 : n >= 14 ? 3 : n >= 8 ? 2 : n > 0 ? 1 : 0;
-        h += '<i class="' + (dt > today() ? 'future' : (lv ? 'on l' + lv : '')) + (dt === today() ? ' now' : '') + '"' + (lv ? ' style="--w:' + w + '" title="' + fmtDate(dt) + ': ' + n + ' sets"' : '') + '></i>';
+        h += '<i class="' + (dt > today() ? 'future' : (lv ? 'on l' + lv : '')) + (dt === today() ? ' now' : '') + '"' + (lv ? ' style="--w:' + Math.max(0, w - (W - 22)) + '" title="' + fmtDate(dt) + (dt.slice(0, 4) !== today().slice(0, 4) ? ' ' + dt.slice(0, 4) : '') + ': ' + n + ' sets"' : '') + '></i>';
       }
     }
     var days = list.filter(function (s) { return s.date >= start; }).length;
-    return '<div class="cal" role="img" aria-label="' + days + ' workouts in the last ' + W + ' weeks"><span></span><div class="cal-months">' + months + '</div>' +
-      '<div class="cal-rows"><span>Mon</span><span></span><span>Wed</span><span></span><span>Fri</span><span></span><span>Sun</span></div><div class="cal-grid">' + h + '</div></div>';
+    return '<div class="cal" role="img" aria-label="' + days + ' workouts in the last ' + W + ' weeks"><div class="cal-rows"><span>Mon</span><span></span><span>Wed</span><span></span><span>Fri</span><span></span><span>Sun</span></div>' +
+      '<div class="cal-scroll" id="cal-scroll" style="--weeks:' + W + '"><div class="cal-months">' + months + '</div><div class="cal-grid">' + h + '</div></div></div>';
   }
+  /* the strip opens on today and stays where it was slid to while the page redraws */
+  function calPlace() { var el = document.getElementById('cal-scroll'); if (!el) return; el.scrollLeft = calX == null ? el.scrollWidth : calX; el.onscroll = function () { calX = el.scrollLeft >= el.scrollWidth - el.clientWidth - 2 ? null : el.scrollLeft; }; }
   function muscleBars(list) {
     var md = musData(list), got = md.got, h = '', plan = md.plan;
     var rows = LIBRARY.MUSCLES.filter(function (m) { return plan[m.id] || got[m.id]; }), free = 10;
@@ -637,10 +645,11 @@
     var units = {}; rs.forEach(function (r) { units[metricUnit(r.e)] = 1; });
     var mixed = Object.keys(units).length > 1, pct = mixed || !!state.ui.liftPct, anyWr = rs.some(function (r) { return r.e.log === 'wr'; }), unit = pct ? '%' : metricUnit(rs[0].e);
     if (!anyWr && mode === 'e1rm') mode = 'max';
-    var sers = [];
+    var sers = [], firstDate = null;
     rs.forEach(function (r) {
       if (show[r.id] == null) return;
-      var first = null, pts = historyOf(r.id, list).map(function (x) { var v = liftVal(r.e, x.sets, mode, x.warm); if (first == null && v > 0) first = v; return { x: x.date, raw: v, y: pct ? (first ? Math.round((v / first - 1) * 1000) / 10 : 0) : v }; });
+      var full = historyOf(r.id, list); if (full.length && (!firstDate || full[0].date < firstDate)) firstDate = full[0].date;
+      var first = null, pts = inRange(full).map(function (x) { var v = liftVal(r.e, x.sets, mode, x.warm); if (first == null && v > 0) first = v; return { x: x.date, raw: v, y: pct ? (first ? Math.round((v / first - 1) * 1000) / 10 : 0) : v }; });
       sers.push({ id: r.id, name: r.name, slot: show[r.id], e: r.e, pts: pts });
     });
     var h = '<div class="chips" role="group" aria-label="Muscle group">' + groups.map(function (x) { return '<button class="chip" type="button" data-act="lift-grp" data-v="' + esc(x) + '" aria-pressed="' + (x === g) + '">' + esc(x) + '</button>'; }).join('') + '</div>';
@@ -650,6 +659,7 @@
     }).join('') + '</div>';
     if (liftInfo) h += '<p class="note">One line per exercise, up to ' + LIFT_MAX + ' at a time. Tap a name to hide or show its line.' + (pct ? ' The change is measured from each exercise\'s first logged workout, so light and heavy lifts can be compared.' : '') + (mixed ? ' These exercises are measured in different units, so only the change can be shown.' : '') + (mode === 'tot' ? ' Total is weight × reps added up over every set that day.' : '') + ' Tap the graph to see a day.</p>';
     h += sers.length ? '<div class="chart" data-chart="mus">' + multiChart('mus', sers, { pct: pct, unit: unit }) + '</div>' : '<p class="sub" style="padding:36px 0;text-align:center">Tap a name to show its line.</p>';
+    h += rangePills(firstDate);
     h += '<div class="opt-row">' + modePills(anyWr) + (mixed ? '<span class="opt-note">Change since the start, %</span>' : pctPill(pct)) + '</div>';
     return h;
   }
@@ -677,8 +687,8 @@
     if (ends.length && ends[ends.length - 1].y > H - m.b) { ends[ends.length - 1].y = H - m.b; for (i = ends.length - 2; i >= 0; i--) if (ends[i + 1].y - ends[i].y < gap) ends[i].y = ends[i + 1].y - gap; }
     ends.forEach(function (q) { s += '<text class="val" x="' + (q.x + 9).toFixed(1) + '" y="' + (q.y + 4).toFixed(1) + '">' + q.t + '</text>'; });
     var ds = Object.keys(dates).sort();
-    s += '<text x="' + X(x0) + '" y="' + (H - 6) + '" text-anchor="' + (x1 === x0 ? 'middle' : 'start') + '">' + fmtDate(ds[0], true) + '</text>';
-    if (x1 !== x0) s += '<text x="' + X(x1) + '" y="' + (H - 6) + '" text-anchor="end">' + fmtDate(ds[ds.length - 1], true) + '</text>';
+    s += '<text x="' + X(x0) + '" y="' + (H - 6) + '" text-anchor="' + (x1 === x0 ? 'middle' : 'start') + '">' + axDate(ds[0], ds[ds.length - 1]) + '</text>';
+    if (x1 !== x0) s += '<text x="' + X(x1) + '" y="' + (H - 6) + '" text-anchor="end">' + axDate(ds[ds.length - 1], ds[0]) + '</text>';
     s += '</svg><div class="tip" id="' + id + '-t" hidden></div>';
     charts[id] = { type: 'multi', W: W, top: m.t, cols: ds.map(function (d) {
       var rows = []; sers.forEach(function (se) { se.pts.forEach(function (p) { if (p.x === d) rows.push('<span class="trow"><i style="background:var(--cat-' + (se.slot + 1) + ')"></i>' + esc(se.name) + ' · ' + val(p, se.e) + '</span>'); }); });
@@ -691,6 +701,16 @@
     var mode = liftModeNow(), opts = anyWr ? [['max', 'Top weight'], ['e1rm', 'Est. 1RM'], ['tot', 'Total']] : [['max', 'Best set'], ['tot', 'Total']];
     if (!anyWr && mode === 'e1rm') mode = 'max';
     return '<div class="mseg" role="group" aria-label="What to measure">' + opts.map(function (o) { return '<button class="opt" type="button" data-act="lift-mode" data-v="' + o[0] + '" aria-pressed="' + (mode === o[0]) + '">' + o[1] + '</button>'; }).join('') + '</div>';
+  }
+  /* How far back the exercise graphs go. Only the ranges shorter than the data are offered. */
+  var RANGES = [['3m', '3M', 92], ['6m', '6M', 183], ['1y', '1Y', 366], ['all', 'All', 0]];
+  function rangeCut() { var r = RANGES.filter(function (x) { return x[0] === state.ui.liftRange; })[0]; return r && r[2] ? addDays(today(), -r[2]) : null; }
+  function inRange(hist) { var c = rangeCut(); if (!c) return hist; var out = hist.filter(function (x) { return x.date >= c; }); return out.length ? out : hist.slice(-1); }
+  function rangePills(firstDate) {
+    var span = firstDate ? Math.round((toDate(today()) - toDate(firstDate)) / 864e5) : 0, opts = RANGES.filter(function (r) { return !r[2] || r[2] < span; }), cur = state.ui.liftRange || 'all';
+    if (opts.length < 2) return '';
+    if (!opts.some(function (r) { return r[0] === cur; })) cur = 'all';
+    return '<div class="opt-row"><div class="mseg" role="group" aria-label="Time range">' + opts.map(function (r) { return '<button class="opt" type="button" data-act="lift-range" data-v="' + r[0] + '" aria-pressed="' + (r[0] === cur) + '">' + r[1] + '</button>'; }).join('') + '</div></div>';
   }
   function pctPill(on) { return '<button class="opt solo end" type="button" data-act="lift-pct" aria-pressed="' + on + '" aria-label="Show the change since the start in percent">%</button>'; }
   /* every time an exercise beat its own best, oldest first; the first time an exercise is logged is not a record */
@@ -755,7 +775,7 @@
     var exId = state.ui.ex && historyOf(state.ui.ex, list).length ? state.ui.ex : null;
     if (!exId && recs.length) { var byDate = recs.slice().sort(function (a, b) { return a.lastDate < b.lastDate ? 1 : -1; }); exId = byDate[0].id; routineList().some(function (r) { return r.items.some(function (it) { if (historyOf(it.ex, list).length) { exId = it.ex; return true; } return false; }); }); }
     if (!exId) return '<p class="empty">Log a workout and your lifts appear here.</p>';
-    var e = exi(exId), hist = historyOf(exId, list), wr = e.log === 'wr', pct = !!state.ui.liftPct, em = wr ? mode : (mode === 'tot' ? 'tot' : 'max'), unit = metricUnit(e);
+    var e = exi(exId), histAll = historyOf(exId, list), hist = inRange(histAll), wr = e.log === 'wr', pct = !!state.ui.liftPct, em = wr ? mode : (mode === 'tot' ? 'tot' : 'max'), unit = metricUnit(e);
     var onGraph = state.ui.liftSets === 'graph' && em !== 'tot' && !pct, extra = [];
     if (onGraph) hist.forEach(function (x) {
       var by = {};
@@ -788,6 +808,7 @@
       h += '<div class="chart" data-chart="exc">' + lineChart('exc', hist.map(function (x, i) {
         return { x: x.date, y: pct ? ch(vals[i]) : vals[i], tip: '<b>' + fmtDate(x.date) + '</b><br>' + esc(setsText(e, onGraph ? [bestSet(e, x.sets, em)] : x.sets)) + (em === 'tot' ? '<br>Total ' + big(vals[i]) + ' ' + unit : '') + (pct ? '<br>' + sg(ch(vals[i])) + ' since the start' : '') + (i === bi && vals.length > 1 ? '<br>Your best' : '') };
       }), null, { up: true, extra: extra, bars: em === 'tot' && !pct, best: bi, fmt: pct ? function (t) { return fmt(t) + '%'; } : function (t) { return t >= 1000 ? (t / 1000) + 'K' : fmt(t); }, end: pct ? sg : big }) + '</div>';
+      h += rangePills(histAll[0].date);
       h += '<div class="opt-row">' + (em !== 'tot' && !pct ? '<button class="opt solo" type="button" data-act="lift-sets" data-v="' + (onGraph ? 'off' : 'graph') + '" aria-pressed="' + onGraph + '">All sets</button>' : '') + pctPill(pct) + '</div>';
       h += '</section>';
     }
@@ -1043,7 +1064,7 @@
     var full = wLive() && !state.ui.wmin && tab === 'log' && !editor && !su && !wait && !lost, mini = wLive() && !full && !su && !wait && !editor && !lost;
     document.body.classList.toggle('in-workout', full); document.body.classList.toggle('has-mini', mini);
     document.getElementById('wmini').hidden = !mini;
-    chrome(); observe(); if (mini) drawMini();
+    chrome(); observe(); if (mini) drawMini(); calPlace();
   }
   function go(tab, push) {
     planEdit = false; outEdit = false; delMode = null; if (wLive() && tab !== 'log') state.ui.wmin = true; state.ui.tab = tab; saveLocal(); render(); enter(); window.scrollTo(0, 0);
